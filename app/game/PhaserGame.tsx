@@ -1267,7 +1267,7 @@ const SPECIES = [
   {
     label: 'DINO',
     desc: 'Fierce hunter',
-    stageNames:  ['Egg', 'Hatchling', 'Saurling', 'Raptus', 'Tyranex', 'Goraxis'],
+    stageNames:  ['Egg', 'Nubclaw', 'Saurling', 'Raptus', 'Tyranex', 'Goraxis'],
     stageColors: [0xd4c5f9, 0x77dd66, 0x44aa55, 0x4488cc, 0xcc4422, 0xff66dd],
     stagePulse:  [0xeeeeff, 0xaaff99, 0x88dd77, 0x77bbdd, 0xff8844, 0xffbbff],
     draw: drawDino,
