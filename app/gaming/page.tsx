@@ -127,16 +127,16 @@ export default function GamingPage() {
                 Play the demo
               </Link>
               <Link
-                href="/#join"
+                href="#devlog"
                 className="rounded-xl border border-white/30 px-6 py-3 font-black uppercase tracking-widest text-white transition hover:bg-white/10"
               >
-                Get devlog updates
+                Read the devlog
               </Link>
             </div>
           </div>
 
           {/* ───────── RC DEVLOG ───────── */}
-          <div className="rounded-3xl border border-lime-400/30 bg-gradient-to-br from-lime-500/10 via-cyan-500/5 to-transparent p-6 sm:p-10">
+          <div id="devlog" className="scroll-mt-24 rounded-3xl border border-lime-400/30 bg-gradient-to-br from-lime-500/10 via-cyan-500/5 to-transparent p-6 sm:p-10">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="font-display text-xs tracking-[0.3em] text-lime-400">
