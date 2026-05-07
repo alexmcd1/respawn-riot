@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 
 export const metadata: Metadata = {
@@ -273,46 +274,72 @@ export default async function OrlandoPage() {
             {"Live weather + NWS alerts, what's moving at Disney and Universal, and how messy I-75 and the Turnpike are right now."}
           </p>
 
-          {/* Live weather strip */}
-          <div className="mt-8 grid gap-4 rounded-2xl border border-orange-400/30 bg-gradient-to-br from-orange-500/15 via-fuchsia-500/10 to-transparent p-5 sm:grid-cols-4">
-            <div>
-              <p className="font-display text-xs tracking-[0.3em] text-orange-300">
-                NOW IN ORLANDO
-              </p>
-              <p className="mt-1 font-display text-5xl tracking-tight">
-                {tempF !== null ? `${tempF}°F` : "—"}
-              </p>
-              <p className="mt-1 text-sm text-white/75">
-                {obs?.textDescription ?? "Conditions unavailable"}
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-2 sm:col-span-2 sm:grid-cols-3">
-              <div className="rounded-lg border border-white/10 bg-black/40 p-3">
-                <p className="text-[10px] uppercase tracking-[0.25em] text-orange-300">Humidity</p>
-                <p className="mt-1 font-display text-xl">
-                  {humidity !== null ? `${humidity}%` : "—"}
-                </p>
+          {/* Live weather strip — or Kid Ghost fallback if NWS is down */}
+          {tempF === null && !today ? (
+            <div className="mt-8 grid items-center gap-5 rounded-2xl border border-fuchsia-500/40 bg-gradient-to-br from-fuchsia-500/15 to-transparent p-5 sm:grid-cols-[120px_1fr]">
+              <div className="relative mx-auto h-28 w-28 overflow-hidden rounded-xl border border-fuchsia-500/40 bg-black sm:mx-0">
+                <Image
+                  src="/mascot/animated.gif"
+                  alt="The Kid Ghost"
+                  fill
+                  sizes="120px"
+                  className="object-cover"
+                  unoptimized
+                />
               </div>
-              <div className="rounded-lg border border-white/10 bg-black/40 p-3">
-                <p className="text-[10px] uppercase tracking-[0.25em] text-orange-300">Wind</p>
-                <p className="mt-1 font-display text-xl">
-                  {windMph !== null ? `${windMph} mph` : "—"}
+              <div>
+                <p className="font-display text-xs tracking-[0.3em] text-fuchsia-300">
+                  ▌ SIGNAL LOST
                 </p>
-              </div>
-              <div className="col-span-2 rounded-lg border border-white/10 bg-black/40 p-3 sm:col-span-1">
-                <p className="text-[10px] uppercase tracking-[0.25em] text-orange-300">Today</p>
-                <p className="mt-1 truncate font-display text-base">
-                  {today ? `${today.temperature}°${today.temperatureUnit} · ${today.shortForecast}` : "—"}
+                <p className="mt-2 font-display text-2xl tracking-wide">
+                  {"NWS isn't talking right now."}
+                </p>
+                <p className="mt-2 text-sm text-white/70">
+                  {"can't reach api.weather.gov. it'll cycle back next page load. —kg"}
                 </p>
               </div>
             </div>
-            <div className="text-xs text-white/55 sm:text-right">
-              <p className="font-display tracking-[0.2em] text-white/70">SOURCE</p>
-              <p className="mt-1">National Weather Service (NWS)</p>
-              <p className="mt-1">KMCO • MLB grid 26,68</p>
-              <p className="mt-1">Updates every 10 min</p>
+          ) : (
+            <div className="mt-8 grid gap-4 rounded-2xl border border-orange-400/30 bg-gradient-to-br from-orange-500/15 via-fuchsia-500/10 to-transparent p-5 sm:grid-cols-4">
+              <div>
+                <p className="font-display text-xs tracking-[0.3em] text-orange-300">
+                  NOW IN ORLANDO
+                </p>
+                <p className="mt-1 font-display text-5xl tracking-tight">
+                  {tempF !== null ? `${tempF}°F` : "—"}
+                </p>
+                <p className="mt-1 text-sm text-white/75">
+                  {obs?.textDescription ?? "Conditions unavailable"}
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-2 sm:col-span-2 sm:grid-cols-3">
+                <div className="rounded-lg border border-white/10 bg-black/40 p-3">
+                  <p className="text-[10px] uppercase tracking-[0.25em] text-orange-300">Humidity</p>
+                  <p className="mt-1 font-display text-xl">
+                    {humidity !== null ? `${humidity}%` : "—"}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-white/10 bg-black/40 p-3">
+                  <p className="text-[10px] uppercase tracking-[0.25em] text-orange-300">Wind</p>
+                  <p className="mt-1 font-display text-xl">
+                    {windMph !== null ? `${windMph} mph` : "—"}
+                  </p>
+                </div>
+                <div className="col-span-2 rounded-lg border border-white/10 bg-black/40 p-3 sm:col-span-1">
+                  <p className="text-[10px] uppercase tracking-[0.25em] text-orange-300">Today</p>
+                  <p className="mt-1 truncate font-display text-base">
+                    {today ? `${today.temperature}°${today.temperatureUnit} · ${today.shortForecast}` : "—"}
+                  </p>
+                </div>
+              </div>
+              <div className="text-xs text-white/55 sm:text-right">
+                <p className="font-display tracking-[0.2em] text-white/70">SOURCE</p>
+                <p className="mt-1">National Weather Service (NWS)</p>
+                <p className="mt-1">KMCO • MLB grid 26,68</p>
+                <p className="mt-1">Updates every 10 min</p>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </section>
 

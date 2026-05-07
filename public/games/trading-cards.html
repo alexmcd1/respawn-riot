@@ -73,9 +73,10 @@
   .coll-emoji{font-size:28px;}
   .coll-name{font-family:'Bebas Neue',sans-serif;font-size:11px;letter-spacing:.5px;color:#fff;margin-top:4px;word-break:break-word;line-height:1.2;}
   .coll-count{position:absolute;top:4px;right:4px;background:rgba(0,0,0,.6);color:#fff;font-size:10px;font-weight:700;border-radius:8px;padding:1px 5px;}
-  .empty-state{text-align:center;color:#4b4670;padding:40px 20px;grid-column:1/-1;}
-  .empty-state-icon{font-size:48px;margin-bottom:12px;}
-  .empty-state-text{font-size:15px;}
+  .empty-state{text-align:center;color:#a39bc8;padding:32px 20px;grid-column:1/-1;display:flex;flex-direction:column;align-items:center;gap:10px;}
+  .empty-state-mascot{width:120px;height:120px;border-radius:14px;border:1px solid rgba(168,85,247,.4);box-shadow:0 0 24px rgba(168,85,247,.25);object-fit:cover;background:#000;}
+  .empty-state-text{font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:2px;color:#e8e0ff;}
+  .empty-state-sub{font-size:12px;color:#8b7fc7;letter-spacing:1px;}
   .pack-one-piece{background:linear-gradient(135deg,#1a0a00,#3d1a00);}
   .pack-jjk{background:linear-gradient(135deg,#0a0a1a,#1a0033);}
   .pack-pokemon{background:linear-gradient(135deg,#001a00,#003300);}
@@ -521,7 +522,7 @@ function renderSellGrid(){
     return o[a.rarity]-o[b.rarity];
   });
   if(cards.length===0){
-    document.getElementById('sell-grid').innerHTML='<div class="empty-state"><div class="empty-state-icon">📦</div><div class="empty-state-text">No cards to sell. Open some packs first!</div></div>';
+    document.getElementById('sell-grid').innerHTML='<div class="empty-state"><img class="empty-state-mascot" src="/mascot/animated.gif" alt="Kid Ghost"><div class="empty-state-text">NO CARDS TO SELL</div><div class="empty-state-sub">open a pack first. —kg</div></div>';
     return;
   }
   document.getElementById('sell-grid').innerHTML=cards.map(c=>{
@@ -560,7 +561,7 @@ function openYourPicker(){
       <div class="market-price" style="color:${RARITY_COLOR[c.rarity]}">${RARITY_LABEL[c.rarity]}</div>
       <div style="font-size:9px;color:#8b7fc7">×${c.count} owned</div>
     </div>`).join('');
-  if(cards.length===0)grid.innerHTML='<div class="empty-state"><div class="empty-state-icon">🃏</div><div class="empty-state-text">No cards yet!</div></div>';
+  if(cards.length===0)grid.innerHTML='<div class="empty-state"><img class="empty-state-mascot" src="/mascot/animated.gif" alt="Kid Ghost"><div class="empty-state-text">COLLECTION AT 0%</div><div class="empty-state-sub">go open something. —kg</div></div>';
   document.getElementById('swap-picker').style.display='block';
 }
 
@@ -697,7 +698,7 @@ function renderCollection(filter){
   document.getElementById('coll-total').textContent=`${cards.length} unique · ${cards.reduce((a,c)=>a+c.count,0)} total`;
   const sorted=cards.sort((a,b)=>({secret:0,legendary:1,epic:2,rare:3,common:4}[a.rarity]-{secret:0,legendary:1,epic:2,rare:3,common:4}[b.rarity]));
   document.getElementById('coll-grid').innerHTML=sorted.length===0
-    ?'<div class="empty-state"><div class="empty-state-icon">🃏</div><div class="empty-state-text">No cards. Open some packs!</div></div>'
+    ?'<div class="empty-state"><img class="empty-state-mascot" src="/mascot/animated.gif" alt="Kid Ghost"><div class="empty-state-text">NO CARDS HERE</div><div class="empty-state-sub">open some packs first. —kg</div></div>'
     :sorted.map(c=>`<div class="coll-card rarity-${c.rarity}">
       <div class="coll-count">×${c.count}</div>
       <div class="coll-emoji">${c.emoji}</div>

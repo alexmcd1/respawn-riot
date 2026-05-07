@@ -316,13 +316,14 @@ export default function Home() {
 
       <footer className="relative border-t border-white/10 px-6 py-10 text-center text-sm text-white/50">
         <div className="mx-auto flex max-w-3xl flex-col items-center gap-4">
-          <div className="relative h-16 w-16">
+          <div className="relative h-20 w-20 overflow-hidden rounded-xl border border-fuchsia-500/40 bg-black shadow-[0_0_24px_rgba(217,70,239,0.35)]">
             <Image
-              src="/mascot/sticker.png"
+              src="/mascot/animated.gif"
               alt="The Kid Ghost"
               fill
-              sizes="64px"
-              className="object-contain opacity-90"
+              sizes="80px"
+              className="object-cover"
+              unoptimized
             />
           </div>
           <p className="font-display tracking-[0.25em]">© 2026 RESPAWN/RIOT</p>
