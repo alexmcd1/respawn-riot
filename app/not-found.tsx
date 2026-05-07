@@ -26,13 +26,12 @@ export default function NotFound() {
           </span>
           <div className="relative aspect-square w-full overflow-hidden rounded-2xl border border-fuchsia-500/40 bg-black shadow-[0_0_50px_rgba(217,70,239,0.35)]">
             <Image
-              src="/mascot/animated.gif"
-              alt="The Kid Ghost looking tired"
+              src="/mascot/battery.jpg"
+              alt="The Kid Ghost holding coffee with a battery-at-4% indicator"
               fill
               sizes="(min-width: 768px) 360px, 320px"
               className="object-cover"
               priority
-              unoptimized
             />
           </div>
         </div>

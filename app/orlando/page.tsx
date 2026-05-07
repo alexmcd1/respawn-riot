@@ -279,12 +279,11 @@ export default async function OrlandoPage() {
             <div className="mt-8 grid items-center gap-5 rounded-2xl border border-fuchsia-500/40 bg-gradient-to-br from-fuchsia-500/15 to-transparent p-5 sm:grid-cols-[120px_1fr]">
               <div className="relative mx-auto h-28 w-28 overflow-hidden rounded-xl border border-fuchsia-500/40 bg-black sm:mx-0">
                 <Image
-                  src="/mascot/animated.gif"
-                  alt="The Kid Ghost"
+                  src="/mascot/battery.jpg"
+                  alt="The Kid Ghost — battery at 4%"
                   fill
                   sizes="120px"
                   className="object-cover"
-                  unoptimized
                 />
               </div>
               <div>
