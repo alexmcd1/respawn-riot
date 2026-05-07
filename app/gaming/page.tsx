@@ -152,34 +152,56 @@ export default function GamingPage() {
             </div>
 
             <ol className="mt-8 space-y-6">
-              {devlogPosts.map((post) => (
-                <li
-                  key={post.issue}
-                  className="grid gap-4 rounded-2xl border border-white/10 bg-black/40 p-5 sm:grid-cols-[120px_1fr] sm:p-6"
-                >
-                  <div className="flex sm:flex-col sm:items-start sm:gap-1 items-baseline gap-3">
-                    <span className="font-display text-3xl tracking-wider text-lime-300">
-                      #{post.issue}
-                    </span>
-                    <span className="font-mono text-xs text-white/50">
-                      {post.date}
-                    </span>
-                    <span className="ml-auto rounded border border-lime-400/40 px-2 py-0.5 font-display text-[10px] tracking-[0.2em] text-lime-300 sm:ml-0">
-                      {post.tag}
-                    </span>
-                  </div>
-                  <div>
-                    <h3 className="font-display text-xl tracking-wide text-white">
-                      {post.title}
-                    </h3>
-                    <div className="mt-3 space-y-2 text-sm leading-6 text-white/75">
-                      {post.body.map((p, i) => (
-                        <p key={i}>{p}</p>
-                      ))}
+              {devlogPosts.map((post) => {
+                const id = post.source === "manual" ? `m-${post.issue}` : `g-${post.sha}`;
+                return (
+                  <li
+                    key={id}
+                    className="grid gap-4 rounded-2xl border border-white/10 bg-black/40 p-5 sm:grid-cols-[140px_1fr] sm:p-6"
+                  >
+                    <div className="flex items-baseline gap-3 sm:flex-col sm:items-start sm:gap-1">
+                      {post.source === "manual" ? (
+                        <span className="font-display text-3xl tracking-wider text-lime-300">
+                          #{post.issue}
+                        </span>
+                      ) : (
+                        <a
+                          href={post.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-mono text-base text-lime-300 underline-offset-2 hover:underline"
+                        >
+                          {post.sha}
+                        </a>
+                      )}
+                      <span className="font-mono text-xs text-white/50">
+                        {post.date}
+                      </span>
+                      <span
+                        className={`ml-auto rounded border px-2 py-0.5 font-display text-[10px] tracking-[0.2em] sm:ml-0 ${
+                          post.source === "manual"
+                            ? "border-lime-400/40 text-lime-300"
+                            : "border-cyan-400/40 text-cyan-300"
+                        }`}
+                      >
+                        {post.source === "manual" ? post.tag : "GIT"}
+                      </span>
                     </div>
-                  </div>
-                </li>
-              ))}
+                    <div>
+                      <h3 className="font-display text-xl tracking-wide text-white">
+                        {post.title}
+                      </h3>
+                      <div className="mt-3 space-y-2 text-sm leading-6 text-white/75">
+                        {post.body.length > 0 ? (
+                          post.body.map((p, i) => <p key={i}>{p}</p>)
+                        ) : (
+                          <p className="text-white/40">{"(no body)"}</p>
+                        )}
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
             </ol>
 
             <p className="mt-6 text-xs text-white/45">

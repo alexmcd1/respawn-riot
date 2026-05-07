@@ -1,0 +1,133 @@
+[
+  {
+    "sha": "5621432",
+    "date": "2026-05-07",
+    "title": "Rename dino stage 1: Hatchling -> Nubclaw",
+    "body": [
+      "A bit punchier than the generic Hatchling."
+    ],
+    "url": "https://github.com/alexmcd1/respawn-riot/commit/562143273eef9fb1d772bc0eb53fb1d541830356"
+  },
+  {
+    "sha": "f0f9dd0",
+    "date": "2026-05-07",
+    "title": "Revert 2x-resolution rendering; restore original layout",
+    "body": [
+      "The previous commit doubled the Phaser canvas to 960x640 and used a camera setZoom(2) per scene to fit existing 480x320 coordinates. On some viewports the canvas was rendering tiny in the top-left of its container, so reverting to the safer layout that was working before: - Canvas back to 480x320 internal with pixelArt + roundPixels - Removed cameras.main.setZoom(2) from every scene - Wrapper maxWidth back to 960 with imageRendering: pixelated - Re-enabled the applyCrisp callback for the canvas style",
+      "Will revisit \"sharper graphics\" with a less invasive approach once the layout is stable again."
+    ],
+    "url": "https://github.com/alexmcd1/respawn-riot/commit/f0f9dd0982c7a065d5ffc3d2a3512bec92e683f5"
+  },
+  {
+    "sha": "137cbcf",
+    "date": "2026-05-07",
+    "title": "Render at 2x internal resolution with antialiasing for sharper graphics",
+    "body": [
+      "- Phaser canvas backing buffer is now 960x640 (was 480x320). Each scene calls cameras.main.setZoom(2) so all existing 480x320 logical coordinates fill the larger canvas without rewriting any drawing code. Vector primitives (circles, triangles, lines) now have twice the pixel budget for their edges. - Switched from pixelArt + nearest-neighbor scaling to antialias:true with smooth edges. Diagonal lines and curved creature outlines no longer have blocky stair-step aliasing. - Removed the canvas image-rendering: pixelated style and bumped the wrapper div maxWidth from 960 to 1280 so the higher-res canvas can display larger on desktop screens. Mobile stays responsive at 100% width."
+    ],
+    "url": "https://github.com/alexmcd1/respawn-riot/commit/137cbcfd797718591f8095b876adf5030101f84d"
+  },
+  {
+    "sha": "145c7f4",
+    "date": "2026-05-07",
+    "title": "Sleep restores everything; clean two-row HUD on HOME and OVERWORLD",
+    "body": [
+      "- Sleeping now sets HP, FOOD (hunger), and MOOD (happy) all to full and advances the day counter, instead of trickling +happy and *reducing* hunger by 35. - HUD redesigned to a 36-px tall two-row layout (was 26-px crammed): - Row 1: name + level on the left, HP and XP bars in the middle - Row 2: day + stage on the left, FOOD and MOOD bars in the middle - Right side: roomy CODEX, BAG and music buttons, vertically centered in the bar so labels no longer collide - Stat labels renamed to short, readable forms: HP, FOOD, MOOD, XP. Bar labels now sit above each bar instead of crowding to the side, so they never overlap the colored fill. - Floating \"+N STAT\" feedback uses the new label set; eat-and-stat pulse still flashes the matching bar."
+    ],
+    "url": "https://github.com/alexmcd1/respawn-riot/commit/145c7f4e20d212c7545f4b7019ec7405b033999d"
+  },
+  {
+    "sha": "6137f61",
+    "date": "2026-05-07",
+    "title": "Rebalance XP, juicy training & feeding feedback, 5-track soundtrack",
+    "body": [
+      "XP curve now favors exploration: - Training: 10 XP -> 6 XP - Wild battle win: 8-20 XP -> 18+stage*5+rand(0-6) (~24-44) - Boss win: 55 XP -> 80+stage*15 (~95-155 depending on enemy stage)",
+      "Training feel: - Punching bag now visibly swings on each hit (left/right shake) - Burst of golden impact sparks at the bag - Brief camera shake - Floating \"+6 XP\" (and \"+1 MAX HP\" when it lands) appears next to the creature",
+      "Feeding feel: - Eating a fruit shows specific floating text colored by stat: +HP in green, +Hunger in orange, +Happy in pink. The matching stat bar pulses white briefly so you can see the change.",
+      "Soundtrack: - The Theme class now cycles through five tracks back-to-back. After one finishes its melody loop the next track takes over (bass resyncs to the new track). 1. Heroic Adventure (existing) — C major march 2. Mystery — A minor, slow, contemplative 3. Building Storm — A minor, urgent driving rhythm 4. Triumphant March — C major, bold confidence 5. Wonder — C major, slow, dreamlike close"
+    ],
+    "url": "https://github.com/alexmcd1/respawn-riot/commit/6137f6193679713589b78435df4eb0c3973dfb70"
+  },
+  {
+    "sha": "f0d214e",
+    "date": "2026-05-07",
+    "title": "Add on-screen touch controls for mobile play",
+    "body": [
+      "- HOME and OVERWORLD now have an on-screen D-pad (◀ ▶) and a big ACTION button at the bottom of the canvas. Hold the arrows to walk; tap ACTION to interact with the zone you're standing on (eat at the Fruit Tree, train, sleep, open chests, etc.). - Movement buttons set internal touchLeft/touchRight flags that feed the same update() branch as keyboard input, so kbd and touch both work simultaneously. - Backpack, Chest, and Codex overlays each get a tappable ✕ close button in the top-right corner (ESC/B/C still work on desktop). - Bottom hint texts updated since key shortcuts aren't the only controls anymore."
+    ],
+    "url": "https://github.com/alexmcd1/respawn-riot/commit/f0d214e193ab26c3c95fb1c8f895153cb3fc9822"
+  },
+  {
+    "sha": "c8cf2c5",
+    "date": "2026-05-07",
+    "title": "Fix fidget bounce drift; one-tap feeding at the Fruit Tree",
+    "body": [
+      "- Rapid SPACE presses inside the fidget zone stacked overlapping tweens on cGfx. Each new tween captured the (already-shifted) current y as its starting point, so the yoyo never returned to 0 and the creature crept off-screen. Add a resetSprite() helper that kills active tweens and zeros the transform before kicking off a new animation; use absolute (not relative) tween targets. - Picking from the Fruit Tree now eats one fruit immediately (applying the +HP / +Hunger / +Happy effect right away) AND drops an extra in the bag if there's room. The \"[SPACE] EAT\" prompt makes the action obvious so you don't have to open the backpack to feed before training. The \"Too hungry to train\" toast now hints to eat at the Fruit Tree."
+    ],
+    "url": "https://github.com/alexmcd1/respawn-riot/commit/c8cf2c55436ab718484e211fd3a906311ac6e957"
+  },
+  {
+    "sha": "b3630fd",
+    "date": "2026-05-07",
+    "title": "Per-level stat growth, visible level-ups, codex, diverse enemies, stage 5",
+    "body": [
+      "- Levels now gained continuously via XP (xpToLevel = 20 + level*10). Each level grants +3 maxHP, +1 ATK, +1 DEF, and +1 SPD every 2 levels. - Evolution thresholds are level-based: stage 1->2 at L4, 2->3 at L9, 3->4 at L16, 4->5 at L26 (final ascended form). - Visible level-up: camera flash, \"LEVEL UP!\" text rises with sparkle particles, and Theme.chime() plays a triumphant arpeggio. Same treatment in HOME and BATTLE scenes. - New CODEX scene (button on HOME or press C) shows your species' full evolution chain with level requirements, your current stats, XP toward next level, and how leveling works. - Wild enemies now pick a random species (Dino / Water / Lion-Turtle) with themed name pools — no more clones of your own kind. Boss name pool expanded too. - New Stage 5 ascended forms drawn for all three species: - Dino   -> Goraxis    (4-wing apex with crown of horns + crystal) - Water  -> Abyssarus  (three-headed serpent with guardian pearls) - Lion T -> World Turtle (vast guardian with a forest grove on its shell)"
+    ],
+    "url": "https://github.com/alexmcd1/respawn-riot/commit/b3630fdc58f8251d075b73607b6a0a6b33cb861f"
+  },
+  {
+    "sha": "bf2ea35",
+    "date": "2026-05-07",
+    "title": "Make HOME interactive jungle hub; side-scrolling world; inventory & chests",
+    "body": [
+      "HOME is now a retro space jungle where the creature walks around (WASD/Arrows) between five interactive zones: - Fruit Tree (pick berries/apples/herbs into the bag) - Punching Bag with backwards cap (training, +XP, chance of +1 maxHP) - Fidget Rings (play, +happy, chance of crystal drop) - Bed (sleep, advance day, full HP recovery) - Doorway (enter the overworld)",
+      "Overworld is now a side-scrolling map (1440 wide, camera follows). Items lie on the ground to pick up, encounter zones flag where wild battles can trigger, and a boss zone lurks at the right edge. Two chests live along the path.",
+      "Inventory is a 100-slot backpack with a UI scene (B to open). Items can be used directly to apply effects (+5 HP berry, +12 hunger apple, +5 XP crystal, +8 happy herb).",
+      "Chests open a transfer UI letting you move items between chest and backpack one at a time."
+    ],
+    "url": "https://github.com/alexmcd1/respawn-riot/commit/bf2ea357b7feb1debb52dc7d1ddfbcbadb833c45"
+  },
+  {
+    "sha": "e3a349a",
+    "date": "2026-05-07",
+    "title": "Add species picker, water/lion-turtle creatures, theme song, Rest action",
+    "body": [
+      "- Pick screen lets you choose Dino, Water Dragon, or Lion Turtle, each with its own 5-stage evolution drawn from primitives - Dino: Egg -> Hatchling -> Saurling -> Raptus -> Tyranex - Water Dragon: Egg -> Tadrake -> Aquilis -> Hydrabane -> Leviarus - Lion Turtle: Egg -> Cubshell -> Maneshield -> Roarshell -> Lion Turtle - Retro chiptune theme: 16-bar heroic melody (square wave) over a C-G-Am-F bass (triangle wave) via Web Audio, looping continuously. Starts on first tap of the picker; HOME panel has a music toggle. - Rest button on HOME: full HP restore for 25 hunger. - Train now has a 25% chance to also raise max HP by 1, so you can grow HP outside of evolutions."
+    ],
+    "url": "https://github.com/alexmcd1/respawn-riot/commit/e3a349a0b94c95b2cadbafbecbf3b0f1bbabb9d3"
+  },
+  {
+    "sha": "946b5b1",
+    "date": "2026-05-07",
+    "title": "Sharpen rendering, redesign creatures as dino lineage, detail world",
+    "body": [
+      "- pixelArt + roundPixels in Phaser config and image-rendering: pixelated on the canvas so the upscaled 480x320 view stays crisp instead of bilinear-blurry - Dinosaur evolution line: Egg -> Hatchling -> Saurling -> Raptus -> Tyranex with progressively bigger frames, spikes, claws, teeth, and a winged apex form - WorldScene: clear \"<- HOME\" button in the top-right header so you can leave the overworld without knowing the ESC shortcut - Map tiles: layered tree canopies, water ripples + sparkles, shaded rocks with cracks, glowing boss-zone fissures, varied grass with occasional flowers"
+    ],
+    "url": "https://github.com/alexmcd1/respawn-riot/commit/946b5b1d44a2410adf65f5b259a9977abb091f13"
+  },
+  {
+    "sha": "eeb8dbd",
+    "date": "2026-05-07",
+    "title": "Add creature game at /game",
+    "body": [],
+    "url": "https://github.com/alexmcd1/respawn-riot/commit/eeb8dbd1a8aeef924fb43f0dd39b1dcdbb203c80"
+  },
+  {
+    "sha": "41ba395",
+    "date": "2026-05-07",
+    "title": "Wire animated Kid Ghost into 404, Orlando fallback, TDC empty states, footer",
+    "body": [
+      "- New app/not-found.tsx with 'BATTERY AT 4%' framing, animated mascot panel, and back-to-home + play CTAs (catches every broken link) - Orlando page now shows a 'SIGNAL LOST' Kid Ghost panel when NWS weather data fails to load instead of dashes - TDC empty states (sell-grid, collection grid, swap picker) now show the animated mascot with on-brand sub-copy ('open something. —kg') - Homepage footer swaps the static sticker for the animated GIF in a glowing fuchsia frame"
+    ],
+    "url": "https://github.com/alexmcd1/respawn-riot/commit/41ba39571384393b2b1f7d28db9be366ad972574"
+  },
+  {
+    "sha": "7346b46",
+    "date": "2026-05-07",
+    "title": "Add TDC trading card game and real linked content for all sections",
+    "body": [
+      "Hosts A Zoku21's TDC (Trading Digital Cards) at /trading-cards via iframe, adds it to the nav and homepage. Rewrites anime, pop punk, and gaming pages to link real current articles and (for pop punk) real Wikimedia photos of each band."
+    ],
+    "url": "https://github.com/alexmcd1/respawn-riot/commit/7346b4612891d162cfc4c531f1a5cbc4658fb08d"
+  }
+]

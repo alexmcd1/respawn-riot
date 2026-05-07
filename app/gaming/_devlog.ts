@@ -1,18 +1,34 @@
 // RC (Respawn Creatures) devlog posts.
-// To add a new entry: prepend a new object to the array (newest first).
-// `body` is an array of paragraphs — keep them short and punchy.
-// Tags are free-form; common ones: FEATURE, FIX, ART, BALANCE, MILESTONE.
+//
+// TWO SOURCES, MERGED:
+//   1. Manual entries (this file, MANUAL_POSTS below) — for richer
+//      multi-paragraph posts you write deliberately.
+//   2. Auto entries from git history — pulled at build time by
+//      scripts/build-devlog.mjs into _devlog-auto.json.
+//      Includes commits that touched app/game/** or public/games/**,
+//      OR have [devlog] in the subject. Skips [skip devlog].
+//
+// To add a manual entry: prepend to MANUAL_POSTS.
+// To add an auto entry: write a good commit message and push.
+
+import autoEntries from "./_devlog-auto.json";
 
 export type DevlogPost = {
-  issue: string;        // "01", "02", "03"...
-  date: string;         // ISO YYYY-MM-DD
+  date: string;       // ISO YYYY-MM-DD
   title: string;
-  tag: string;
-  body: string[];       // paragraphs
+  body: string[];     // paragraphs
+  source: "manual" | "auto";
+  // Manual-only:
+  issue?: string;
+  tag?: string;
+  // Auto-only:
+  sha?: string;
+  url?: string;
 };
 
-export const devlogPosts: DevlogPost[] = [
+const MANUAL_POSTS: DevlogPost[] = [
   {
+    source: "manual",
     issue: "02",
     date: "2026-05-07",
     title: "Species rework — three lineages, six stages each",
@@ -24,6 +40,7 @@ export const devlogPosts: DevlogPost[] = [
     ],
   },
   {
+    source: "manual",
     issue: "01",
     date: "2026-05-06",
     title: "RC is live at /game",
@@ -35,3 +52,26 @@ export const devlogPosts: DevlogPost[] = [
     ],
   },
 ];
+
+type RawAuto = {
+  sha: string;
+  date: string;
+  title: string;
+  body: string[];
+  url: string;
+};
+
+const AUTO_POSTS: DevlogPost[] = (autoEntries as RawAuto[]).map((e) => ({
+  source: "auto",
+  date: e.date,
+  title: e.title,
+  body: e.body,
+  sha: e.sha,
+  url: e.url,
+}));
+
+// Merge + sort newest first. Manual entries with no time component sort
+// alongside auto by date string (ISO-comparable).
+export const devlogPosts: DevlogPost[] = [...MANUAL_POSTS, ...AUTO_POSTS].sort(
+  (a, b) => b.date.localeCompare(a.date)
+);
