@@ -1518,29 +1518,31 @@ function createHomeScene(Phaser: any) {
         z.label_text = this.add.text(z.x, this.floorY - 56, z.label, { fontSize: '7px', color: '#aaccee', letterSpacing: 1 }).setOrigin(0.5)
       }
 
-      // Top HUD
-      this.add.rectangle(W/2, 13, W, 26, 0x080814, 0.95)
-      this.add.rectangle(W/2, 26, W, 1, 0x224488)
-      this.nameT = this.add.text(6, 4, '', { fontSize: '8px', color: '#ddddff', fontStyle: 'bold', letterSpacing: 1 })
-      this.dayT  = this.add.text(6, 14, '', { fontSize: '7px', color: '#7799cc' })
-      this.mkBar(82, 7,  'HP',     0x44ff88)
-      this.mkBar(82, 17, 'HUNGER', 0xff9944)
-      this.mkBar(190, 7,  'HAPPY', 0xff44bb)
-      this.mkBar(190, 17, 'XP',    0x44aaff)
+      // Top HUD — taller two-row layout so labels and values don't collide
+      this.add.rectangle(W/2, 18, W, 36, 0x060810, 0.96)
+      this.add.rectangle(W/2, 36, W, 1, 0x224488)
 
-      // Codex button
-      const codexBtn = this.add.rectangle(W - 165, 13, 56, 16, 0x2a1a44, 0.92).setInteractive({ useHandCursor: true }).setStrokeStyle(1, 0x886699)
-      this.add.text(W - 165, 13, 'CODEX', { fontSize: '8px', color: '#ddccff', fontStyle: 'bold' }).setOrigin(0.5)
+      // Identity column (left)
+      this.nameT = this.add.text(6, 5, '', { fontSize: '10px', color: '#eeeeff', fontStyle: 'bold', letterSpacing: 1 })
+      this.dayT  = this.add.text(6, 21, '', { fontSize: '8px', color: '#7799cc' })
+
+      // Stat bars in a 2x2 grid (label above bar)
+      this.mkBar(110, 9,  'HP',   0x44ff88)
+      this.mkBar(110, 24, 'FOOD', 0xff9944)
+      this.mkBar(206, 9,  'XP',   0x44aaff)
+      this.mkBar(206, 24, 'MOOD', 0xff44bb)
+
+      // Right-side action buttons (each centered vertically in the 36px bar)
+      const codexBtn = this.add.rectangle(W - 158, 18, 56, 26, 0x2a1a44, 0.94).setInteractive({ useHandCursor: true }).setStrokeStyle(1, 0x886699)
+      this.add.text(W - 158, 18, 'CODEX', { fontSize: '9px', color: '#ddccff', fontStyle: 'bold', letterSpacing: 1 }).setOrigin(0.5)
       codexBtn.on('pointerdown', () => this.openCodex())
 
-      // Bag button
-      const bagBtn = this.add.rectangle(W - 100, 13, 60, 16, 0x1a2a44, 0.92).setInteractive({ useHandCursor: true }).setStrokeStyle(1, 0x556699)
-      this.bagT = this.add.text(W - 100, 13, '', { fontSize: '8px', color: '#ddccaa' }).setOrigin(0.5)
+      const bagBtn = this.add.rectangle(W - 92, 18, 64, 26, 0x1a2a44, 0.94).setInteractive({ useHandCursor: true }).setStrokeStyle(1, 0x556699)
+      this.bagT = this.add.text(W - 92, 18, '', { fontSize: '9px', color: '#ddccaa', fontStyle: 'bold' }).setOrigin(0.5)
       bagBtn.on('pointerdown', () => this.openBag())
 
-      // Music toggle
-      const mb = this.add.rectangle(W - 30, 13, 50, 16, 0x1a1a2a, 0.92).setInteractive({ useHandCursor: true }).setStrokeStyle(1, 0x556699)
-      this.musicT = this.add.text(W - 30, 13, theme.isMuted ? '♪ OFF' : '♪ ON', { fontSize: '7px', color: theme.isMuted ? '#778899' : '#aaccee' }).setOrigin(0.5)
+      const mb = this.add.rectangle(W - 28, 18, 50, 26, 0x1a1a2a, 0.94).setInteractive({ useHandCursor: true }).setStrokeStyle(1, 0x556699)
+      this.musicT = this.add.text(W - 28, 18, theme.isMuted ? '♪ OFF' : '♪ ON', { fontSize: '9px', color: theme.isMuted ? '#778899' : '#aaccee', fontStyle: 'bold' }).setOrigin(0.5)
       mb.on('pointerdown', () => {
         theme.toggleMute()
         this.musicT.setText(theme.isMuted ? '♪ OFF' : '♪ ON').setColor(theme.isMuted ? '#778899' : '#aaccee')
@@ -1598,26 +1600,27 @@ function createHomeScene(Phaser: any) {
     }
 
     mkBar(x: number, y: number, label: string, color: number) {
-      this.add.text(x - 24, y - 2, label, { fontSize: '6px', color: '#7788aa', letterSpacing: 1 })
-      this.add.rectangle(x + 30, y, 60, 4, 0x0a1528).setOrigin(0.5)
-      const f = this.add.rectangle(x, y, 0, 3, color).setOrigin(0, 0.5)
-      this.bars[label] = { f, mw: 60 }
+      // Label sits above the bar so it never collides with the fill colors.
+      this.add.text(x, y - 6, label, { fontSize: '7px', color: '#aabbcc', fontStyle: 'bold', letterSpacing: 1 }).setOrigin(0, 0.5)
+      this.add.rectangle(x, y + 2, 80, 5, 0x0a1528).setOrigin(0, 0.5)
+      const f = this.add.rectangle(x, y + 2, 0, 4, color).setOrigin(0, 0.5)
+      this.bars[label] = { f, mw: 80 }
       this.updBar(label)
     }
     updBar(k: string) {
       const b = this.bars[k]; if (!b) return
       let p = 0
-      if (k === 'HP')     p = G.hp / G.maxHp
-      if (k === 'HUNGER') p = G.hunger / 100
-      if (k === 'HAPPY')  p = G.happy / 100
-      if (k === 'XP')     p = G.xp / xpToLevel(G.level)
+      if (k === 'HP')   p = G.hp / G.maxHp
+      if (k === 'FOOD') p = G.hunger / 100
+      if (k === 'MOOD') p = G.happy / 100
+      if (k === 'XP')   p = G.xp / xpToLevel(G.level)
       b.f.width = Math.max(0, p) * b.mw
     }
     updHUD() {
-      ;['HP','HUNGER','HAPPY','XP'].forEach(k => this.updBar(k))
-      this.nameT.setText(G.name + '  Lv.' + G.level)
-      this.dayT.setText('Day ' + G.day + '   Stage ' + G.stage)
-      this.bagT.setText('🎒 ' + invTotal() + '/' + G.maxInv)
+      ;['HP','FOOD','MOOD','XP'].forEach(k => this.updBar(k))
+      this.nameT.setText(G.name + '   Lv.' + G.level)
+      this.dayT.setText('Day ' + G.day + '   ·   Stage ' + G.stage)
+      this.bagT.setText('BAG ' + invTotal() + '/' + G.maxInv)
     }
 
     drawFruitTree(z: any) {
@@ -1683,7 +1686,7 @@ function createHomeScene(Phaser: any) {
 
     // Floating "+N STAT" label near the creature, with the matching bar pulsed.
     showStatGain(stat: string, amount: number) {
-      const palette: any = { HP: '#44ff88', HUNGER: '#ff9944', HAPPY: '#ff44bb', XP: '#44aaff', 'MAX HP': '#ffdd44' }
+      const palette: any = { HP: '#44ff88', FOOD: '#ff9944', MOOD: '#ff44bb', XP: '#44aaff', 'MAX HP': '#ffdd44' }
       const color = palette[stat] || '#ffffff'
       const t = this.add.text(
         this.cX + 16 + Phaser.Math.Between(-4, 4),
@@ -1711,11 +1714,11 @@ function createHomeScene(Phaser: any) {
         if (G.hp >= G.maxHp) line = 'HP already full'
         else { const gained = Math.min(5, G.maxHp - G.hp); G.hp += gained; this.showStatGain('HP', gained); line = 'Ate a Berry' }
       } else if (itemId === 'apple') {
-        if (G.hunger >= 100) line = 'Hunger already full'
-        else { const gained = Math.min(12, 100 - G.hunger); G.hunger += gained; this.showStatGain('HUNGER', gained); line = 'Ate an Apple' }
+        if (G.hunger >= 100) line = 'Food already full'
+        else { const gained = Math.min(12, 100 - G.hunger); G.hunger += gained; this.showStatGain('FOOD', gained); line = 'Ate an Apple' }
       } else {
-        if (G.happy >= 100) line = 'Happy already full'
-        else { const gained = Math.min(8, 100 - G.happy); G.happy += gained; this.showStatGain('HAPPY', gained); line = 'Ate a Herb' }
+        if (G.happy >= 100) line = 'Mood already full'
+        else { const gained = Math.min(8, 100 - G.happy); G.happy += gained; this.showStatGain('MOOD', gained); line = 'Ate a Herb' }
       }
       if (invAdd(itemId, 1)) line += '   (+1 in bag)'
       this.msg(line); this.updHUD()
@@ -1784,12 +1787,12 @@ function createHomeScene(Phaser: any) {
     sleep() {
       G.day += 1
       G.hp = G.maxHp
-      G.happy = Math.min(100, G.happy + 15)
-      G.hunger = Math.max(0, G.hunger - 35)
+      G.hunger = 100
+      G.happy = 100
       this.cameras.main.fadeOut(450, 0, 0, 0)
       this.time.delayedCall(500, () => {
         this.cameras.main.fadeIn(450, 0, 0, 0)
-        this.msg('Day ' + G.day + ' begins. Fully rested!')
+        this.msg('Day ' + G.day + ' begins. Fully rested  HP/FOOD/MOOD restored')
         this.updHUD()
       })
     }
@@ -1981,20 +1984,26 @@ function createWorldScene(Phaser: any) {
       this.cGfx = this.add.graphics()
       this.drawPlayer()
 
-      // HUD (fixed to camera)
-      this.add.rectangle(W/2, 13, W, 26, 0x080814, 0.95).setScrollFactor(0)
-      this.add.rectangle(W/2, 26, W, 1, 0x224488).setScrollFactor(0)
-      this.hpT = this.add.text(8, 7, '', { fontSize: '8px', color: '#44ff88' }).setScrollFactor(0)
-      const homeBg = this.add.rectangle(W - 174, 13, 56, 16, 0x1a3344, 0.95).setScrollFactor(0).setInteractive({ useHandCursor: true }).setStrokeStyle(1, 0x55aaff)
-      this.add.text(W - 174, 13, '← HOME', { fontSize: '8px', color: '#aaccee', fontStyle: 'bold' }).setOrigin(0.5).setScrollFactor(0)
+      // HUD (fixed to camera) — taller two-row layout to match HOME
+      this.add.rectangle(W/2, 18, W, 36, 0x060810, 0.96).setScrollFactor(0)
+      this.add.rectangle(W/2, 36, W, 1, 0x224488).setScrollFactor(0)
+
+      // Two-row identity readout on the left
+      this.hpT = this.add.text(8, 5, '', { fontSize: '9px', color: '#eeeeff', fontStyle: 'bold' }).setScrollFactor(0)
+      const subT = this.add.text(8, 21, '', { fontSize: '8px', color: '#7799cc' }).setScrollFactor(0)
+      ;(this as any)._subT = subT  // updated alongside hpT in updHUD()
+
+      // Right-side action buttons (centered vertically in the 36-px bar)
+      const homeBg = this.add.rectangle(W - 158, 18, 56, 26, 0x1a3344, 0.95).setScrollFactor(0).setInteractive({ useHandCursor: true }).setStrokeStyle(1, 0x55aaff)
+      this.add.text(W - 158, 18, '← HOME', { fontSize: '9px', color: '#aaccee', fontStyle: 'bold' }).setOrigin(0.5).setScrollFactor(0)
       homeBg.on('pointerdown', () => this.scene.start('HomeScene'))
 
-      const bagBtn = this.add.rectangle(W - 100, 13, 64, 16, 0x1a2a44, 0.92).setScrollFactor(0).setInteractive({ useHandCursor: true }).setStrokeStyle(1, 0x556699)
-      this.bagT = this.add.text(W - 100, 13, '', { fontSize: '8px', color: '#ddccaa' }).setOrigin(0.5).setScrollFactor(0)
+      const bagBtn = this.add.rectangle(W - 92, 18, 64, 26, 0x1a2a44, 0.94).setScrollFactor(0).setInteractive({ useHandCursor: true }).setStrokeStyle(1, 0x556699)
+      this.bagT = this.add.text(W - 92, 18, '', { fontSize: '9px', color: '#ddccaa', fontStyle: 'bold' }).setOrigin(0.5).setScrollFactor(0)
       bagBtn.on('pointerdown', () => this.openBag())
 
-      const mb = this.add.rectangle(W - 30, 13, 50, 16, 0x1a1a2a, 0.92).setScrollFactor(0).setInteractive({ useHandCursor: true }).setStrokeStyle(1, 0x556699)
-      const mt = this.add.text(W - 30, 13, theme.isMuted ? '♪ OFF' : '♪ ON', { fontSize: '7px', color: theme.isMuted ? '#778899' : '#aaccee' }).setOrigin(0.5).setScrollFactor(0)
+      const mb = this.add.rectangle(W - 28, 18, 50, 26, 0x1a1a2a, 0.94).setScrollFactor(0).setInteractive({ useHandCursor: true }).setStrokeStyle(1, 0x556699)
+      const mt = this.add.text(W - 28, 18, theme.isMuted ? '♪ OFF' : '♪ ON', { fontSize: '9px', color: theme.isMuted ? '#778899' : '#aaccee', fontStyle: 'bold' }).setOrigin(0.5).setScrollFactor(0)
       mb.on('pointerdown', () => { theme.toggleMute(); mt.setText(theme.isMuted ? '♪ OFF' : '♪ ON').setColor(theme.isMuted ? '#778899' : '#aaccee') })
 
       // Bottom strip + touch controls
@@ -2071,8 +2080,9 @@ function createWorldScene(Phaser: any) {
     msg(txt: string) { this.msgT.setText(txt).setAlpha(1); this.msgTime = 1400 }
 
     updHUD() {
-      this.hpT.setText('HP ' + G.hp + '/' + G.maxHp + '   ' + G.name + ' Lv.' + G.level + '   Day ' + G.day)
-      this.bagT.setText('🎒 ' + invTotal() + '/' + G.maxInv)
+      this.hpT.setText(G.name + '   Lv.' + G.level)
+      ;(this as any)._subT.setText('HP ' + G.hp + '/' + G.maxHp + '   ·   Day ' + G.day)
+      this.bagT.setText('BAG ' + invTotal() + '/' + G.maxInv)
     }
 
     update(time: number, dt: number) {
