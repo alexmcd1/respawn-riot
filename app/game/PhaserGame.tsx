@@ -1299,6 +1299,7 @@ function createPickScene(Phaser: any) {
     constructor() { super('PickScene') }
 
     create() {
+      this.cameras.main.setZoom(2)
       this.add.rectangle(W / 2, H / 2, W, H, 0x0d0d1a)
       // Twinkling stars
       for (let i = 0; i < 50; i++) {
@@ -1367,6 +1368,7 @@ function createEggScene(Phaser: any) {
     constructor() { super('EggScene') }
 
     create() {
+      this.cameras.main.setZoom(2)
       this.add.rectangle(W / 2, H / 2, W, H, 0x0d0d1a)
       for (let i = 0; i < 60; i++) {
         const s = this.add.circle(
@@ -1450,6 +1452,7 @@ function createHomeScene(Phaser: any) {
     constructor() { super('HomeScene') }
 
     create() {
+      this.cameras.main.setZoom(2)
       this.t = 0
       this.cX = 100
 
@@ -1885,6 +1888,7 @@ function createWorldScene(Phaser: any) {
     create(data: any) {
       this.pX = 100
       this.items = []; this.chests = []
+      this.cameras.main.setZoom(2)
       this.cameras.main.setBounds(0, 0, this.wWidth, H)
 
       // Sky
@@ -2154,6 +2158,7 @@ function createInventoryScene(Phaser: any) {
     init(data: any) { this.from = data?.from || 'HomeScene' }
 
     create() {
+      this.cameras.main.setZoom(2)
       this.add.rectangle(W/2, H/2, W, H, 0x000000, 0.7).setInteractive()
       this.add.rectangle(W/2, H/2, 400, 248, 0x0a1428, 0.97).setStrokeStyle(2, 0x4466aa)
       this.add.rectangle(W/2, H/2 - 106, 400, 24, 0x1a2a4a)
@@ -2211,6 +2216,7 @@ function createChestScene(Phaser: any) {
     }
 
     create() {
+      this.cameras.main.setZoom(2)
       if (!G.chests[this.chestId]) G.chests[this.chestId] = { items: [] }
       this.add.rectangle(W/2, H/2, W, H, 0x000000, 0.7).setInteractive()
       this.add.rectangle(W/2, H/2, 440, 250, 0x0a1428, 0.97).setStrokeStyle(2, 0x886030)
@@ -2285,6 +2291,7 @@ function createCodexScene(Phaser: any) {
     init(data: any) { this.from = data?.from || 'HomeScene' }
 
     create() {
+      this.cameras.main.setZoom(2)
       this.add.rectangle(W/2, H/2, W, H, 0x000000, 0.85)
       this.add.rectangle(W/2, H/2, W - 24, H - 24, 0x0a0f1e, 0.97).setStrokeStyle(2, 0x886699)
       this.add.rectangle(W/2, 26, W - 24, 22, 0x2a1a44)
@@ -2352,6 +2359,7 @@ function createBattleScene(Phaser: any) {
     constructor() { super('BattleScene') }
 
     create(data: any) {
+      this.cameras.main.setZoom(2)
       this.isBoss    = data?.isBoss    || false
       this.fromWorld = data?.fromWorld || false
       this.turn = 'player'; this.animating = false
@@ -2576,14 +2584,19 @@ export default function PhaserGame() {
     import('phaser').then((PhaserModule) => {
       const Phaser = PhaserModule.default
 
+      // Render at 2x logical resolution. The canvas backing buffer is W*RES
+      // by H*RES so primitive edges have twice the pixels for antialiasing.
+      // Each scene calls this.cameras.main.setZoom(RES) so existing 480x320
+      // logical coordinates fill the larger canvas.
+      const RES = 2
       gameRef.current = new Phaser.Game({
         type:            Phaser.AUTO,
-        width:           W,
-        height:          H,
+        width:           W * RES,
+        height:          H * RES,
         backgroundColor: '#0d0d1a',
         parent:          containerRef.current!,
-        pixelArt:        true,
-        roundPixels:     true,
+        antialias:       true,
+        roundPixels:     false,
         scene: [
           createPickScene(Phaser),
           createEggScene(Phaser),
@@ -2599,13 +2612,6 @@ export default function PhaserGame() {
           autoCenter: Phaser.Scale.CENTER_BOTH,
         },
       })
-
-      const applyCrisp = () => {
-        const canvas = containerRef.current?.querySelector('canvas') as HTMLCanvasElement | null
-        if (canvas) canvas.style.imageRendering = 'pixelated'
-      }
-      applyCrisp()
-      setTimeout(applyCrisp, 100)
     })
 
     return () => {
@@ -2618,7 +2624,7 @@ export default function PhaserGame() {
   return (
     <div
       ref={containerRef}
-      style={{ width: '100%', maxWidth: 960, aspectRatio: '480/320', imageRendering: 'pixelated' }}
+      style={{ width: '100%', maxWidth: 1280, aspectRatio: '480/320' }}
     />
   )
 }
