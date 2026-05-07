@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import JoinTheRiotForm from "./_components/JoinTheRiotForm";
 
 const sections = [
   {
@@ -298,19 +299,7 @@ export default function Home() {
             one inbox.
           </p>
 
-          <form className="mx-auto mt-8 flex max-w-xl flex-col gap-4 sm:flex-row">
-            <input
-              type="email"
-              placeholder="Enter your email"
-              className="w-full rounded-xl border border-white/15 bg-black/40 px-4 py-3 text-white outline-none placeholder:text-white/35"
-            />
-            <button
-              type="submit"
-              className="rounded-xl bg-fuchsia-500 px-6 py-3 font-bold text-white transition hover:scale-105"
-            >
-              Sign Up
-            </button>
-          </form>
+          <JoinTheRiotForm />
         </div>
       </section>
 
