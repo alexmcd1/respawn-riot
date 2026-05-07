@@ -12,6 +12,10 @@ const G: any = {
   xp: 0,
   xpNeeded: [30, 100, 250, 500, 9999999],
   level: 1, wins: 0, lastFed: 0,
+  day: 1,
+  inventory: [] as any[],
+  maxInv: 100,
+  chests: {} as any,
 }
 
 const W = 480, H = 320
@@ -128,6 +132,38 @@ class Theme {
 }
 
 const theme = new Theme()
+
+// ─── Items + inventory ────────────────────────────────────────────────────────
+const ITEMS: any = {
+  berry: { name: 'Berry',   color: 0xff5577, desc: '+5 HP',      effect: () => { if (G.hp < G.maxHp) { G.hp = Math.min(G.maxHp, G.hp + 5); return true } return false } },
+  apple: { name: 'Apple',   color: 0xff8844, desc: '+12 Hunger', effect: () => { if (G.hunger < 100) { G.hunger = Math.min(100, G.hunger + 12); return true } return false } },
+  shard: { name: 'Crystal', color: 0x88ddff, desc: '+5 XP',      effect: () => { G.xp += 5; return true } },
+  herb:  { name: 'Herb',    color: 0x88dd66, desc: '+8 Happy',   effect: () => { if (G.happy < 100) { G.happy = Math.min(100, G.happy + 8); return true } return false } },
+  coin:  { name: 'Coin',    color: 0xffdd44, desc: 'Currency',   effect: () => false },
+}
+
+function invTotal() { return G.inventory.reduce((s: number, x: any) => s + x.qty, 0) }
+function invAdd(id: string, qty = 1) {
+  if (!ITEMS[id]) return false
+  if (invTotal() + qty > G.maxInv) return false
+  const slot = G.inventory.find((x: any) => x.id === id)
+  if (slot) slot.qty += qty
+  else G.inventory.push({ id, qty })
+  return true
+}
+function invRemove(id: string, qty = 1) {
+  const slot = G.inventory.find((x: any) => x.id === id)
+  if (!slot || slot.qty < qty) return false
+  slot.qty -= qty
+  if (slot.qty <= 0) G.inventory = G.inventory.filter((x: any) => x.id !== id)
+  return true
+}
+function invUse(id: string) {
+  const item = ITEMS[id]
+  if (!item) return false
+  if (item.effect()) { invRemove(id, 1); return true }
+  return false
+}
 
 // ─── Creature drawing — dinosaur lineage (Egg → Tyranex) ──────────────────────
 function drawDino(g: any, stage: number, x: number, y: number) {
@@ -984,83 +1020,154 @@ function createEggScene(Phaser: any) {
   }
 }
 
-// ─── HomeScene ────────────────────────────────────────────────────────────────
+// ─── HomeScene — interactive retro space jungle hub ──────────────────────────
 function createHomeScene(Phaser: any) {
   return class HomeScene extends Phaser.Scene {
     private t = 0
-    private bars: Record<string, any> = {}
     private cGfx: any
-    private cX = 0; private cY = 0
-    private aTxt: any
-    private nTxt: any; private sTxt: any; private lTxt: any
-    private atkTxt: any; private defTxt: any; private spdTxt: any; private winTxt: any
+    private cX = 100
+    private floorY = 252
+    private bars: Record<string, any> = {}
+    private cursors: any; private wasd: any
+    private zones: any[] = []
+    private nearZone: any = null
+    private promptT: any
+    private msgT: any
+    private msgTime = 0
+    private nameT: any; private dayT: any; private bagT: any
+    private musicT: any
+    private SPEED = 1.6
 
     constructor() { super('HomeScene') }
 
     create() {
       this.t = 0
-      this.add.rectangle(W / 2, H / 2, W, H, 0x0d1a2e)
-      for (let i = 0; i < 10; i++) {
-        const p = this.add.circle(
-          Phaser.Math.Between(0, W - 120), Phaser.Math.Between(H * 0.3, H * 0.9),
-          Phaser.Math.Between(1, 3), sp().stageColors[G.stage], 0.22
+      this.cX = 100
+
+      // Sky
+      this.add.rectangle(W/2, H/2, W, H, 0x0d0a26)
+      // Stars
+      for (let i = 0; i < 70; i++) {
+        const s = this.add.circle(
+          Phaser.Math.Between(0, W), Phaser.Math.Between(28, 200),
+          Phaser.Math.Between(1, 2), 0xffffff, Math.random() * 0.7 + 0.1
         )
-        this.tweens.add({ targets: p, y: p.y - Phaser.Math.Between(30, 70), alpha: 0, duration: Phaser.Math.Between(2000, 4000), repeat: -1, repeatDelay: Phaser.Math.Between(0, 2000) })
+        this.tweens.add({ targets: s, alpha: 0.1, duration: Phaser.Math.Between(800, 2400), yoyo: true, repeat: -1 })
       }
-      this.add.rectangle(W / 2, H - 20, W, 40, 0x0a1828)
-      this.add.rectangle(W / 2, H - 40, W, 3, 0x112233)
+      // Moons / planets
+      this.add.circle(80, 90, 12, 0x4a3a6a, 0.6)
+      this.add.circle(78, 87, 10, 0x6a5a8a, 0.45)
+      this.add.circle(380, 60, 8, 0xff8866, 0.55)
+      this.add.circle(382, 58, 6, 0xffaa88, 0.4)
 
-      const px = W - 112
-      this.add.rectangle(px + 46, H / 2, 114, H, 0x080f1a).setStrokeStyle(1, 0x1a3a5a)
-      this.nTxt = this.add.text(px + 46, 15, G.name, { fontSize: '12px', color: '#eeeeff', fontStyle: 'bold' }).setOrigin(0.5)
-      this.sTxt = this.add.text(px + 46, 29, 'Stage ' + G.stage, { fontSize: '8px', color: '#7788aa', letterSpacing: 1 }).setOrigin(0.5)
-      this.lTxt = this.add.text(px + 46, 41, 'Lv.' + G.level, { fontSize: '8px', color: '#aaaacc' }).setOrigin(0.5)
-      this.add.rectangle(px + 46, 51, 90, 1, 0x1a3050)
+      // Background mountain silhouettes
+      const bgG = this.add.graphics()
+      bgG.fillStyle(0x1a1a3a, 0.7)
+      bgG.fillTriangle(-10, 240, 90, 150, 200, 240)
+      bgG.fillTriangle(140, 240, 250, 130, 360, 240)
+      bgG.fillTriangle(300, 240, 400, 160, 500, 240)
 
-      this.mkBar(px, 61, 'HP', 0x44ff88)
-      this.mkBar(px, 79, 'HUNGER', 0xff9944)
-      this.mkBar(px, 97, 'HAPPY', 0xff44bb)
-      this.mkBar(px, 115, 'XP', 0x44aaff)
-      this.add.rectangle(px + 46, 131, 90, 1, 0x1a3050)
+      // Mid-ground tree silhouettes
+      const treeG = this.add.graphics()
+      treeG.fillStyle(0x0a2218, 0.85)
+      for (let i = 0; i < 9; i++) {
+        const tx = 24 + i * 56 + (i%2)*16
+        const ty = 230 - (i%3)*4
+        treeG.fillTriangle(tx - 12, ty, tx, ty - 32, tx + 12, ty)
+        treeG.fillRect(tx - 2, ty - 4, 4, 4)
+      }
 
-      this.atkTxt = this.add.text(px + 2, 137, 'ATK: ' + G.atk, { fontSize: '8px', color: '#ff7755' })
-      this.defTxt = this.add.text(px + 2, 149, 'DEF: ' + G.def, { fontSize: '8px', color: '#55aaff' })
-      this.spdTxt = this.add.text(px + 2, 161, 'SPD: ' + G.spd, { fontSize: '8px', color: '#55ff99' })
-      this.winTxt = this.add.text(px + 2, 173, 'WINS: ' + G.wins, { fontSize: '8px', color: '#ffdd55' })
-      this.add.rectangle(px + 46, 186, 90, 1, 0x1a3050)
+      // Floor
+      this.add.rectangle(W/2, this.floorY + 30, W, 80, 0x2a3a1a)
+      this.add.rectangle(W/2, this.floorY, W, 4, 0x4a6a2a)
+      // Floor speckle
+      const fg = this.add.graphics()
+      fg.fillStyle(0x4a6a2a, 0.5)
+      for (let i = 0; i < 30; i++) {
+        const fx = Phaser.Math.Between(0, W)
+        fg.fillCircle(fx, this.floorY + 4 + Phaser.Math.Between(0, 30), 1)
+      }
+      // Foreground crystals
+      for (let i = 0; i < 6; i++) {
+        const cx = 24 + i * 86
+        const cg = this.add.graphics()
+        cg.fillStyle(0x88ddff, 0.3); cg.fillTriangle(cx - 4, this.floorY + 22, cx, this.floorY + 8, cx + 4, this.floorY + 22)
+        cg.fillStyle(0xddeeff, 0.55); cg.fillTriangle(cx - 1, this.floorY + 22, cx, this.floorY + 12, cx + 2, this.floorY + 22)
+      }
 
-      this.mkBtn(px + 46, 200, 'Feed',    0x0d3322, 0x44ff88, () => this.feed())
-      this.mkBtn(px + 46, 220, 'Rest',    0x33220d, 0xffaa55, () => this.rest())
-      this.mkBtn(px + 46, 240, 'Train',   0x0d1a33, 0x44aaff, () => this.train())
-      this.mkBtn(px + 46, 260, 'Explore', 0x1a0d33, 0xaa44ff, () => this.scene.start('WorldScene'))
-      this.mkBtn(px + 46, 280, 'Info',    0x1a1a0a, 0xffdd44, () => this.showInfo())
+      // Define and draw zones
+      this.zones = [
+        { x: 60,  label: 'Fruit Tree',   prompt: '[SPACE] PICK',    action: () => this.pickFruit(),  draw: this.drawFruitTree.bind(this) },
+        { x: 155, label: 'Punching Bag', prompt: '[SPACE] TRAIN',   action: () => this.train(),     draw: this.drawBag.bind(this) },
+        { x: 240, label: 'Fidget Rings', prompt: '[SPACE] PLAY',    action: () => this.fidget(),    draw: this.drawFidget.bind(this) },
+        { x: 335, label: 'Bed',          prompt: '[SPACE] SLEEP',   action: () => this.sleep(),     draw: this.drawBed.bind(this) },
+        { x: 430, label: 'Doorway',      prompt: '[SPACE] EXPLORE', action: () => this.scene.start('WorldScene'), draw: this.drawDoor.bind(this) },
+      ]
+      for (const z of this.zones) {
+        z.gfx = this.add.graphics()
+        z.draw(z)
+        z.label_text = this.add.text(z.x, this.floorY - 56, z.label, { fontSize: '7px', color: '#aaccee', letterSpacing: 1 }).setOrigin(0.5)
+      }
+
+      // Top HUD
+      this.add.rectangle(W/2, 13, W, 26, 0x080814, 0.95)
+      this.add.rectangle(W/2, 26, W, 1, 0x224488)
+      this.nameT = this.add.text(6, 4, '', { fontSize: '8px', color: '#ddddff', fontStyle: 'bold', letterSpacing: 1 })
+      this.dayT  = this.add.text(6, 14, '', { fontSize: '7px', color: '#7799cc' })
+      this.mkBar(82, 7,  'HP',     0x44ff88)
+      this.mkBar(82, 17, 'HUNGER', 0xff9944)
+      this.mkBar(190, 7,  'HAPPY', 0xff44bb)
+      this.mkBar(190, 17, 'XP',    0x44aaff)
+
+      // Bag button
+      const bagBtn = this.add.rectangle(W - 100, 13, 60, 16, 0x1a2a44, 0.92).setInteractive({ useHandCursor: true }).setStrokeStyle(1, 0x556699)
+      this.bagT = this.add.text(W - 100, 13, '', { fontSize: '8px', color: '#ddccaa' }).setOrigin(0.5)
+      bagBtn.on('pointerdown', () => this.openBag())
 
       // Music toggle
-      const mb = this.add.rectangle(px + 46, H - 8, 96, 12, 0x0a1020, 0.9).setInteractive({ useHandCursor: true }).setStrokeStyle(1, 0x445566)
-      const mt = this.add.text(px + 46, H - 8, theme.isMuted ? '♪ MUSIC: OFF' : '♪ MUSIC: ON', { fontSize: '7px', color: theme.isMuted ? '#778899' : '#aaccee', letterSpacing: 1 }).setOrigin(0.5)
+      const mb = this.add.rectangle(W - 30, 13, 50, 16, 0x1a1a2a, 0.92).setInteractive({ useHandCursor: true }).setStrokeStyle(1, 0x556699)
+      this.musicT = this.add.text(W - 30, 13, theme.isMuted ? '♪ OFF' : '♪ ON', { fontSize: '7px', color: theme.isMuted ? '#778899' : '#aaccee' }).setOrigin(0.5)
       mb.on('pointerdown', () => {
         theme.toggleMute()
-        mt.setText(theme.isMuted ? '♪ MUSIC: OFF' : '♪ MUSIC: ON')
-        mt.setColor(theme.isMuted ? '#778899' : '#aaccee')
+        this.musicT.setText(theme.isMuted ? '♪ OFF' : '♪ ON').setColor(theme.isMuted ? '#778899' : '#aaccee')
       })
 
-      this.cX = (W - 114) / 2; this.cY = H / 2 - 10
+      // Player creature
       this.cGfx = this.add.graphics()
       this.drawC()
 
-      this.aTxt = this.add.text(this.cX, H - 65, '', { fontSize: '10px', color: '#ffdd55' }).setOrigin(0.5).setAlpha(0)
+      // Prompt + msg
+      this.promptT = this.add.text(W/2, this.floorY - 76, '', { fontSize: '9px', color: '#ffdd66', fontStyle: 'bold' }).setOrigin(0.5).setAlpha(0)
+      this.msgT = this.add.text(W/2, 50, '', { fontSize: '9px', color: '#ffeeaa', backgroundColor: '#000814', padding: { x: 6, y: 3 } as any }).setOrigin(0.5).setAlpha(0)
+
+      // Bottom hint
+      this.add.rectangle(W/2, H - 8, W, 16, 0x080814, 0.85)
+      this.add.text(W/2, H - 8, 'WASD/Arrows to move   SPACE to interact   B for backpack', { fontSize: '7px', color: '#556677' }).setOrigin(0.5)
+
+      // Controls
+      this.cursors = this.input.keyboard.createCursorKeys()
+      this.wasd = this.input.keyboard.addKeys('W,A,S,D')
+      this.input.keyboard.on('keydown-SPACE', () => this.tryActivate())
+      this.input.keyboard.on('keydown-E',     () => this.tryActivate())
+      this.input.keyboard.on('keydown-B',     () => this.openBag())
+
+      this.updHUD()
 
       if (G.stage < 4 && G.xp >= G.xpNeeded[G.stage]) this.time.delayedCall(300, () => this.evolve())
     }
 
-    mkBar(x: number, y: number, label: string, color: number) {
-      this.add.text(x + 2, y, label, { fontSize: '7px', color: '#5566aa', letterSpacing: 1 })
-      this.add.rectangle(x + 47, y + 9, 82, 6, 0x0a1528).setOrigin(0.5)
-      const f = this.add.rectangle(x + 6, y + 9, 0, 4, color).setOrigin(0, 0.5)
-      this.bars[label] = { f, mw: 80 }
-      this.updBar(label)
+    drawC() {
+      this.cGfx.clear()
+      drawCreature(this.cGfx, G.stage, this.cX, this.floorY - 22 + Math.sin(this.t * 2) * 1.5)
     }
 
+    mkBar(x: number, y: number, label: string, color: number) {
+      this.add.text(x - 24, y - 2, label, { fontSize: '6px', color: '#7788aa', letterSpacing: 1 })
+      this.add.rectangle(x + 30, y, 60, 4, 0x0a1528).setOrigin(0.5)
+      const f = this.add.rectangle(x, y, 0, 3, color).setOrigin(0, 0.5)
+      this.bars[label] = { f, mw: 60 }
+      this.updBar(label)
+    }
     updBar(k: string) {
       const b = this.bars[k]; if (!b) return
       let p = 0
@@ -1070,69 +1177,110 @@ function createHomeScene(Phaser: any) {
       if (k === 'XP')     p = G.stage < 4 ? G.xp / G.xpNeeded[G.stage] : 1
       b.f.width = Math.max(0, p) * b.mw
     }
-
-    updAll() {
-      ;['HP', 'HUNGER', 'HAPPY', 'XP'].forEach(k => this.updBar(k))
-      this.nTxt.setText(G.name)
-      this.sTxt.setText('Stage ' + G.stage)
-      this.lTxt.setText('Lv.' + G.level)
-      this.atkTxt.setText('ATK: ' + G.atk)
-      this.defTxt.setText('DEF: ' + G.def)
-      this.spdTxt.setText('SPD: ' + G.spd)
-      this.winTxt.setText('WINS: ' + G.wins)
+    updHUD() {
+      ;['HP','HUNGER','HAPPY','XP'].forEach(k => this.updBar(k))
+      this.nameT.setText(G.name + '  Lv.' + G.level)
+      this.dayT.setText('Day ' + G.day + '   Stage ' + G.stage)
+      this.bagT.setText('🎒 ' + invTotal() + '/' + G.maxInv)
     }
 
-    mkBtn(x: number, y: number, label: string, bg: number, col: number, cb: () => void) {
-      const b = this.add.rectangle(x, y, 96, 19, bg).setInteractive({ useHandCursor: true }).setStrokeStyle(1, col)
-      this.add.text(x, y, label, { fontSize: '9px', color: '#' + col.toString(16).padStart(6, '0') }).setOrigin(0.5)
-      b.on('pointerover', () => b.setAlpha(1.4))
-      b.on('pointerout',  () => b.setAlpha(1))
-      b.on('pointerdown', cb)
+    drawFruitTree(z: any) {
+      const g = z.gfx, x = z.x, fy = this.floorY
+      g.fillStyle(0x4a2810); g.fillRect(x - 3, fy - 30, 6, 30)
+      g.fillStyle(0x0a2218); g.fillCircle(x - 6, fy - 36, 12); g.fillCircle(x + 6, fy - 36, 12)
+      g.fillStyle(0x1a4422); g.fillCircle(x, fy - 44, 11)
+      g.fillStyle(0x2a5532, 0.7); g.fillCircle(x - 2, fy - 42, 6)
+      g.fillStyle(0xff5577); g.fillCircle(x - 8, fy - 32, 2)
+      g.fillStyle(0xff7788); g.fillCircle(x + 8, fy - 30, 2)
+      g.fillStyle(0xff8844); g.fillCircle(x - 2, fy - 28, 2)
     }
 
-    drawC() { drawCreature(this.cGfx, G.stage, this.cX, this.cY) }
+    drawBag(z: any) {
+      const g = z.gfx, x = z.x, fy = this.floorY
+      // Hook + chain
+      g.fillStyle(0x666666); g.fillRect(x - 1, fy - 60, 2, 28)
+      // Bag body
+      g.fillStyle(0x884422); g.fillRoundedRect(x - 8, fy - 36, 16, 36, 6)
+      g.fillStyle(0xaa5533, 0.7); g.fillEllipse(x - 3, fy - 26, 4, 18)
+      g.fillStyle(0x4a2010); g.fillRect(x - 8, fy - 18, 16, 2)
+      // Backwards baseball cap on top
+      g.fillStyle(0xcc3333); g.fillEllipse(x, fy - 42, 14, 5)
+      g.fillStyle(0xee5555); g.fillRoundedRect(x - 6, fy - 46, 12, 6, 2)
+      g.fillStyle(0xcc3333); g.fillRect(x - 9, fy - 42, 4, 3)  // brim back
+    }
 
-    feed() {
-      if (G.hunger >= 100) { this.msg('Already full!'); return }
-      G.hunger = Math.min(100, G.hunger + 20); G.hp = Math.min(G.maxHp, G.hp + 2); G.xp += 2
-      this.msg('+20 Hunger  +2 HP')
-      this.updAll()
-      this.tweens.add({ targets: this.cGfx, y: -8, duration: 200, yoyo: true, ease: 'Back.easeOut' })
-      this.chkEvo()
+    drawFidget(z: any) {
+      const g = z.gfx, x = z.x, fy = this.floorY
+      g.lineStyle(2, 0x88ccff, 0.85); g.strokeCircle(x, fy - 30, 13)
+      g.lineStyle(1.5, 0xff66bb, 0.85); g.strokeCircle(x, fy - 30, 9)
+      g.fillStyle(0xffdd44); g.fillCircle(x, fy - 30, 3)
+      g.fillStyle(0xddeeff, 0.7); g.fillCircle(x - 18, fy - 38, 1.2); g.fillCircle(x + 14, fy - 22, 1.2)
+    }
+
+    drawBed(z: any) {
+      const g = z.gfx, x = z.x, fy = this.floorY
+      g.fillStyle(0x4a3a2a); g.fillRect(x - 16, fy - 14, 32, 14)
+      g.fillStyle(0x6a5a3a); g.fillRect(x - 16, fy - 14, 32, 3)
+      g.fillStyle(0xeebbcc); g.fillRoundedRect(x - 14, fy - 12, 28, 8, 3)
+      g.fillStyle(0xddaaaa); g.fillRoundedRect(x + 6, fy - 22, 10, 8, 3)
+      g.fillStyle(0xeeeebb); g.fillCircle(x, fy - 38, 5)
+      g.fillStyle(0x4a3a2a); g.fillCircle(x + 2, fy - 39, 4)
+    }
+
+    drawDoor(z: any) {
+      const g = z.gfx, x = z.x, fy = this.floorY
+      g.fillStyle(0x4a3a5a); g.fillRoundedRect(x - 14, fy - 50, 28, 50, 14)
+      g.fillStyle(0x1a0a2a); g.fillRoundedRect(x - 11, fy - 45, 22, 45, 11)
+      g.fillStyle(0x88ddff, 0.7); g.fillCircle(x - 7, fy - 26, 1.5)
+      g.fillStyle(0xff66bb, 0.6); g.fillCircle(x + 5, fy - 16, 1.2)
+      g.fillStyle(0xffdd44); g.fillRect(x + 7, fy - 28, 2, 4)
+    }
+
+    tryActivate() { if (this.nearZone) this.nearZone.action() }
+
+    pickFruit() {
+      const r = Math.random()
+      const itemId = r < 0.55 ? 'berry' : (r < 0.85 ? 'apple' : 'herb')
+      if (invAdd(itemId, 1)) {
+        this.msg('Picked a ' + ITEMS[itemId].name + '!')
+        this.tweens.add({ targets: this.cGfx, y: this.cGfx.y - 8, duration: 180, yoyo: true })
+      } else this.msg('Bag is full!')
+      this.updHUD()
     }
 
     train() {
       if (G.hunger <= 10) { this.msg('Too hungry to train!'); return }
       G.hunger = Math.max(0, G.hunger - 10); G.xp += 10; G.happy = Math.min(100, G.happy + 5)
-      let line = '+10 XP  -10 Hunger'
-      // 25% chance: training also strengthens the body, raising maxHP
-      if (Math.random() < 0.25) {
-        G.maxHp += 1; G.hp = Math.min(G.maxHp, G.hp + 1)
-        line = '+10 XP  +1 MAX HP!'
-      }
-      this.msg(line)
-      this.updAll()
-      this.tweens.add({ targets: this.cGfx, y: -28, duration: 280, yoyo: true, ease: 'Quad.easeOut' })
+      let line = '+10 XP   -10 Hunger'
+      if (Math.random() < 0.25) { G.maxHp += 1; G.hp = Math.min(G.maxHp, G.hp + 1); line = '+10 XP   +1 MAX HP!' }
+      this.msg(line); this.updHUD()
+      this.tweens.add({ targets: this.cGfx, x: this.cX + 6, duration: 90, yoyo: true, repeat: 2 })
       this.chkEvo()
     }
 
-    rest() {
-      if (G.hp >= G.maxHp) { this.msg('Already at full HP!'); return }
-      if (G.hunger < 25)   { this.msg('Too hungry to rest!'); return }
-      G.hunger = Math.max(0, G.hunger - 25)
-      G.hp = G.maxHp
-      G.happy = Math.min(100, G.happy + 5)
-      this.msg('Fully rested  HP restored')
-      this.updAll()
-      this.tweens.add({ targets: this.cGfx, alpha: 0.4, duration: 320, yoyo: true, repeat: 1 })
+    fidget() {
+      G.happy = Math.min(100, G.happy + Phaser.Math.Between(5, 12))
+      G.hunger = Math.max(0, G.hunger - 3)
+      let line = 'You played and felt happy!'
+      if (Math.random() < 0.3 && invAdd('shard', 1)) line = 'Played +Happy   Found a Crystal!'
+      this.msg(line); this.updHUD()
+      this.tweens.add({ targets: this.cGfx, y: this.cGfx.y - 10, duration: 180, yoyo: true, repeat: 1 })
     }
 
-    showInfo() {
-      const info = `${G.name}  |  Stage ${G.stage}  |  Lv.${G.level}\nHP:${G.hp}/${G.maxHp}   ATK:${G.atk}   DEF:${G.def}   SPD:${G.spd}\nWins: ${G.wins}   XP: ${G.xp}/${G.xpNeeded[G.stage]}`
-      const bg = this.add.rectangle(this.cX, this.cY, 240, 80, 0x0a1020, 0.95).setStrokeStyle(1, 0x4466aa)
-      const t  = this.add.text(this.cX, this.cY, info, { fontSize: '9px', color: '#ccdeff', align: 'center' }).setOrigin(0.5)
-      this.time.delayedCall(2500, () => { bg.destroy(); t.destroy() })
+    sleep() {
+      G.day += 1
+      G.hp = G.maxHp
+      G.happy = Math.min(100, G.happy + 15)
+      G.hunger = Math.max(0, G.hunger - 35)
+      this.cameras.main.fadeOut(450, 0, 0, 0)
+      this.time.delayedCall(500, () => {
+        this.cameras.main.fadeIn(450, 0, 0, 0)
+        this.msg('Day ' + G.day + ' begins. Fully rested!')
+        this.updHUD()
+      })
     }
+
+    openBag() { this.scene.launch('InventoryScene', { from: 'HomeScene' }); this.scene.pause() }
 
     chkEvo() { if (G.stage < 4 && G.xp >= G.xpNeeded[G.stage]) this.time.delayedCall(400, () => this.evolve()) }
 
@@ -1142,239 +1290,422 @@ function createHomeScene(Phaser: any) {
       G.maxHp += 15; G.hp = G.maxHp; G.atk += 4; G.def += 3; G.spd += 2; G.level++
       this.cameras.main.flash(700, 255, 200, 100)
       this.cameras.main.shake(400, 0.015)
-      const et = this.add.text(this.cX, this.cY - 55, 'EVOLVED!\n' + G.name, { fontSize: '13px', color: '#ffdd44', align: 'center', fontStyle: 'bold' }).setOrigin(0.5)
+      const et = this.add.text(this.cX, this.floorY - 80, 'EVOLVED!\n' + G.name, { fontSize: '13px', color: '#ffdd44', align: 'center', fontStyle: 'bold' }).setOrigin(0.5)
       this.tweens.add({ targets: et, y: et.y - 36, alpha: 0, duration: 2000, onComplete: () => et.destroy() })
-      this.drawC(); this.updAll()
+      this.drawC(); this.updHUD()
     }
 
     msg(txt: string) {
-      this.aTxt.setText(txt).setAlpha(1)
-      this.aTxt.y = H - 65
-      this.tweens.add({ targets: this.aTxt, y: H - 85, alpha: 0, duration: 1400, onComplete: () => { this.aTxt.setAlpha(0); this.aTxt.y = H - 65 } })
+      this.msgT.setText(txt).setAlpha(1)
+      this.msgTime = 1400
     }
 
     update(time: number, dt: number) {
       this.t += dt * 0.002
-      this.cGfx.y = Math.sin(this.t * 2) * 5
-      if (time - G.lastFed > 7000) { G.hunger = Math.max(0, G.hunger - 0.5); G.lastFed = time; this.updBar('HUNGER') }
+
+      if (this.msgTime > 0) {
+        this.msgTime -= dt
+        if (this.msgTime <= 0) this.msgT.setAlpha(0)
+      }
+
+      let dx = 0
+      if (this.cursors.left.isDown  || this.wasd.A.isDown) dx -= 1
+      if (this.cursors.right.isDown || this.wasd.D.isDown) dx += 1
+      if (dx !== 0) this.cX = Math.max(20, Math.min(W - 20, this.cX + dx * this.SPEED))
+      this.drawC()
+
+      const nz = this.zones.find((z: any) => Math.abs(z.x - this.cX) < 30) || null
+      if (nz !== this.nearZone) {
+        this.nearZone = nz
+        if (nz) this.promptT.setText(nz.prompt).setX(nz.x).setAlpha(1)
+        else    this.promptT.setAlpha(0)
+      }
+
+      if (time - G.lastFed > 7000) {
+        G.hunger = Math.max(0, G.hunger - 0.5); G.lastFed = time; this.updBar('HUNGER')
+      }
     }
   }
 }
 
-// ─── WorldScene ───────────────────────────────────────────────────────────────
+// ─── WorldScene — side-scrolling exploration with items + chests ─────────────
 function createWorldScene(Phaser: any) {
   return class WorldScene extends Phaser.Scene {
-    private TS = 24; private COLS = 20; private ROWS = 15
-    private map: number[][] = []
-    private pC = 10; private pR = 8
-    private camX = 0; private camY = 0
-    private mvDelay = 0; private eCd = 0
-    private mG: any; private pG: any
-    private hpT: any
+    private wWidth = 1440
+    private floorY = 252
+    private pX = 100
+    private cGfx: any
     private cursors: any; private wasd: any; private escK: any
+    private items: any[] = []
+    private chests: any[] = []
+    private encZones: any[] = []
+    private encCd = 0
+    private hpT: any; private bagT: any
+    private prompt: any; private msgT: any; private msgTime = 0
+    private nearTarget: any = null
 
     constructor() { super('WorldScene') }
 
     create(data: any) {
-      this.map = this.mkMap()
-      this.pC = 10; this.pR = 8; this.camX = 0; this.camY = 0
-      this.mvDelay = 0; this.eCd = 0
+      this.pX = 100
+      this.items = []; this.chests = []
+      this.cameras.main.setBounds(0, 0, this.wWidth, H)
 
-      this.mG = this.add.graphics()
-      this.pG = this.add.graphics()
-      this.redraw()
+      // Sky
+      this.add.rectangle(this.wWidth/2, H/2, this.wWidth, H, 0x081428)
+      // Stars
+      for (let i = 0; i < 70; i++) {
+        const s = this.add.circle(Phaser.Math.Between(0, this.wWidth), Phaser.Math.Between(20, 180), Phaser.Math.Between(1,2), 0xffffff, Math.random() * 0.6 + 0.1)
+        this.tweens.add({ targets: s, alpha: 0.2, duration: Phaser.Math.Between(800, 2400), yoyo: true, repeat: -1 })
+      }
+      // Distant mountains
+      const farG = this.add.graphics()
+      farG.fillStyle(0x1a1a3a, 0.5)
+      for (let i = 0; i < 12; i++) {
+        const cx = i * 140 + 60
+        farG.fillTriangle(cx - 60, 240, cx, 130 + (i%3)*15, cx + 60, 240)
+      }
+      // Mid-ground trees
+      const midG = this.add.graphics()
+      midG.fillStyle(0x0a2218, 0.85)
+      for (let i = 0; i < 32; i++) {
+        const tx = 30 + i * 48 + (i%2)*20
+        const ty = 230 - (i%3)*5
+        midG.fillTriangle(tx - 14, ty, tx, ty - 36, tx + 14, ty)
+        midG.fillRect(tx - 2, ty - 4, 4, 6)
+      }
+      // Floor
+      this.add.rectangle(this.wWidth/2, this.floorY + 30, this.wWidth, 80, 0x2a3a1a)
+      this.add.rectangle(this.wWidth/2, this.floorY, this.wWidth, 4, 0x4a6a2a)
+      // Foliage
+      const fg = this.add.graphics()
+      fg.fillStyle(0x1a4422, 0.85)
+      for (let i = 0; i < 16; i++) {
+        const bx = 60 + i * 90 + (i%2)*30
+        fg.fillCircle(bx, this.floorY - 4, 6); fg.fillCircle(bx + 6, this.floorY - 6, 4); fg.fillCircle(bx - 4, this.floorY - 6, 4)
+      }
+      for (let i = 0; i < 9; i++) {
+        const cx = 80 + i * 160
+        fg.fillStyle(0x88ddff, 0.45)
+        fg.fillTriangle(cx - 4, this.floorY + 18, cx, this.floorY + 6, cx + 4, this.floorY + 18)
+      }
 
-      // Top bar
-      this.add.rectangle(W / 2, 14, W, 28, 0x080810, 0.93).setDepth(5)
-      this.add.text(10, 6, 'OVERWORLD', { fontSize: '8px', color: '#7788aa', letterSpacing: 3 }).setDepth(6)
-      this.hpT = this.add.text(W / 2, 7, 'HP:' + G.hp + '/' + G.maxHp, { fontSize: '9px', color: '#44ff88' }).setOrigin(0.5, 0).setDepth(6)
-      this.add.text(W / 2, 18, G.name, { fontSize: '8px', color: '#9999cc' }).setOrigin(0.5, 0).setDepth(6)
+      // Doorway home (left)
+      const doorG = this.add.graphics()
+      doorG.fillStyle(0x4a3a5a); doorG.fillRoundedRect(20, this.floorY - 50, 28, 50, 14)
+      doorG.fillStyle(0x1a0a2a); doorG.fillRoundedRect(23, this.floorY - 45, 22, 45, 11)
+      doorG.fillStyle(0xffdd44); doorG.fillRect(38, this.floorY - 28, 2, 4)
+      this.add.text(34, this.floorY - 60, 'HOME', { fontSize: '8px', color: '#aaccee' }).setOrigin(0.5)
 
-      // HOME button (clickable, replaces small ESC hint)
-      const homeBg = this.add.rectangle(W - 38, 14, 64, 18, 0x1a3344, 0.95).setInteractive({ useHandCursor: true }).setStrokeStyle(1, 0x55aaff).setDepth(6)
-      this.add.text(W - 38, 14, '← HOME', { fontSize: '9px', color: '#aaccff', fontStyle: 'bold' }).setOrigin(0.5).setDepth(7)
-      homeBg.on('pointerover', () => homeBg.setStrokeStyle(2, 0x88ccff))
-      homeBg.on('pointerout',  () => homeBg.setStrokeStyle(1, 0x55aaff))
+      // Items along the path
+      const itemSpots = [
+        { x: 230, id: 'berry' }, { x: 400, id: 'apple' }, { x: 540, id: 'herb' },
+        { x: 720, id: 'shard' }, { x: 880, id: 'berry' }, { x: 1020, id: 'apple' },
+        { x: 1200, id: 'shard' }, { x: 1280, id: 'coin' },
+      ]
+      for (const it of itemSpots) {
+        const g = this.add.graphics()
+        this.drawItem(g, it.x, this.floorY - 6, ITEMS[it.id].color)
+        this.tweens.add({ targets: g, y: -3, duration: 800, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' })
+        this.items.push({ x: it.x, id: it.id, gfx: g, taken: false })
+      }
+
+      // Chests
+      const chestSpots = [
+        { x: 460, id: 'world_chest_1', seed: [{ id: 'shard', qty: 3 }, { id: 'apple', qty: 2 }] },
+        { x: 1100, id: 'world_chest_2', seed: [{ id: 'herb', qty: 2 }, { id: 'coin', qty: 5 }] },
+      ]
+      for (const cs of chestSpots) {
+        if (!G.chests[cs.id]) G.chests[cs.id] = { items: cs.seed.map((x: any) => ({ ...x })) }
+        const g = this.add.graphics()
+        this.drawChest(g, cs.x, this.floorY - 6)
+        this.chests.push({ x: cs.x, id: cs.id, gfx: g })
+      }
+
+      // Encounter zones (visual indicators)
+      this.encZones = [
+        { x1: 280, x2: 360, ch: 22 },
+        { x1: 600, x2: 720, ch: 32 },
+        { x1: 940, x2: 1040, ch: 28 },
+      ]
+      const encG = this.add.graphics()
+      for (const z of this.encZones) {
+        encG.fillStyle(0x44ff66, 0.18); encG.fillRect(z.x1, this.floorY - 2, z.x2 - z.x1, 6)
+        encG.fillStyle(0x66ff88, 0.6); for (let i = 0; i < 6; i++) {
+          const tx = z.x1 + Phaser.Math.Between(0, z.x2 - z.x1), ty = this.floorY - 18 - Phaser.Math.Between(0, 12)
+          encG.fillCircle(tx, ty, 1)
+        }
+      }
+
+      // Boss zone (right end)
+      const bossG = this.add.graphics()
+      bossG.fillStyle(0xaa0033, 0.4); bossG.fillRect(1340, this.floorY - 14, 80, 18)
+      bossG.lineStyle(1, 0xff3366, 0.85)
+      bossG.beginPath(); bossG.moveTo(1346, this.floorY - 5); bossG.lineTo(1356, this.floorY); bossG.lineTo(1366, this.floorY - 5); bossG.strokePath()
+      this.add.text(1380, this.floorY - 36, 'BOSS', { fontSize: '10px', color: '#ff5577', fontStyle: 'bold' }).setOrigin(0.5)
+
+      // Player
+      this.cGfx = this.add.graphics()
+      this.drawPlayer()
+
+      // HUD (fixed to camera)
+      this.add.rectangle(W/2, 13, W, 26, 0x080814, 0.95).setScrollFactor(0)
+      this.add.rectangle(W/2, 26, W, 1, 0x224488).setScrollFactor(0)
+      this.hpT = this.add.text(8, 7, '', { fontSize: '8px', color: '#44ff88' }).setScrollFactor(0)
+      const homeBg = this.add.rectangle(W - 174, 13, 56, 16, 0x1a3344, 0.95).setScrollFactor(0).setInteractive({ useHandCursor: true }).setStrokeStyle(1, 0x55aaff)
+      this.add.text(W - 174, 13, '← HOME', { fontSize: '8px', color: '#aaccee', fontStyle: 'bold' }).setOrigin(0.5).setScrollFactor(0)
       homeBg.on('pointerdown', () => this.scene.start('HomeScene'))
 
-      // Bottom bar
-      this.add.rectangle(W / 2, H - 14, W, 28, 0x080810, 0.9).setDepth(5)
-      this.add.text(8, H - 22, 'WASD/Arrows to move   ESC or HOME to return', { fontSize: '7px', color: '#556677' }).setDepth(6)
-      this.add.text(W - 8, H - 22, 'Grass=Wild  Forest=Hard  Red=Boss', { fontSize: '7px', color: '#774455' }).setOrigin(1, 0).setDepth(6)
+      const bagBtn = this.add.rectangle(W - 100, 13, 64, 16, 0x1a2a44, 0.92).setScrollFactor(0).setInteractive({ useHandCursor: true }).setStrokeStyle(1, 0x556699)
+      this.bagT = this.add.text(W - 100, 13, '', { fontSize: '8px', color: '#ddccaa' }).setOrigin(0.5).setScrollFactor(0)
+      bagBtn.on('pointerdown', () => this.openBag())
+
+      const mb = this.add.rectangle(W - 30, 13, 50, 16, 0x1a1a2a, 0.92).setScrollFactor(0).setInteractive({ useHandCursor: true }).setStrokeStyle(1, 0x556699)
+      const mt = this.add.text(W - 30, 13, theme.isMuted ? '♪ OFF' : '♪ ON', { fontSize: '7px', color: theme.isMuted ? '#778899' : '#aaccee' }).setOrigin(0.5).setScrollFactor(0)
+      mb.on('pointerdown', () => { theme.toggleMute(); mt.setText(theme.isMuted ? '♪ OFF' : '♪ ON').setColor(theme.isMuted ? '#778899' : '#aaccee') })
+
+      // Bottom hint
+      this.add.rectangle(W/2, H - 8, W, 16, 0x080814, 0.85).setScrollFactor(0)
+      this.add.text(W/2, H - 8, 'A/D Arrows move   SPACE interact   B backpack   ESC home', { fontSize: '7px', color: '#556677' }).setOrigin(0.5).setScrollFactor(0)
+
+      // Prompt + msg
+      this.prompt = this.add.text(0, 0, '', { fontSize: '9px', color: '#ffdd66', fontStyle: 'bold' }).setOrigin(0.5).setAlpha(0)
+      this.msgT = this.add.text(W/2, 50, '', { fontSize: '9px', color: '#ffeeaa', backgroundColor: '#000814', padding: { x: 6, y: 3 } as any }).setOrigin(0.5).setAlpha(0).setScrollFactor(0)
 
       this.cursors = this.input.keyboard.createCursorKeys()
-      this.wasd    = this.input.keyboard.addKeys('W,A,S,D')
-      this.escK    = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC)
+      this.wasd = this.input.keyboard.addKeys('W,A,S,D')
+      this.escK = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC)
+      this.input.keyboard.on('keydown-SPACE', () => this.tryActivate())
+      this.input.keyboard.on('keydown-E',     () => this.tryActivate())
+      this.input.keyboard.on('keydown-B',     () => this.openBag())
 
-      this.input.on('pointerdown', (ptr: any) => {
-        if (ptr.y < 28 || ptr.y > H - 28) return
-        const wC = Math.floor((ptr.x + this.camX) / this.TS)
-        const wR = Math.floor((ptr.y - 28 + this.camY) / this.TS)
-        this.moveToward(wC, wR)
-      })
+      this.updHUD()
 
       if (data?.result) {
         const color = data.result === 'win' ? '#44ff88' : '#ff4444'
         const label = data.result === 'win' ? 'Victory!' : 'Defeated!'
-        const rt = this.add.text(W / 2, H / 2, label, { fontSize: '15px', color, fontStyle: 'bold' }).setOrigin(0.5).setDepth(8)
+        const rt = this.add.text(W/2, H/2, label, { fontSize: '15px', color, fontStyle: 'bold' }).setOrigin(0.5).setDepth(8).setScrollFactor(0)
         this.tweens.add({ targets: rt, y: rt.y - 40, alpha: 0, duration: 2000, onComplete: () => rt.destroy() })
       }
     }
 
-    mkMap() {
-      const m: number[][] = []
-      for (let r = 0; r < this.ROWS; r++) { m[r] = []; for (let c = 0; c < this.COLS; c++) m[r][c] = 0 }
-      for (let c = 0; c < this.COLS; c++) { m[7][c] = 1; m[8][c] = 1 }
-      for (let r = 0; r < this.ROWS; r++) { m[r][9] = 1; m[r][10] = 1 }
-      for (let r = 1; r < 5; r++)  for (let c = 1;  c < 5;  c++) m[r][c] = 2
-      for (let r = 1; r < 7; r++)  for (let c = 15; c < 19; c++) m[r][c] = 3
-      for (let r = 10; r < 14; r++) for (let c = 2;  c < 7;  c++) m[r][c] = 4
-      for (let r = 9;  r < 13; r++) for (let c = 16; c < 19; c++) m[r][c] = 5
-      for (let c = 0; c < this.COLS; c++) { m[0][c] = 4; m[this.ROWS - 1][c] = 4 }
-      for (let r = 0; r < this.ROWS; r++) { m[r][0] = 4; m[r][this.COLS - 1] = 4 }
-      return m
+    drawItem(g: any, x: number, y: number, color: number) {
+      g.fillStyle(0x000000, 0.3); g.fillEllipse(x, y + 6, 8, 3)
+      g.fillStyle(color); g.fillCircle(x, y, 4)
+      g.fillStyle(0xffffff, 0.6); g.fillCircle(x - 1, y - 1, 1)
     }
 
-    tc(t: number) { return [0x1f5028, 0x9c7a1c, 0x1d3e72, 0x0d3322, 0x4a3a2a, 0x2a0022][t] || 0x1f5028 }
-
-    redraw() { this.drawMap(); this.drawPlayer() }
-
-    drawMap() {
-      const g = this.mG; g.clear()
-      for (let r = 0; r < this.ROWS; r++) for (let c = 0; c < this.COLS; c++) {
-        const t = this.map[r][c]
-        const wx = c * this.TS - this.camX
-        const wy = r * this.TS - this.camY + 28
-        const seed = (r * 31 + c * 17) % 11
-
-        // Base
-        g.fillStyle(this.tc(t)); g.fillRect(wx, wy, this.TS - 1, this.TS - 1)
-
-        if (t === 0) {
-          // Grass — base shade variation, tufts, occasional flowers
-          g.fillStyle(0x2a6b34, 0.45 + (seed % 3) * 0.08); g.fillRect(wx, wy, this.TS - 1, this.TS - 1)
-          // tufts
-          g.fillStyle(0x44aa44, 0.55)
-          g.fillTriangle(wx + 4, wy + 9, wx + 5, wy + 4, wx + 6, wy + 9)
-          g.fillTriangle(wx + 11, wy + 13, wx + 12, wy + 9, wx + 13, wy + 13)
-          g.fillStyle(0x66cc55, 0.45)
-          g.fillRect(wx + 16, wy + 6, 1, 4); g.fillRect(wx + 18, wy + 7, 1, 3)
-          // sparse flowers
-          if (seed === 0) {
-            g.fillStyle(0xff6688); g.fillCircle(wx + 14, wy + 14, 1.6)
-            g.fillStyle(0xffdd44); g.fillCircle(wx + 14, wy + 14, 0.7)
-          } else if (seed === 3) {
-            g.fillStyle(0xeebb44); g.fillCircle(wx + 6, wy + 16, 1.6)
-            g.fillStyle(0xffeebb); g.fillCircle(wx + 6, wy + 16, 0.7)
-          } else if (seed === 7) {
-            g.fillStyle(0x88aaff); g.fillCircle(wx + 17, wy + 17, 1.4)
-          }
-        } else if (t === 1) {
-          // Path/dirt — speckled, slightly darker edges
-          g.fillStyle(0x5a3e10, 0.55); g.fillRect(wx + 3, wy + 4, 2, 2)
-          g.fillStyle(0x5a3e10, 0.55); g.fillRect(wx + 16, wy + 9, 2, 2)
-          g.fillStyle(0x5a3e10, 0.55); g.fillRect(wx + 8, wy + 17, 2, 2)
-          g.fillStyle(0xb89544, 0.4); g.fillRect(wx + 12, wy + 6, 1, 1)
-          g.fillStyle(0xb89544, 0.4); g.fillRect(wx + 5, wy + 12, 1, 1)
-          g.fillStyle(0x6a4818, 0.3); g.fillRect(wx, wy, this.TS - 1, 2) // top edge
-          g.fillStyle(0x6a4818, 0.3); g.fillRect(wx, wy + this.TS - 3, this.TS - 1, 2)
-        } else if (t === 2) {
-          // Water — wave bands + sparkle
-          g.fillStyle(0x2a5a9a, 0.45); g.fillRect(wx + 1, wy + 3, this.TS - 3, 3)
-          g.fillStyle(0x4477bb, 0.5);  g.fillRect(wx + 2, wy + 10, this.TS - 5, 2)
-          g.fillStyle(0x6699cc, 0.5);  g.fillRect(wx + 4, wy + 17, this.TS - 8, 2)
-          if (seed % 4 === 0) { g.fillStyle(0xddeeff, 0.7); g.fillCircle(wx + 6, wy + 8, 1) }
-          if (seed % 3 === 1) { g.fillStyle(0xddeeff, 0.5); g.fillCircle(wx + 16, wy + 14, 0.8) }
-        } else if (t === 3) {
-          // Forest — tree with trunk and layered canopy
-          // Ground hint
-          g.fillStyle(0x1a4422, 0.6); g.fillRect(wx, wy + this.TS - 6, this.TS - 1, 5)
-          // trunk
-          g.fillStyle(0x3a200a); g.fillRect(wx + 10, wy + 13, 4, 9)
-          g.fillStyle(0x553a18, 0.6); g.fillRect(wx + 11, wy + 13, 1, 9)
-          // canopy
-          g.fillStyle(0x0a2218, 0.95); g.fillCircle(wx + 8, wy + 8, 8)
-          g.fillStyle(0x0a2218, 0.95); g.fillCircle(wx + 16, wy + 10, 6)
-          g.fillStyle(0x1a4422, 0.85); g.fillCircle(wx + 9, wy + 6, 5)
-          g.fillStyle(0x2a5532, 0.7); g.fillCircle(wx + 11, wy + 5, 3)
-          g.fillStyle(0x4a6638, 0.5); g.fillCircle(wx + 10, wy + 4, 1.5)
-        } else if (t === 4) {
-          // Rock/mountain — shaded with peak highlight + cracks
-          g.fillStyle(0x6a5a4a, 0.85); g.fillTriangle(wx + 3, wy + this.TS - 2, wx + 11, wy + 3, wx + 20, wy + this.TS - 2)
-          g.fillStyle(0x8a7a6a, 0.5); g.fillTriangle(wx + 6, wy + this.TS - 4, wx + 11, wy + 5, wx + 13, wy + this.TS - 4)
-          g.fillStyle(0xaaaaaa, 0.4); g.fillTriangle(wx + 9, wy + 8, wx + 11, wy + 4, wx + 12, wy + 8)
-          // cracks
-          g.lineStyle(1, 0x2a201a, 0.6)
-          g.beginPath(); g.moveTo(wx + 8, wy + 14); g.lineTo(wx + 12, wy + 18); g.strokePath()
-        } else if (t === 5) {
-          // Boss zone — ominous, glowing cracks
-          g.fillStyle(0xaa0033, 0.45); g.fillRect(wx, wy, this.TS - 1, this.TS - 1)
-          g.fillStyle(0xff0044, 0.18); g.fillRect(wx + 2, wy + 2, this.TS - 5, this.TS - 5)
-          g.lineStyle(1, 0xff3366, 0.65)
-          g.beginPath(); g.moveTo(wx + 3, wy + 6); g.lineTo(wx + 9, wy + 12); g.lineTo(wx + 14, wy + 18); g.strokePath()
-          g.beginPath(); g.moveTo(wx + 17, wy + 4); g.lineTo(wx + 12, wy + 11); g.strokePath()
-          g.fillStyle(0xffaa44, 0.45); g.fillCircle(wx + 9, wy + 12, 1.6)
-          if (seed % 2 === 0) { g.fillStyle(0xffdd66, 0.4); g.fillCircle(wx + 16, wy + 16, 1) }
-        }
-      }
+    drawChest(g: any, x: number, y: number) {
+      g.fillStyle(0x000000, 0.3); g.fillEllipse(x, y + 14, 24, 4)
+      g.fillStyle(0x6a4a2a); g.fillRoundedRect(x - 12, y, 24, 14, 2)
+      g.fillStyle(0x886030); g.fillRoundedRect(x - 12, y - 6, 24, 8, 3)
+      g.fillStyle(0xffdd44); g.fillRect(x - 1, y, 2, 5)
+      g.fillStyle(0x4a3a1a, 0.5); g.fillRect(x - 12, y + 7, 24, 2)
     }
 
     drawPlayer() {
-      const g = this.pG; g.clear()
-      const wx = this.pC * this.TS - this.camX + this.TS / 2
-      const wy = this.pR * this.TS - this.camY + 28 + this.TS / 2
-      g.fillStyle(0x000000, 0.25); g.fillEllipse(wx, wy + 10, 22, 6)
-      // Mini dino sprite (matches current stage color)
-      g.fillStyle(sp().stageColors[G.stage]); g.fillCircle(wx, wy - 1, 9)
-      // Snout hint
-      g.fillStyle(sp().stageColors[G.stage]); g.fillEllipse(wx + 5, wy + 1, 8, 5)
-      g.fillStyle(0x1a1a3a); g.fillCircle(wx - 2, wy - 3, 2); g.fillCircle(wx + 3, wy - 3, 2)
-      g.fillStyle(0xffffff); g.fillCircle(wx - 1, wy - 4, 0.7); g.fillCircle(wx + 4, wy - 4, 0.7)
-      // Highlight ring
-      g.lineStyle(2, 0xffffff, 0.45); g.strokeCircle(wx, wy - 1, 12)
+      this.cGfx.clear()
+      drawCreature(this.cGfx, G.stage, this.pX, this.floorY - 22)
     }
 
-    moveToward(tc: number, tr: number) {
-      const dc = Math.sign(tc - this.pC), dr = Math.sign(tr - this.pR)
-      if (Math.abs(tc - this.pC) >= Math.abs(tr - this.pR)) this.tryMove(this.pC + dc, this.pR)
-      else this.tryMove(this.pC, this.pR + dr)
+    tryActivate() {
+      if (!this.nearTarget) return
+      const t = this.nearTarget
+      if (t.kind === 'home')       this.scene.start('HomeScene')
+      else if (t.kind === 'chest') { this.scene.launch('ChestScene', { chestId: t.id, from: 'WorldScene' }); this.scene.pause() }
+      else if (t.kind === 'boss')  { this.cameras.main.flash(280, 255, 100, 100); this.time.delayedCall(280, () => this.scene.start('BattleScene', { isBoss: true, fromWorld: true })) }
     }
 
-    tryMove(nc: number, nr: number) {
-      if (nc < 0 || nc >= this.COLS || nr < 0 || nr >= this.ROWS) return
-      const t = this.map[nr][nc]
-      if (t === 2 || t === 4) return
-      this.pC = nc; this.pR = nr
-      this.camX = Phaser.Math.Clamp(this.pC * this.TS - W / 2 + this.TS / 2, 0, this.COLS * this.TS - W)
-      this.camY = Phaser.Math.Clamp(this.pR * this.TS - H / 2 + this.TS / 2, 0, this.ROWS * this.TS - H + 28)
-      this.redraw()
-      this.chkEnc(t)
+    openBag() { this.scene.launch('InventoryScene', { from: 'WorldScene' }); this.scene.pause() }
+
+    msg(txt: string) { this.msgT.setText(txt).setAlpha(1); this.msgTime = 1400 }
+
+    updHUD() {
+      this.hpT.setText('HP ' + G.hp + '/' + G.maxHp + '   ' + G.name + ' Lv.' + G.level + '   Day ' + G.day)
+      this.bagT.setText('🎒 ' + invTotal() + '/' + G.maxInv)
     }
 
-    chkEnc(t: number) {
-      if (this.eCd-- > 0) return
-      let ch = 0, boss = false
-      if (t === 0) ch = 20
-      else if (t === 3) ch = 40
-      else if (t === 5) { ch = 75; boss = true }
-      if (Phaser.Math.Between(1, 100) <= ch) {
-        this.eCd = 3
-        this.cameras.main.flash(280, 255, 255, 255)
-        this.time.delayedCall(280, () => this.scene.start('BattleScene', { isBoss: boss, fromWorld: true }))
+    update(time: number, dt: number) {
+      if (Phaser.Input.Keyboard.JustDown(this.escK)) { this.scene.start('HomeScene'); return }
+
+      let dx = 0
+      if (this.cursors.left.isDown  || this.wasd.A.isDown) dx -= 1
+      if (this.cursors.right.isDown || this.wasd.D.isDown) dx += 1
+      if (dx !== 0) {
+        this.pX = Math.max(20, Math.min(this.wWidth - 20, this.pX + dx * 1.7))
+        this.drawPlayer()
+        this.cameras.main.scrollX = Phaser.Math.Clamp(this.pX - W/2, 0, this.wWidth - W)
+      }
+
+      // Item pickups
+      for (const it of this.items) {
+        if (!it.taken && Math.abs(it.x - this.pX) < 14) {
+          if (invAdd(it.id, 1)) {
+            it.taken = true; it.gfx.destroy()
+            this.msg('Picked up ' + ITEMS[it.id].name)
+            this.updHUD()
+          } else this.msg('Bag is full!')
+        }
+      }
+
+      // Encounter check
+      this.encCd -= dt
+      if (this.encCd <= 0 && dx !== 0) {
+        for (const z of this.encZones) {
+          if (this.pX >= z.x1 && this.pX <= z.x2) {
+            if (Phaser.Math.Between(1, 1000) <= z.ch * 4) {
+              this.encCd = 1500
+              this.cameras.main.flash(280, 255, 255, 255)
+              this.time.delayedCall(280, () => this.scene.start('BattleScene', { isBoss: false, fromWorld: true }))
+              return
+            }
+          }
+        }
+      }
+
+      // Targets
+      let near: any = null
+      if (this.pX < 56) near = { kind: 'home', x: 34, y: this.floorY - 70 }
+      for (const c of this.chests) if (Math.abs(c.x - this.pX) < 22) near = { kind: 'chest', id: c.id, x: c.x, y: this.floorY - 32 }
+      if (this.pX > 1340 && this.pX < 1420) near = { kind: 'boss', x: 1380, y: this.floorY - 70 }
+
+      if (near !== this.nearTarget) {
+        this.nearTarget = near
+        if (near) {
+          const lbl = near.kind === 'home' ? '[SPACE] HOME' : (near.kind === 'chest' ? '[SPACE] OPEN CHEST' : '[SPACE] CHALLENGE BOSS')
+          this.prompt.setText(lbl).setX(near.x).setY(near.y).setAlpha(1)
+        } else this.prompt.setAlpha(0)
+      }
+
+      if (this.msgTime > 0) {
+        this.msgTime -= dt
+        if (this.msgTime <= 0) this.msgT.setAlpha(0)
       }
     }
+  }
+}
 
-    update(_: number, dt: number) {
-      this.mvDelay -= dt
-      if (Phaser.Input.Keyboard.JustDown(this.escK)) { this.scene.start('HomeScene'); return }
-      if (this.mvDelay > 0) return
-      let mv = false
-      if      (this.cursors.left.isDown  || this.wasd.A.isDown) { this.tryMove(this.pC - 1, this.pR); mv = true }
-      else if (this.cursors.right.isDown || this.wasd.D.isDown) { this.tryMove(this.pC + 1, this.pR); mv = true }
-      else if (this.cursors.up.isDown    || this.wasd.W.isDown) { this.tryMove(this.pC, this.pR - 1); mv = true }
-      else if (this.cursors.down.isDown  || this.wasd.S.isDown) { this.tryMove(this.pC, this.pR + 1); mv = true }
-      if (mv) this.mvDelay = 150
-      this.hpT.setText('HP:' + G.hp + '/' + G.maxHp)
+// ─── InventoryScene — backpack overlay ────────────────────────────────────────
+function createInventoryScene(Phaser: any) {
+  return class InventoryScene extends Phaser.Scene {
+    private from = 'HomeScene'
+
+    constructor() { super('InventoryScene') }
+    init(data: any) { this.from = data?.from || 'HomeScene' }
+
+    create() {
+      this.add.rectangle(W/2, H/2, W, H, 0x000000, 0.7).setInteractive()
+      this.add.rectangle(W/2, H/2, 400, 248, 0x0a1428, 0.97).setStrokeStyle(2, 0x4466aa)
+      this.add.rectangle(W/2, H/2 - 106, 400, 24, 0x1a2a4a)
+      this.add.text(W/2, H/2 - 106, 'BACKPACK   ' + invTotal() + ' / ' + G.maxInv, { fontSize: '11px', color: '#ddeeff', fontStyle: 'bold', letterSpacing: 2 }).setOrigin(0.5)
+
+      const cols = 5, slotW = 70, slotH = 38
+      const startX = W/2 - (cols * slotW) / 2 + slotW/2
+      const startY = H/2 - 70
+      const items = G.inventory.slice(0, 25)
+      for (let i = 0; i < 25; i++) {
+        const r = Math.floor(i / cols), c = i % cols
+        const sx = startX + c * slotW, sy = startY + r * slotH
+        const slot = this.add.rectangle(sx, sy, slotW - 4, slotH - 4, 0x14244a, 0.9).setStrokeStyle(1, 0x33446a)
+        if (items[i]) {
+          const it = items[i]; const def = ITEMS[it.id]
+          slot.setInteractive({ useHandCursor: true })
+          this.add.circle(sx, sy - 6, 6, def.color)
+          this.add.text(sx, sy + 6, def.name + ' x' + it.qty, { fontSize: '7px', color: '#ddeeff' }).setOrigin(0.5)
+          this.add.text(sx, sy + 13, def.desc, { fontSize: '6px', color: '#7799bb' }).setOrigin(0.5)
+          slot.on('pointerdown', () => {
+            if (invUse(it.id)) {
+              this.scene.stop()
+              this.scene.resume(this.from)
+              this.scene.launch('InventoryScene', { from: this.from }); this.scene.pause(this.from)
+            } else {
+              const tip = this.add.text(sx, sy - 18, "Can't use", { fontSize: '7px', color: '#ff8888' }).setOrigin(0.5)
+              this.time.delayedCall(700, () => tip.destroy())
+            }
+          })
+        }
+      }
+
+      this.add.text(W/2, H/2 + 102, 'Click an item to use it   ESC or B to close', { fontSize: '8px', color: '#7788aa' }).setOrigin(0.5)
+      const close = () => { this.scene.stop(); this.scene.resume(this.from) }
+      this.input.keyboard.on('keydown-ESC', close)
+      this.input.keyboard.on('keydown-B',   close)
+    }
+  }
+}
+
+// ─── ChestScene — transfer items between chest and backpack ───────────────────
+function createChestScene(Phaser: any) {
+  return class ChestScene extends Phaser.Scene {
+    private from = 'WorldScene'
+    private chestId = ''
+
+    constructor() { super('ChestScene') }
+    init(data: any) {
+      this.from = data?.from || 'WorldScene'
+      this.chestId = data?.chestId || ''
+    }
+
+    create() {
+      if (!G.chests[this.chestId]) G.chests[this.chestId] = { items: [] }
+      this.add.rectangle(W/2, H/2, W, H, 0x000000, 0.7).setInteractive()
+      this.add.rectangle(W/2, H/2, 440, 250, 0x0a1428, 0.97).setStrokeStyle(2, 0x886030)
+      this.add.rectangle(W/2, H/2 - 107, 440, 24, 0x4a3a1a)
+      this.add.text(W/2, H/2 - 107, 'CHEST', { fontSize: '11px', color: '#ffdd99', fontStyle: 'bold', letterSpacing: 2 }).setOrigin(0.5)
+
+      this.refresh()
+      this.add.text(W/2, H/2 + 105, 'Click to transfer   ESC/B to close', { fontSize: '8px', color: '#7788aa' }).setOrigin(0.5)
+
+      const close = () => { this.scene.stop(); this.scene.resume(this.from) }
+      this.input.keyboard.on('keydown-ESC', close)
+      this.input.keyboard.on('keydown-B',   close)
+    }
+
+    refresh() {
+      // destroy previous slot objects then redraw both columns
+      const slots: any[] = (this as any)._slots || []
+      slots.forEach(o => o.destroy())
+      const newSlots: any[] = []
+
+      const chest = G.chests[this.chestId]
+      const lblL = this.add.text(W/2 - 100, H/2 - 80, 'IN CHEST  (' + chest.items.length + ')', { fontSize: '9px', color: '#ffdd99', fontStyle: 'bold' }).setOrigin(0.5)
+      const lblR = this.add.text(W/2 + 100, H/2 - 80, 'IN BAG  ' + invTotal() + '/' + G.maxInv, { fontSize: '9px', color: '#ddeeff', fontStyle: 'bold' }).setOrigin(0.5)
+      newSlots.push(lblL, lblR)
+
+      const drawCol = (items: any[], baseX: number, fromChest: boolean) => {
+        for (let i = 0; i < Math.min(items.length, 8); i++) {
+          const it = items[i]; const def = ITEMS[it.id]
+          const sy = H/2 - 56 + i * 18
+          const slot = this.add.rectangle(baseX, sy, 150, 16, 0x14244a, 0.9).setStrokeStyle(1, 0x33446a).setInteractive({ useHandCursor: true })
+          const dot = this.add.circle(baseX - 64, sy, 4, def.color)
+          const txt = this.add.text(baseX - 56, sy - 4, def.name + ' x' + it.qty, { fontSize: '8px', color: '#ddeeff' })
+          const arr = this.add.text(baseX + 60, sy - 4, fromChest ? '→' : '←', { fontSize: '9px', color: '#88ccff' })
+          newSlots.push(slot, dot, txt, arr)
+          slot.on('pointerdown', () => {
+            if (fromChest) {
+              if (invAdd(it.id, 1)) {
+                it.qty -= 1
+                if (it.qty <= 0) chest.items = chest.items.filter((x: any) => x.id !== it.id)
+                this.refresh()
+              }
+            } else {
+              if (invRemove(it.id, 1)) {
+                const ex = chest.items.find((x: any) => x.id === it.id)
+                if (ex) ex.qty += 1; else chest.items.push({ id: it.id, qty: 1 })
+                this.refresh()
+              }
+            }
+          })
+        }
+        if (items.length === 0) {
+          newSlots.push(this.add.text(baseX, H/2 - 56, '(empty)', { fontSize: '8px', color: '#445566' }).setOrigin(0.5))
+        }
+      }
+
+      drawCol(chest.items, W/2 - 100, true)
+      drawCol(G.inventory, W/2 + 100, false)
+
+      ;(this as any)._slots = newSlots
     }
   }
 }
@@ -1580,6 +1911,7 @@ export default function PhaserGame() {
       species: 0, stage: 0, name: '???', hp: 20, maxHp: 20,
       atk: 5, def: 3, spd: 4, hunger: 80, happy: 80,
       xp: 0, level: 1, wins: 0, lastFed: 0,
+      day: 1, inventory: [], maxInv: 100, chests: {},
     })
 
     import('phaser').then((PhaserModule) => {
@@ -1599,6 +1931,8 @@ export default function PhaserGame() {
           createHomeScene(Phaser),
           createWorldScene(Phaser),
           createBattleScene(Phaser),
+          createInventoryScene(Phaser),
+          createChestScene(Phaser),
         ],
         scale: {
           mode:       Phaser.Scale.FIT,
