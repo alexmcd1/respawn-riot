@@ -18,7 +18,7 @@ const links: NavLink[] = [
   { href: '/anime',         label: 'Anime',    text: 'text-fuchsia-300',   glow: 'hover:border-fuchsia-400 hover:text-fuchsia-300 shadow-fuchsia-500/40', num: '01' },
   { href: '/pop-punk',      label: 'Pop Punk', text: 'text-pink-300',      glow: 'hover:border-pink-400 hover:text-pink-300 shadow-pink-500/40',       num: '02' },
   { href: '/gaming',        label: 'Gaming',   text: 'text-cyan-300',      glow: 'hover:border-cyan-400 hover:text-cyan-300 shadow-cyan-500/40',       num: '03' },
-  { href: '/game',          label: 'Lumling',  text: 'text-lime-300',      glow: 'hover:border-lime-400 hover:text-lime-300 shadow-lime-500/40',       num: '04' },
+  { href: '/game',          label: 'RC',       text: 'text-lime-300',      glow: 'hover:border-lime-400 hover:text-lime-300 shadow-lime-500/40',       num: '04' },
   { href: '/trading-cards', label: 'TDC',      text: 'text-amber-300',     glow: 'hover:border-amber-400 hover:text-amber-300 shadow-amber-500/40',    num: '05' },
   { href: '/orlando',       label: 'Orlando',  text: 'text-orange-300',    glow: 'hover:border-orange-400 hover:text-orange-300 shadow-orange-500/40', num: '06' },
 ]
@@ -27,7 +27,7 @@ const tickerItems = [
   '★ NEW DROP — TDC TRADING CARDS LIVE',
   '✶ SPRING 2026 ANIME RANKED',
   '☠ POP PUNK HEADLINES',
-  '◢ LUMLING DEVLOG',
+  '◢ RC — RESPAWN CREATURES DEVLOG',
   '☼ ORLANDO LIVE WEATHER + PARK NEWS',
   '⚡ JOIN THE RIOT',
 ]
