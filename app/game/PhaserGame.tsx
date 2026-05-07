@@ -1404,7 +1404,7 @@ function createHomeScene(Phaser: any) {
 
       // Define and draw zones
       this.zones = [
-        { x: 60,  label: 'Fruit Tree',   prompt: '[SPACE] PICK',    action: () => this.pickFruit(),  draw: this.drawFruitTree.bind(this) },
+        { x: 60,  label: 'Fruit Tree',   prompt: '[SPACE] EAT',     action: () => this.pickFruit(),  draw: this.drawFruitTree.bind(this) },
         { x: 155, label: 'Punching Bag', prompt: '[SPACE] TRAIN',   action: () => this.train(),     draw: this.drawBag.bind(this) },
         { x: 240, label: 'Fidget Rings', prompt: '[SPACE] PLAY',    action: () => this.fidget(),    draw: this.drawFidget.bind(this) },
         { x: 335, label: 'Bed',          prompt: '[SPACE] SLEEP',   action: () => this.sleep(),     draw: this.drawBed.bind(this) },
@@ -1454,7 +1454,7 @@ function createHomeScene(Phaser: any) {
 
       // Bottom hint
       this.add.rectangle(W/2, H - 8, W, 16, 0x080814, 0.85)
-      this.add.text(W/2, H - 8, 'WASD/Arrows to move   SPACE to interact   B for backpack', { fontSize: '7px', color: '#556677' }).setOrigin(0.5)
+      this.add.text(W/2, H - 8, 'WASD/Arrows move   SPACE interact   B backpack   C codex', { fontSize: '7px', color: '#556677' }).setOrigin(0.5)
 
       // Controls
       this.cursors = this.input.keyboard.createCursorKeys()
@@ -1551,24 +1551,40 @@ function createHomeScene(Phaser: any) {
 
     tryActivate() { if (this.nearZone) this.nearZone.action() }
 
+    // Reset transform + cancel pending tweens before kicking off a new bounce.
+    // Without this, rapid SPACE presses stacked tweens and cGfx.y drifted away
+    // from 0, leaving the creature stuck off-screen.
+    resetSprite() {
+      this.tweens.killTweensOf(this.cGfx)
+      this.cGfx.x = 0
+      this.cGfx.y = 0
+    }
+
     pickFruit() {
       const r = Math.random()
       const itemId = r < 0.55 ? 'berry' : (r < 0.85 ? 'apple' : 'herb')
-      if (invAdd(itemId, 1)) {
-        this.msg('Picked a ' + ITEMS[itemId].name + '!')
-        this.tweens.add({ targets: this.cGfx, y: this.cGfx.y - 8, duration: 180, yoyo: true })
-      } else this.msg('Bag is full!')
-      this.updHUD()
+      const item = ITEMS[itemId]
+      // Eat one immediately so the player doesn't have to open the bag to feed.
+      const ate = item.effect()
+      let line = ate
+        ? `Ate a ${item.name}   ${item.desc}`
+        : `Picked a ${item.name}, but already maxed`
+      // Always also drop one in the bag if there's room.
+      if (invAdd(itemId, 1)) line += '   (+1 in bag)'
+      this.msg(line); this.updHUD()
+      this.resetSprite()
+      this.tweens.add({ targets: this.cGfx, y: -8, duration: 180, yoyo: true })
     }
 
     train() {
-      if (G.hunger <= 10) { this.msg('Too hungry to train!'); return }
+      if (G.hunger <= 10) { this.msg('Too hungry to train! Eat at the Fruit Tree first.'); return }
       G.hunger = Math.max(0, G.hunger - 10); G.happy = Math.min(100, G.happy + 5)
       let line = '+10 XP   -10 Hunger'
       if (Math.random() < 0.25) { G.maxHp += 1; G.hp = Math.min(G.maxHp, G.hp + 1); line = '+10 XP   +1 MAX HP!' }
       const r = gainXp(10)
       this.msg(line); this.updHUD()
-      this.tweens.add({ targets: this.cGfx, x: this.cX + 6, duration: 90, yoyo: true, repeat: 2 })
+      this.resetSprite()
+      this.tweens.add({ targets: this.cGfx, x: 8, duration: 80, yoyo: true, repeat: 2 })
       if (r.leveled) this.showLevelUp(r.levelsGained)
       if (r.shouldEvolve) this.time.delayedCall(900, () => this.evolve())
     }
@@ -1580,7 +1596,8 @@ function createHomeScene(Phaser: any) {
       if (Math.random() < 0.3 && invAdd('shard', 1)) line = 'Played +Happy   Found a Crystal!'
       const r = gainXp(3)
       this.msg(line); this.updHUD()
-      this.tweens.add({ targets: this.cGfx, y: this.cGfx.y - 10, duration: 180, yoyo: true, repeat: 1 })
+      this.resetSprite()
+      this.tweens.add({ targets: this.cGfx, y: -12, duration: 180, yoyo: true, repeat: 1 })
       if (r.leveled) this.showLevelUp(r.levelsGained)
       if (r.shouldEvolve) this.time.delayedCall(900, () => this.evolve())
     }
