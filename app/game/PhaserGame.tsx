@@ -11,89 +11,309 @@ const G: any = {
   xp: 0,
   xpNeeded: [30, 100, 250, 500, 9999999],
   level: 1, wins: 0, lastFed: 0,
-  stageNames: ['Egg', 'Lumling', 'Lumora', 'Lumorex', 'Lumaxis'],
-  stageColors: [0xd4c5f9, 0x88d8ff, 0x44aaff, 0x4466cc, 0xaa44ff],
-  stagePulse:  [0xeeeeff, 0xaaddff, 0x66bbff, 0x6688ff, 0xcc66ff],
+  stageNames: ['Egg', 'Hatchling', 'Saurling', 'Raptus', 'Tyranex'],
+  stageColors: [0xd4c5f9, 0x77dd66, 0x44aa55, 0x4488cc, 0xcc4422],
+  stagePulse:  [0xeeeeff, 0xaaff99, 0x88dd77, 0x77bbdd, 0xff8844],
 }
 
 const W = 480, H = 320
 
-// ─── Creature drawing ─────────────────────────────────────────────────────────
+// ─── Creature drawing (dinosaur evolution line) ───────────────────────────────
 function drawCreature(g: any, stage: number, x: number, y: number) {
   const c = G.stageColors[stage]
   const p = G.stagePulse[stage]
   g.clear()
 
   if (stage === 0) {
+    // Dino egg with dark green spots
     g.fillStyle(0x000000, 0.18); g.fillEllipse(x, y + 22, 30, 8)
     g.fillStyle(0xeeeeff);       g.fillEllipse(x, y, 30, 38)
     g.fillStyle(0xffffff, 0.55); g.fillEllipse(x - 6, y - 8, 10, 14)
-    g.fillStyle(c, 0.5)
-    g.fillCircle(x + 4, y + 4, 4); g.fillCircle(x - 6, y + 8, 3); g.fillCircle(x + 2, y - 4, 2)
+    g.fillStyle(0x44aa55, 0.85)
+    g.fillCircle(x + 5, y + 4, 4); g.fillCircle(x - 7, y + 9, 3)
+    g.fillCircle(x + 3, y - 6, 3); g.fillCircle(x - 4, y - 1, 2)
+    g.fillStyle(0x2a7a35, 0.6); g.fillCircle(x + 5, y + 4, 2)
 
   } else if (stage === 1) {
-    g.fillStyle(0x000000, 0.15); g.fillEllipse(x, y + 20, 28, 7)
+    // Hatchling — chubby baby dino, big head, oversized eyes
+    g.fillStyle(0x000000, 0.2); g.fillEllipse(x, y + 22, 26, 7)
+
+    // Tail nub
     g.fillStyle(c)
-    g.fillCircle(x, y + 4, 16); g.fillCircle(x - 10, y - 6, 7); g.fillCircle(x + 10, y - 6, 7)
-    g.fillStyle(p); g.fillCircle(x - 10, y - 6, 4); g.fillCircle(x + 10, y - 6, 4)
-    g.fillStyle(0x1a1a3a); g.fillCircle(x - 6, y + 2, 5); g.fillCircle(x + 6, y + 2, 5)
-    g.fillStyle(0xffffff); g.fillCircle(x - 4, y, 2); g.fillCircle(x + 8, y, 2)
-    g.fillStyle(0xff88bb, 0.4); g.fillCircle(x - 10, y + 6, 4); g.fillCircle(x + 10, y + 6, 4)
-    g.fillStyle(0x1a1a3a); g.fillRoundedRect(x - 4, y + 9, 8, 3, 2)
+    g.fillTriangle(x + 8, y + 6, x + 18, y + 12, x + 8, y + 14)
+
+    // Body
+    g.fillStyle(c); g.fillEllipse(x, y + 4, 22, 24)
+    // Belly
+    g.fillStyle(p, 0.55); g.fillEllipse(x - 1, y + 8, 12, 14)
+
+    // Legs
+    g.fillStyle(c)
+    g.fillRoundedRect(x - 7, y + 13, 5, 9, 2)
+    g.fillRoundedRect(x + 2, y + 13, 5, 9, 2)
+    g.fillStyle(0x1a1a3a)
+    g.fillRect(x - 8, y + 20, 7, 3); g.fillRect(x + 1, y + 20, 7, 3)
+
+    // Head
+    g.fillStyle(c); g.fillCircle(x - 2, y - 8, 13)
+    // Snout
+    g.fillStyle(c); g.fillEllipse(x + 7, y - 6, 10, 8)
+    g.fillStyle(p, 0.4); g.fillEllipse(x + 7, y - 4, 8, 5)
+
+    // Eyes (huge)
+    g.fillStyle(0xffffff)
+    g.fillCircle(x - 5, y - 10, 4); g.fillCircle(x + 3, y - 10, 4)
+    g.fillStyle(0x1a1a3a)
+    g.fillCircle(x - 4, y - 9, 2.2); g.fillCircle(x + 4, y - 9, 2.2)
+    g.fillStyle(0xffffff)
+    g.fillCircle(x - 3, y - 10, 0.9); g.fillCircle(x + 5, y - 10, 0.9)
+
+    // Nostril
+    g.fillStyle(0x1a1a3a); g.fillCircle(x + 11, y - 7, 0.7)
+
+    // Tiny head spike
+    g.fillStyle(p)
+    g.fillTriangle(x - 5, y - 19, x - 2, y - 24, x + 1, y - 19)
 
   } else if (stage === 2) {
-    g.fillStyle(0x000000, 0.15); g.fillEllipse(x, y + 26, 34, 8)
+    // Saurling — juvenile, small spikes, longer tail
+    g.fillStyle(0x000000, 0.22); g.fillEllipse(x, y + 26, 32, 8)
+
+    // Tail
     g.fillStyle(c)
-    g.fillTriangle(x + 14, y + 10, x + 8, y + 18, x + 22, y + 20)
-    g.fillRoundedRect(x - 14, y - 10, 28, 32, 10)
-    g.fillCircle(x, y - 8, 14)
-    g.fillTriangle(x - 14, y - 12, x - 8, y - 22, x - 2, y - 12)
-    g.fillTriangle(x + 14, y - 12, x + 8, y - 22, x + 2, y - 12)
+    g.fillTriangle(x + 6, y + 8, x + 24, y + 4, x + 12, y + 16)
+    g.fillTriangle(x + 14, y + 4, x + 26, y - 2, x + 20, y + 8)
     g.fillStyle(p)
-    g.fillTriangle(x - 12, y - 12, x - 8, y - 20, x - 3, y - 12)
-    g.fillTriangle(x + 12, y - 12, x + 8, y - 20, x + 3, y - 12)
-    g.fillStyle(0x1a1a3a); g.fillCircle(x - 5, y - 10, 5); g.fillCircle(x + 5, y - 10, 5)
-    g.fillStyle(0xffffff); g.fillCircle(x - 3, y - 12, 2); g.fillCircle(x + 7, y - 12, 2)
-    g.fillStyle(p, 0.5); g.fillEllipse(x, y + 6, 16, 18)
+    g.fillTriangle(x + 22, y - 1, x + 28, y - 6, x + 25, y + 2)
+
+    // Body
+    g.fillStyle(c); g.fillEllipse(x - 1, y + 6, 26, 26)
+    g.fillStyle(p, 0.5); g.fillEllipse(x - 1, y + 10, 14, 16)
+
+    // Back spikes
+    g.fillStyle(p)
+    g.fillTriangle(x - 9, y - 4, x - 7, y - 11, x - 5, y - 4)
+    g.fillTriangle(x - 3, y - 6, x - 1, y - 14, x + 1, y - 6)
+    g.fillTriangle(x + 3, y - 4, x + 5, y - 11, x + 7, y - 4)
+
+    // Legs
     g.fillStyle(c)
-    g.fillRoundedRect(x - 10, y + 18, 7, 10, 3); g.fillRoundedRect(x + 3, y + 18, 7, 10, 3)
+    g.fillRoundedRect(x - 9, y + 15, 6, 11, 2)
+    g.fillRoundedRect(x + 2, y + 15, 6, 11, 2)
+    g.fillStyle(0x1a1a3a)
+    g.fillRect(x - 10, y + 24, 8, 3); g.fillRect(x + 1, y + 24, 8, 3)
+    // Foot claws
+    g.fillStyle(0xeeeeff)
+    for (let i = 0; i < 3; i++) {
+      g.fillTriangle(x - 10 + i*3, y + 27, x - 9 + i*3, y + 29, x - 8 + i*3, y + 27)
+      g.fillTriangle(x + 1 + i*3, y + 27, x + 2 + i*3, y + 29, x + 3 + i*3, y + 27)
+    }
+
+    // Tiny arms
+    g.fillStyle(c)
+    g.fillRoundedRect(x - 14, y + 4, 4, 8, 2)
+    g.fillRoundedRect(x + 9, y + 4, 4, 8, 2)
+
+    // Head
+    g.fillStyle(c); g.fillCircle(x - 4, y - 8, 12)
+    // Snout (longer)
+    g.fillStyle(c); g.fillRoundedRect(x + 1, y - 11, 14, 9, 3)
+    g.fillStyle(p, 0.4); g.fillRoundedRect(x + 1, y - 7, 12, 4, 2)
+
+    // Mouth line
+    g.lineStyle(1, 0x1a1a3a, 0.7)
+    g.beginPath(); g.moveTo(x + 2, y - 4); g.lineTo(x + 14, y - 3); g.strokePath()
+
+    // Eyes
+    g.fillStyle(0xffffff); g.fillEllipse(x - 6, y - 10, 6, 5)
+    g.fillStyle(0x1a1a3a); g.fillCircle(x - 5, y - 10, 2)
+    g.fillStyle(0xffffff); g.fillCircle(x - 5, y - 11, 0.8)
+
+    // Brow horn
+    g.fillStyle(p); g.fillTriangle(x - 8, y - 18, x - 5, y - 23, x - 2, y - 18)
+    // Nostril
+    g.fillStyle(0x1a1a3a); g.fillCircle(x + 13, y - 8, 0.8)
 
   } else if (stage === 3) {
-    g.fillStyle(0x000000, 0.15); g.fillEllipse(x, y + 32, 44, 10)
-    g.fillStyle(c, 0.55)
-    g.fillTriangle(x - 16, y, x - 32, y - 16, x - 12, y + 8)
-    g.fillTriangle(x + 16, y, x + 32, y - 16, x + 12, y + 8)
+    // Raptus — teen raptor, fierce, full tail and big spikes
+    g.fillStyle(0x000000, 0.22); g.fillEllipse(x, y + 32, 42, 10)
+
+    // Long tail
     g.fillStyle(c)
-    g.fillRoundedRect(x - 16, y - 14, 32, 40, 12); g.fillCircle(x, y - 12, 16)
-    g.fillStyle(p); g.fillTriangle(x - 6, y - 24, x, y - 30, x + 6, y - 24)
-    g.fillStyle(0x1a1a3a); g.fillEllipse(x - 7, y - 14, 10, 8); g.fillEllipse(x + 7, y - 14, 10, 8)
-    g.fillStyle(p); g.fillEllipse(x - 7, y - 14, 6, 5); g.fillEllipse(x + 7, y - 14, 6, 5)
-    g.fillStyle(0xffffff); g.fillCircle(x - 5, y - 16, 2); g.fillCircle(x + 9, y - 16, 2)
-    g.fillStyle(p, 0.4); g.fillRoundedRect(x - 8, y - 2, 16, 22, 6)
+    g.fillTriangle(x + 6, y + 10, x + 28, y + 4, x + 14, y + 18)
+    g.fillTriangle(x + 16, y + 4, x + 32, y - 6, x + 24, y + 4)
+    g.fillTriangle(x + 22, y - 4, x + 36, y - 16, x + 28, y - 4)
+    g.fillStyle(p)
+    g.fillTriangle(x + 30, y - 14, x + 38, y - 22, x + 34, y - 14)
+
+    // Body
+    g.fillStyle(c); g.fillEllipse(x - 2, y + 4, 28, 32)
+    // Belly + scale lines
+    g.fillStyle(p, 0.55); g.fillEllipse(x - 2, y + 10, 16, 22)
+    g.lineStyle(0.5, 0x1a3a4a, 0.6)
+    for (let i = 0; i < 4; i++) {
+      g.beginPath(); g.moveTo(x - 7, y + 2 + i * 5); g.lineTo(x + 5, y + 2 + i * 5); g.strokePath()
+    }
+
+    // Back spikes (5)
+    g.fillStyle(p)
+    for (let i = 0; i < 5; i++) {
+      const sx = x - 12 + i * 5
+      const sh = i === 2 ? 13 : 9
+      g.fillTriangle(sx - 2, y - 8, sx, y - 8 - sh, sx + 2, y - 8)
+    }
+    g.fillStyle(0xffffff, 0.5)
+    for (let i = 0; i < 5; i++) {
+      const sx = x - 12 + i * 5
+      const sh = i === 2 ? 8 : 5
+      g.fillTriangle(sx - 1, y - 8, sx, y - 8 - sh, sx + 1, y - 8)
+    }
+
+    // Strong legs
     g.fillStyle(c)
-    g.fillRoundedRect(x - 14, y + 22, 9, 12, 4); g.fillRoundedRect(x + 5, y + 22, 9, 12, 4)
-    g.fillStyle(0x222244); g.fillEllipse(x - 10, y + 34, 14, 6); g.fillEllipse(x + 10, y + 34, 14, 6)
+    g.fillEllipse(x - 8, y + 22, 9, 14)
+    g.fillEllipse(x + 4, y + 22, 9, 14)
+    g.fillStyle(0x1a1a3a)
+    g.fillRect(x - 13, y + 30, 11, 4)
+    g.fillRect(x - 1, y + 30, 11, 4)
+    g.fillStyle(0xeeeeff)
+    for (let i = 0; i < 3; i++) {
+      g.fillTriangle(x - 13 + i*4, y + 34, x - 11 + i*4, y + 37, x - 9 + i*4, y + 34)
+      g.fillTriangle(x - 1 + i*4, y + 34, x + 1 + i*4, y + 37, x + 3 + i*4, y + 34)
+    }
+
+    // Arms with hand-claws
+    g.fillStyle(c)
+    g.fillEllipse(x - 14, y + 4, 5, 11)
+    g.fillEllipse(x + 10, y + 4, 5, 11)
+    g.fillStyle(0xeeeeff)
+    g.fillTriangle(x - 16, y + 9, x - 14, y + 13, x - 12, y + 9)
+    g.fillTriangle(x + 8, y + 9, x + 10, y + 13, x + 12, y + 9)
+
+    // Head (more dino-like)
+    g.fillStyle(c); g.fillEllipse(x - 6, y - 12, 18, 14)
+    // Long snout
+    g.fillStyle(c); g.fillRoundedRect(x - 2, y - 14, 18, 10, 3)
+    g.fillStyle(p, 0.4); g.fillRoundedRect(x - 2, y - 9, 16, 4, 2)
+
+    // Teeth
+    g.fillStyle(0xffffff)
+    for (let i = 0; i < 4; i++) {
+      g.fillTriangle(x + 1 + i*4, y - 4, x + 2 + i*4, y - 1, x + 3 + i*4, y - 4)
+    }
+    g.lineStyle(1, 0x1a1a3a, 0.8)
+    g.beginPath(); g.moveTo(x, y - 4); g.lineTo(x + 16, y - 4); g.strokePath()
+
+    // Eyes (fierce yellow)
+    g.fillStyle(0xffdd33); g.fillEllipse(x - 5, y - 14, 6, 5)
+    g.fillStyle(0x1a1a3a); g.fillEllipse(x - 4, y - 14, 3, 5)
+    g.fillStyle(0xffffff); g.fillCircle(x - 3, y - 15, 0.8)
+
+    // Nostril
+    g.fillStyle(0x1a1a3a); g.fillCircle(x + 14, y - 11, 1)
+
+    // Brow horn
+    g.fillStyle(p); g.fillTriangle(x - 9, y - 20, x - 5, y - 27, x - 1, y - 20)
 
   } else {
-    g.fillStyle(c, 0.12); g.fillCircle(x, y, 54)
-    g.fillStyle(c, 0.08); g.fillCircle(x, y, 66)
-    g.fillStyle(c, 0.65)
-    g.fillTriangle(x - 18, y - 10, x - 48, y - 38, x - 10, y + 16)
-    g.fillTriangle(x + 18, y - 10, x + 48, y - 38, x + 10, y + 16)
-    g.fillStyle(p, 0.45)
-    g.fillTriangle(x - 18, y - 10, x - 38, y - 30, x - 12, y + 10)
-    g.fillTriangle(x + 18, y - 10, x + 38, y - 30, x + 12, y + 10)
+    // Tyranex — apex predator, glowing eyes, wings, huge spikes
+    g.fillStyle(c, 0.12); g.fillCircle(x, y, 60)
+    g.fillStyle(c, 0.08); g.fillCircle(x, y, 72)
+
+    g.fillStyle(0x000000, 0.28); g.fillEllipse(x, y + 38, 56, 12)
+
+    // Massive tail
     g.fillStyle(c)
-    g.fillRoundedRect(x - 18, y - 18, 36, 50, 14); g.fillCircle(x, y - 16, 20)
-    g.fillStyle(0xffdd44)
-    for (let i = -2; i <= 2; i++) g.fillTriangle(x + i * 8 - 4, y - 32, x + i * 8, y - 44, x + i * 8 + 4, y - 32)
-    g.fillStyle(p); g.fillEllipse(x - 8, y - 18, 12, 10); g.fillEllipse(x + 8, y - 18, 12, 10)
-    g.fillStyle(0xffffff); g.fillEllipse(x - 8, y - 18, 8, 7); g.fillEllipse(x + 8, y - 18, 8, 7)
-    g.fillStyle(0x220044); g.fillCircle(x - 8, y - 18, 3); g.fillCircle(x + 8, y - 18, 3)
-    g.fillStyle(p, 0.3); g.fillEllipse(x, y + 6, 22, 28)
+    g.fillTriangle(x + 8, y + 16, x + 38, y + 4, x + 18, y + 26)
+    g.fillTriangle(x + 22, y + 4, x + 48, y - 10, x + 32, y + 8)
+    g.fillTriangle(x + 32, y - 8, x + 54, y - 28, x + 42, y - 4)
+    g.fillStyle(p)
+    g.fillTriangle(x + 48, y - 24, x + 58, y - 36, x + 52, y - 22)
+    g.fillTriangle(x + 44, y - 18, x + 54, y - 30, x + 50, y - 16)
+
+    // Wings (dragon flair)
+    g.fillStyle(c, 0.55)
+    g.fillTriangle(x - 14, y - 8, x - 38, y - 32, x - 8, y + 10)
+    g.fillTriangle(x + 14, y - 8, x + 38, y - 32, x + 8, y + 10)
+    g.fillStyle(p, 0.4)
+    g.fillTriangle(x - 14, y - 8, x - 30, y - 24, x - 10, y + 6)
+    g.fillTriangle(x + 14, y - 8, x + 30, y - 24, x + 10, y + 6)
+    // Wing bones
+    g.lineStyle(1, p, 0.6)
+    g.beginPath(); g.moveTo(x - 14, y - 8); g.lineTo(x - 36, y - 30); g.strokePath()
+    g.beginPath(); g.moveTo(x + 14, y - 8); g.lineTo(x + 36, y - 30); g.strokePath()
+
+    // Body
+    g.fillStyle(c); g.fillEllipse(x - 2, y + 6, 36, 40)
+    // Belly + ribs
+    g.fillStyle(p, 0.55); g.fillEllipse(x - 2, y + 14, 22, 28)
+    g.lineStyle(1, 0x441100, 0.55)
+    for (let i = 0; i < 5; i++) {
+      g.beginPath(); g.moveTo(x - 9, y + 2 + i * 6); g.lineTo(x + 5, y + 2 + i * 6); g.strokePath()
+    }
+
+    // HUGE back spikes
+    g.fillStyle(p)
+    for (let i = 0; i < 6; i++) {
+      const sx = x - 16 + i * 6
+      const sh = (i === 2 || i === 3) ? 18 : 12
+      g.fillTriangle(sx - 3, y - 10, sx, y - 10 - sh, sx + 3, y - 10)
+    }
+    g.fillStyle(0xffdd44, 0.7)
+    for (let i = 0; i < 6; i++) {
+      const sx = x - 16 + i * 6
+      const sh = (i === 2 || i === 3) ? 12 : 8
+      g.fillTriangle(sx - 1, y - 10, sx, y - 10 - sh, sx + 1, y - 10)
+    }
+
+    // Strong legs
     g.fillStyle(c)
-    g.fillRoundedRect(x - 16, y + 28, 11, 14, 5); g.fillRoundedRect(x + 5, y + 28, 11, 14, 5)
-    g.fillStyle(p); g.fillTriangle(x - 4, y + 42, x + 4, y + 42, x, y + 56)
+    g.fillEllipse(x - 12, y + 26, 12, 18)
+    g.fillEllipse(x + 6, y + 26, 12, 18)
+    g.fillStyle(0x1a1a3a)
+    g.fillRect(x - 18, y + 36, 14, 5)
+    g.fillRect(x, y + 36, 14, 5)
+    g.fillStyle(0xeeeeff)
+    for (let i = 0; i < 3; i++) {
+      g.fillTriangle(x - 18 + i*5, y + 41, x - 16 + i*5, y + 45, x - 14 + i*5, y + 41)
+      g.fillTriangle(x + i*5, y + 41, x + 2 + i*5, y + 45, x + 4 + i*5, y + 41)
+    }
+
+    // Arms with claws
+    g.fillStyle(c)
+    g.fillEllipse(x - 18, y + 4, 7, 14)
+    g.fillEllipse(x + 14, y + 4, 7, 14)
+    g.fillStyle(0xeeeeff)
+    g.fillTriangle(x - 22, y + 11, x - 18, y + 16, x - 14, y + 11)
+    g.fillTriangle(x + 10, y + 11, x + 14, y + 16, x + 18, y + 11)
+
+    // Head
+    g.fillStyle(c); g.fillEllipse(x - 6, y - 16, 22, 18)
+    // Long snout
+    g.fillStyle(c); g.fillRoundedRect(x, y - 18, 22, 12, 4)
+    g.fillStyle(p, 0.4); g.fillRoundedRect(x, y - 12, 20, 5, 2)
+
+    // Sharp teeth (top + bottom)
+    g.fillStyle(0xffffff)
+    for (let i = 0; i < 5; i++) {
+      g.fillTriangle(x + 2 + i*4, y - 6, x + 3 + i*4, y - 2, x + 4 + i*4, y - 6)
+      g.fillTriangle(x + 2 + i*4, y - 8, x + 3 + i*4, y - 12, x + 4 + i*4, y - 8)
+    }
+
+    // Glowing eyes
+    g.fillStyle(0xff3333); g.fillEllipse(x - 7, y - 18, 7, 6)
+    g.fillStyle(0xffaa00); g.fillEllipse(x - 7, y - 18, 4, 4)
+    g.fillStyle(0xffffff); g.fillCircle(x - 6, y - 19, 1)
+
+    // Nostril
+    g.fillStyle(0x1a1a3a); g.fillCircle(x + 18, y - 14, 1.5)
+
+    // Massive horns
+    g.fillStyle(p)
+    g.fillTriangle(x - 12, y - 24, x - 8, y - 38, x - 4, y - 22)
+    g.fillTriangle(x - 16, y - 22, x - 18, y - 36, x - 8, y - 22)
+    g.fillStyle(0xffdd44, 0.7)
+    g.fillTriangle(x - 11, y - 24, x - 8, y - 34, x - 5, y - 22)
   }
 }
 
@@ -346,14 +566,23 @@ function createWorldScene(Phaser: any) {
       this.pG = this.add.graphics()
       this.redraw()
 
-      this.add.rectangle(W / 2, 14, W, 28, 0x080810, 0.93)
-      this.add.text(10, 6, 'OVERWORLD', { fontSize: '8px', color: '#7788aa', letterSpacing: 3 })
-      this.hpT = this.add.text(W / 2, 7, 'HP:' + G.hp + '/' + G.maxHp, { fontSize: '9px', color: '#44ff88' }).setOrigin(0.5, 0)
-      this.add.text(W - 8, 6, 'ESC=HOME  WASD/ARROWS', { fontSize: '7px', color: '#445566' }).setOrigin(1, 0)
-      this.add.text(W / 2, 18, G.name, { fontSize: '8px', color: '#9999cc' }).setOrigin(0.5, 0)
+      // Top bar
+      this.add.rectangle(W / 2, 14, W, 28, 0x080810, 0.93).setDepth(5)
+      this.add.text(10, 6, 'OVERWORLD', { fontSize: '8px', color: '#7788aa', letterSpacing: 3 }).setDepth(6)
+      this.hpT = this.add.text(W / 2, 7, 'HP:' + G.hp + '/' + G.maxHp, { fontSize: '9px', color: '#44ff88' }).setOrigin(0.5, 0).setDepth(6)
+      this.add.text(W / 2, 18, G.name, { fontSize: '8px', color: '#9999cc' }).setOrigin(0.5, 0).setDepth(6)
 
-      this.add.rectangle(W / 2, H - 14, W, 28, 0x080810, 0.9)
-      this.add.text(8, H - 22, 'Grass=Encounters   Forest=Hard   Red Zone=Boss', { fontSize: '7px', color: '#556677' })
+      // HOME button (clickable, replaces small ESC hint)
+      const homeBg = this.add.rectangle(W - 38, 14, 64, 18, 0x1a3344, 0.95).setInteractive({ useHandCursor: true }).setStrokeStyle(1, 0x55aaff).setDepth(6)
+      this.add.text(W - 38, 14, '← HOME', { fontSize: '9px', color: '#aaccff', fontStyle: 'bold' }).setOrigin(0.5).setDepth(7)
+      homeBg.on('pointerover', () => homeBg.setStrokeStyle(2, 0x88ccff))
+      homeBg.on('pointerout',  () => homeBg.setStrokeStyle(1, 0x55aaff))
+      homeBg.on('pointerdown', () => this.scene.start('HomeScene'))
+
+      // Bottom bar
+      this.add.rectangle(W / 2, H - 14, W, 28, 0x080810, 0.9).setDepth(5)
+      this.add.text(8, H - 22, 'WASD/Arrows to move   ESC or HOME to return', { fontSize: '7px', color: '#556677' }).setDepth(6)
+      this.add.text(W - 8, H - 22, 'Grass=Wild  Forest=Hard  Red=Boss', { fontSize: '7px', color: '#774455' }).setOrigin(1, 0).setDepth(6)
 
       this.cursors = this.input.keyboard.createCursorKeys()
       this.wasd    = this.input.keyboard.addKeys('W,A,S,D')
@@ -369,7 +598,7 @@ function createWorldScene(Phaser: any) {
       if (data?.result) {
         const color = data.result === 'win' ? '#44ff88' : '#ff4444'
         const label = data.result === 'win' ? 'Victory!' : 'Defeated!'
-        const rt = this.add.text(W / 2, H / 2, label, { fontSize: '15px', color, fontStyle: 'bold' }).setOrigin(0.5)
+        const rt = this.add.text(W / 2, H / 2, label, { fontSize: '15px', color, fontStyle: 'bold' }).setOrigin(0.5).setDepth(8)
         this.tweens.add({ targets: rt, y: rt.y - 40, alpha: 0, duration: 2000, onComplete: () => rt.destroy() })
       }
     }
@@ -388,7 +617,7 @@ function createWorldScene(Phaser: any) {
       return m
     }
 
-    tc(t: number) { return [0x1a4422, 0x8B6914, 0x1a3a6a, 0x0d3322, 0x4a3a2a, 0x2a0022][t] || 0x1a4422 }
+    tc(t: number) { return [0x1f5028, 0x9c7a1c, 0x1d3e72, 0x0d3322, 0x4a3a2a, 0x2a0022][t] || 0x1f5028 }
 
     redraw() { this.drawMap(); this.drawPlayer() }
 
@@ -398,12 +627,77 @@ function createWorldScene(Phaser: any) {
         const t = this.map[r][c]
         const wx = c * this.TS - this.camX
         const wy = r * this.TS - this.camY + 28
+        const seed = (r * 31 + c * 17) % 11
+
+        // Base
         g.fillStyle(this.tc(t)); g.fillRect(wx, wy, this.TS - 1, this.TS - 1)
-        if (t === 0) { g.fillStyle(0x2a6633, 0.35); if ((r+c)%3===0) g.fillRect(wx+4,wy+4,2,5); if ((r+c)%5===0) g.fillRect(wx+11,wy+9,2,4) }
-        else if (t === 2) { g.fillStyle(0x2a5a9a, 0.4); g.fillRect(wx+2, wy+(c%2)*5, this.TS-4, 3) }
-        else if (t === 3) { g.fillStyle(0x0a2218, 0.65); g.fillCircle(wx+8,wy+7,7); g.fillCircle(wx+17,wy+9,5) }
-        else if (t === 4) { g.fillStyle(0x6a5a4a, 0.5); g.fillTriangle(wx+4,wy+this.TS-2,wx+10,wy+4,wx+17,wy+this.TS-2) }
-        else if (t === 5) { g.fillStyle(0xaa0033, 0.35); g.fillRect(wx,wy,this.TS-1,this.TS-1); g.fillStyle(0xff0044,0.15); g.fillRect(wx+2,wy+2,this.TS-5,this.TS-5) }
+
+        if (t === 0) {
+          // Grass — base shade variation, tufts, occasional flowers
+          g.fillStyle(0x2a6b34, 0.45 + (seed % 3) * 0.08); g.fillRect(wx, wy, this.TS - 1, this.TS - 1)
+          // tufts
+          g.fillStyle(0x44aa44, 0.55)
+          g.fillTriangle(wx + 4, wy + 9, wx + 5, wy + 4, wx + 6, wy + 9)
+          g.fillTriangle(wx + 11, wy + 13, wx + 12, wy + 9, wx + 13, wy + 13)
+          g.fillStyle(0x66cc55, 0.45)
+          g.fillRect(wx + 16, wy + 6, 1, 4); g.fillRect(wx + 18, wy + 7, 1, 3)
+          // sparse flowers
+          if (seed === 0) {
+            g.fillStyle(0xff6688); g.fillCircle(wx + 14, wy + 14, 1.6)
+            g.fillStyle(0xffdd44); g.fillCircle(wx + 14, wy + 14, 0.7)
+          } else if (seed === 3) {
+            g.fillStyle(0xeebb44); g.fillCircle(wx + 6, wy + 16, 1.6)
+            g.fillStyle(0xffeebb); g.fillCircle(wx + 6, wy + 16, 0.7)
+          } else if (seed === 7) {
+            g.fillStyle(0x88aaff); g.fillCircle(wx + 17, wy + 17, 1.4)
+          }
+        } else if (t === 1) {
+          // Path/dirt — speckled, slightly darker edges
+          g.fillStyle(0x5a3e10, 0.55); g.fillRect(wx + 3, wy + 4, 2, 2)
+          g.fillStyle(0x5a3e10, 0.55); g.fillRect(wx + 16, wy + 9, 2, 2)
+          g.fillStyle(0x5a3e10, 0.55); g.fillRect(wx + 8, wy + 17, 2, 2)
+          g.fillStyle(0xb89544, 0.4); g.fillRect(wx + 12, wy + 6, 1, 1)
+          g.fillStyle(0xb89544, 0.4); g.fillRect(wx + 5, wy + 12, 1, 1)
+          g.fillStyle(0x6a4818, 0.3); g.fillRect(wx, wy, this.TS - 1, 2) // top edge
+          g.fillStyle(0x6a4818, 0.3); g.fillRect(wx, wy + this.TS - 3, this.TS - 1, 2)
+        } else if (t === 2) {
+          // Water — wave bands + sparkle
+          g.fillStyle(0x2a5a9a, 0.45); g.fillRect(wx + 1, wy + 3, this.TS - 3, 3)
+          g.fillStyle(0x4477bb, 0.5);  g.fillRect(wx + 2, wy + 10, this.TS - 5, 2)
+          g.fillStyle(0x6699cc, 0.5);  g.fillRect(wx + 4, wy + 17, this.TS - 8, 2)
+          if (seed % 4 === 0) { g.fillStyle(0xddeeff, 0.7); g.fillCircle(wx + 6, wy + 8, 1) }
+          if (seed % 3 === 1) { g.fillStyle(0xddeeff, 0.5); g.fillCircle(wx + 16, wy + 14, 0.8) }
+        } else if (t === 3) {
+          // Forest — tree with trunk and layered canopy
+          // Ground hint
+          g.fillStyle(0x1a4422, 0.6); g.fillRect(wx, wy + this.TS - 6, this.TS - 1, 5)
+          // trunk
+          g.fillStyle(0x3a200a); g.fillRect(wx + 10, wy + 13, 4, 9)
+          g.fillStyle(0x553a18, 0.6); g.fillRect(wx + 11, wy + 13, 1, 9)
+          // canopy
+          g.fillStyle(0x0a2218, 0.95); g.fillCircle(wx + 8, wy + 8, 8)
+          g.fillStyle(0x0a2218, 0.95); g.fillCircle(wx + 16, wy + 10, 6)
+          g.fillStyle(0x1a4422, 0.85); g.fillCircle(wx + 9, wy + 6, 5)
+          g.fillStyle(0x2a5532, 0.7); g.fillCircle(wx + 11, wy + 5, 3)
+          g.fillStyle(0x4a6638, 0.5); g.fillCircle(wx + 10, wy + 4, 1.5)
+        } else if (t === 4) {
+          // Rock/mountain — shaded with peak highlight + cracks
+          g.fillStyle(0x6a5a4a, 0.85); g.fillTriangle(wx + 3, wy + this.TS - 2, wx + 11, wy + 3, wx + 20, wy + this.TS - 2)
+          g.fillStyle(0x8a7a6a, 0.5); g.fillTriangle(wx + 6, wy + this.TS - 4, wx + 11, wy + 5, wx + 13, wy + this.TS - 4)
+          g.fillStyle(0xaaaaaa, 0.4); g.fillTriangle(wx + 9, wy + 8, wx + 11, wy + 4, wx + 12, wy + 8)
+          // cracks
+          g.lineStyle(1, 0x2a201a, 0.6)
+          g.beginPath(); g.moveTo(wx + 8, wy + 14); g.lineTo(wx + 12, wy + 18); g.strokePath()
+        } else if (t === 5) {
+          // Boss zone — ominous, glowing cracks
+          g.fillStyle(0xaa0033, 0.45); g.fillRect(wx, wy, this.TS - 1, this.TS - 1)
+          g.fillStyle(0xff0044, 0.18); g.fillRect(wx + 2, wy + 2, this.TS - 5, this.TS - 5)
+          g.lineStyle(1, 0xff3366, 0.65)
+          g.beginPath(); g.moveTo(wx + 3, wy + 6); g.lineTo(wx + 9, wy + 12); g.lineTo(wx + 14, wy + 18); g.strokePath()
+          g.beginPath(); g.moveTo(wx + 17, wy + 4); g.lineTo(wx + 12, wy + 11); g.strokePath()
+          g.fillStyle(0xffaa44, 0.45); g.fillCircle(wx + 9, wy + 12, 1.6)
+          if (seed % 2 === 0) { g.fillStyle(0xffdd66, 0.4); g.fillCircle(wx + 16, wy + 16, 1) }
+        }
       }
     }
 
@@ -411,11 +705,15 @@ function createWorldScene(Phaser: any) {
       const g = this.pG; g.clear()
       const wx = this.pC * this.TS - this.camX + this.TS / 2
       const wy = this.pR * this.TS - this.camY + 28 + this.TS / 2
-      g.fillStyle(0x000000, 0.2); g.fillEllipse(wx, wy + 10, 20, 6)
-      g.fillStyle(G.stageColors[G.stage]); g.fillCircle(wx, wy - 2, 10)
-      g.fillStyle(0x1a1a3a); g.fillCircle(wx-3,wy-4,2.5); g.fillCircle(wx+3,wy-4,2.5)
-      g.fillStyle(0xffffff); g.fillCircle(wx-2,wy-5,1); g.fillCircle(wx+4,wy-5,1)
-      g.lineStyle(2, 0xffffff, 0.4); g.strokeCircle(wx, wy - 2, 12)
+      g.fillStyle(0x000000, 0.25); g.fillEllipse(wx, wy + 10, 22, 6)
+      // Mini dino sprite (matches current stage color)
+      g.fillStyle(G.stageColors[G.stage]); g.fillCircle(wx, wy - 1, 9)
+      // Snout hint
+      g.fillStyle(G.stageColors[G.stage]); g.fillEllipse(wx + 5, wy + 1, 8, 5)
+      g.fillStyle(0x1a1a3a); g.fillCircle(wx - 2, wy - 3, 2); g.fillCircle(wx + 3, wy - 3, 2)
+      g.fillStyle(0xffffff); g.fillCircle(wx - 1, wy - 4, 0.7); g.fillCircle(wx + 4, wy - 4, 0.7)
+      // Highlight ring
+      g.lineStyle(2, 0xffffff, 0.45); g.strokeCircle(wx, wy - 1, 12)
     }
 
     moveToward(tc: number, tr: number) {
@@ -534,8 +832,8 @@ function createBattleScene(Phaser: any) {
 
     genEnemy() {
       const s = this.isBoss ? Math.min(4, G.stage + 1) : Math.max(1, G.stage - 1 + Phaser.Math.Between(0, 2))
-      const wn = ['Shadeling', 'Frostclaw', 'Emberwing', 'Stormfin', 'Crystaling', 'Nightshade']
-      const bn = ['VORAX', 'TITAN X', 'NEXUS PRIME', 'SHADOW LORD']
+      const wn = ['Sharptooth', 'Crestrunner', 'Spinejaw', 'Clawfoot', 'Frillback', 'Marshcreeper']
+      const bn = ['VORAX', 'TITANEX', 'NECROSAUR', 'SHADOWFANG']
       const name = this.isBoss ? bn[Phaser.Math.Between(0, bn.length - 1)] : wn[Phaser.Math.Between(0, wn.length - 1)]
       const hp = Math.floor((14 + s * 12) * (this.isBoss ? 2.2 : 1))
       return { name, stage: s, hp, maxHp: hp, atk: (3 + s * 3) * (this.isBoss ? 1.6 : 1), def: 2 + s * 2, spd: 3 + s, level: G.level + (this.isBoss ? 2 : Phaser.Math.Between(-1, 1)) }
@@ -660,7 +958,6 @@ export default function PhaserGame() {
   useEffect(() => {
     if (!containerRef.current || gameRef.current) return
 
-    // Reset global state each mount so the game starts fresh
     Object.assign(G, {
       stage: 0, name: '???', hp: 20, maxHp: 20,
       atk: 5, def: 3, spd: 4, hunger: 80, happy: 80,
@@ -676,6 +973,8 @@ export default function PhaserGame() {
         height:          H,
         backgroundColor: '#0d0d1a',
         parent:          containerRef.current!,
+        pixelArt:        true,
+        roundPixels:     true,
         scene: [
           createEggScene(Phaser),
           createHomeScene(Phaser),
@@ -687,6 +986,14 @@ export default function PhaserGame() {
           autoCenter: Phaser.Scale.CENTER_BOTH,
         },
       })
+
+      // Keep upscaled canvas crisp instead of bilinear-blurry
+      const applyCrisp = () => {
+        const canvas = containerRef.current?.querySelector('canvas') as HTMLCanvasElement | null
+        if (canvas) canvas.style.imageRendering = 'pixelated'
+      }
+      applyCrisp()
+      setTimeout(applyCrisp, 100)
     })
 
     return () => {
@@ -698,7 +1005,7 @@ export default function PhaserGame() {
   return (
     <div
       ref={containerRef}
-      style={{ width: '100%', maxWidth: 960, aspectRatio: '480/320' }}
+      style={{ width: '100%', maxWidth: 960, aspectRatio: '480/320', imageRendering: 'pixelated' }}
     />
   )
 }
