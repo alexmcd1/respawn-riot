@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 const sections = [
@@ -60,6 +61,23 @@ export default function Home() {
         {/* Diagonal stripe band on edges */}
         <div className="pointer-events-none absolute inset-x-0 top-0 h-2 stripe-band" />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2 stripe-band" />
+
+        {/* Kid Ghost portrait — peeking from right, lg+ only */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute right-[-4%] top-1/2 z-10 hidden -translate-y-1/2 rotate-3 lg:block"
+        >
+          <div className="relative h-[460px] w-[460px] xl:h-[560px] xl:w-[560px]">
+            <Image
+              src="/mascot/portrait.png"
+              alt=""
+              fill
+              sizes="(min-width: 1280px) 560px, 460px"
+              className="object-contain drop-shadow-[0_0_40px_rgba(217,70,239,0.35)]"
+              priority
+            />
+          </div>
+        </div>
 
         <div className="relative mx-auto flex max-w-7xl flex-col items-center justify-center px-6 py-16 text-center sm:py-24">
           {/* Top sticker row */}
@@ -186,6 +204,73 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ───────── MEET THE KID GHOST ───────── */}
+      <section className="relative overflow-hidden border-t border-fuchsia-500/30 px-6 py-16 sm:py-24 scanlines">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(217,70,239,0.20),transparent_50%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_30%,rgba(34,211,238,0.18),transparent_50%)]" />
+
+        <div className="relative mx-auto grid max-w-6xl items-center gap-10 md:grid-cols-[minmax(0,460px)_1fr]">
+          {/* Full body art */}
+          <div className="relative mx-auto w-full max-w-[420px] md:max-w-none">
+            <div className="absolute -inset-4 -z-10 rotate-[-2deg] bg-fuchsia-500/10 blur-2xl" />
+            <Image
+              src="/mascot/fullbody.png"
+              alt="The Kid Ghost full-body illustration — skeleton in a patched leather jacket leaning on a Game Boy skateboard"
+              width={1024}
+              height={1536}
+              sizes="(min-width: 768px) 460px, 100vw"
+              className="h-auto w-full rounded-2xl border border-fuchsia-500/30 bg-black object-contain"
+              priority={false}
+            />
+          </div>
+
+          {/* Bio */}
+          <div>
+            <p className="font-display text-sm tracking-[0.3em] text-fuchsia-400">
+              ▌ SITE MASCOT
+            </p>
+            <h2 className="mt-3 font-display text-5xl tracking-[0.04em] sm:text-6xl">
+              MEET <span className="text-fuchsia-400">THE</span> KID GHOST
+            </h2>
+            <p className="mt-4 text-base leading-7 text-white/80">
+              {"Forever 16. Patched leather jacket two sizes too big. Got respawned wrong once — the fuchsia pixel in his eye socket is the save file. Doesn't tell you what's in his headphones."}
+            </p>
+
+            <ul className="mt-6 grid gap-2 text-sm text-white/75 sm:grid-cols-2">
+              <li className="rounded-md border border-white/10 bg-black/50 px-3 py-2">
+                <span className="font-display tracking-[0.25em] text-fuchsia-300">NAME · </span>
+                The Kid Ghost
+              </li>
+              <li className="rounded-md border border-white/10 bg-black/50 px-3 py-2">
+                <span className="font-display tracking-[0.25em] text-fuchsia-300">AGE · </span>
+                Forever 16
+              </li>
+              <li className="rounded-md border border-white/10 bg-black/50 px-3 py-2">
+                <span className="font-display tracking-[0.25em] text-fuchsia-300">SAVE FILE · </span>
+                KID.GHO$T
+              </li>
+              <li className="rounded-md border border-white/10 bg-black/50 px-3 py-2">
+                <span className="font-display tracking-[0.25em] text-fuchsia-300">SIGNS OFF · </span>
+                —kg
+              </li>
+            </ul>
+
+            {/* Sample lines as stickers */}
+            <div className="mt-6 flex flex-wrap gap-2">
+              <span className="sticker rounded-md border border-fuchsia-400/60 bg-black px-3 py-1.5 text-xs text-fuchsia-200">
+                {"\"respawn'd. again. lol\""}
+              </span>
+              <span className="sticker rounded-md border border-cyan-400/60 bg-black px-3 py-1.5 text-xs text-cyan-200">
+                {"\"the timeline is fake. press start.\""}
+              </span>
+              <span className="sticker rounded-md border border-pink-400/60 bg-black px-3 py-1.5 text-xs text-pink-200">
+                {"\"today's mood: SCANLINES\""}
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section id="join" className="px-6 py-20">
         <div className="mx-auto max-w-3xl rounded-3xl border border-white/10 bg-white/5 p-8 text-center backdrop-blur sm:p-12">
           <p className="mb-3 font-display text-sm tracking-[0.3em] text-cyan-400">
@@ -215,8 +300,22 @@ export default function Home() {
         </div>
       </section>
 
-      <footer className="border-t border-white/10 px-6 py-8 text-center text-sm text-white/50">
-        © 2026 Respawn Riot. Built for second chances.
+      <footer className="relative border-t border-white/10 px-6 py-10 text-center text-sm text-white/50">
+        <div className="mx-auto flex max-w-3xl flex-col items-center gap-4">
+          <div className="relative h-16 w-16">
+            <Image
+              src="/mascot/sticker.png"
+              alt="The Kid Ghost"
+              fill
+              sizes="64px"
+              className="object-contain opacity-90"
+            />
+          </div>
+          <p className="font-display tracking-[0.25em]">© 2026 RESPAWN/RIOT</p>
+          <p className="text-xs text-white/40">
+            Built for second chances. The Kid Ghost says <span className="text-fuchsia-300">—kg</span>
+          </p>
+        </div>
       </footer>
     </main>
   );

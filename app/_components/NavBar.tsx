@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
@@ -55,8 +56,15 @@ export default function NavBar() {
             className="group flex items-center gap-2"
             aria-label="Respawn Riot home"
           >
-            <span className="flex h-8 w-8 items-center justify-center rounded-md border border-fuchsia-500/60 bg-fuchsia-500/10 font-display text-base text-fuchsia-300 group-hover:bg-fuchsia-500/20">
-              R/R
+            <span className="relative h-9 w-9 overflow-hidden rounded-full border border-fuchsia-500/60 bg-black transition group-hover:border-fuchsia-300 group-hover:shadow-[0_0_12px_rgba(217,70,239,0.6)]">
+              <Image
+                src="/mascot/sticker.png"
+                alt="The Kid Ghost — site mascot"
+                fill
+                sizes="40px"
+                className="object-cover"
+                priority
+              />
             </span>
             <span
               className="font-display text-2xl tracking-[0.18em] text-white transition group-hover:text-fuchsia-300 sm:text-[26px]"
