@@ -62,100 +62,114 @@ export default function Home() {
         <div className="pointer-events-none absolute inset-x-0 top-0 h-2 stripe-band" />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2 stripe-band" />
 
-        {/* Kid Ghost portrait — peeking from right, lg+ only */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute right-[-4%] top-1/2 z-10 hidden -translate-y-1/2 rotate-3 lg:block"
-        >
-          <div className="relative h-[460px] w-[460px] xl:h-[560px] xl:w-[560px]">
-            <Image
-              src="/mascot/portrait.png"
-              alt=""
-              fill
-              sizes="(min-width: 1280px) 560px, 460px"
-              className="object-contain drop-shadow-[0_0_40px_rgba(217,70,239,0.35)]"
-              priority
-            />
-          </div>
-        </div>
+        <div className="relative mx-auto grid max-w-7xl items-center gap-8 px-6 py-12 sm:py-20 md:grid-cols-[1fr_minmax(280px,420px)] md:gap-10 lg:grid-cols-[1fr_minmax(360px,520px)]">
+          {/* LEFT — text + CTAs */}
+          <div className="text-center md:text-left">
+            {/* Top sticker row */}
+            <div className="mb-5 flex flex-wrap items-center justify-center gap-2 sm:gap-3 md:justify-start">
+              <span className="sticker rounded-md bg-fuchsia-500 px-3 py-1 font-display text-[12px] tracking-[0.25em] text-black shadow-[0_0_18px_rgba(217,70,239,0.7)]">
+                EST. 2026
+              </span>
+              <span className="sticker rounded-md border-2 border-cyan-300 bg-black px-3 py-1 font-display text-[12px] tracking-[0.25em] text-cyan-300">
+                ONLINE • RIOT MODE
+              </span>
+              <span className="sticker rounded-md bg-lime-400 px-3 py-1 font-display text-[12px] tracking-[0.25em] text-black">
+                ★★★★★
+              </span>
+            </div>
 
-        <div className="relative mx-auto flex max-w-7xl flex-col items-center justify-center px-6 py-16 text-center sm:py-24">
-          {/* Top sticker row */}
-          <div className="mb-6 flex flex-wrap items-center justify-center gap-2 sm:gap-3">
-            <span className="sticker rounded-md bg-fuchsia-500 px-3 py-1 font-display text-[12px] tracking-[0.25em] text-black shadow-[0_0_18px_rgba(217,70,239,0.7)]">
-              EST. 2026
-            </span>
-            <span className="sticker rounded-md border-2 border-cyan-300 bg-black px-3 py-1 font-display text-[12px] tracking-[0.25em] text-cyan-300">
-              ONLINE • RIOT MODE
-            </span>
-            <span className="sticker rounded-md bg-lime-400 px-3 py-1 font-display text-[12px] tracking-[0.25em] text-black">
-              ★★★★★
-            </span>
-          </div>
-
-          {/* Big Title */}
-          <h1 className="font-display text-[64px] leading-[0.9] tracking-[0.04em] sm:text-[120px] md:text-[160px] lg:text-[200px]">
-            <span
-              className="glitch bg-gradient-to-b from-white via-fuchsia-200 to-fuchsia-500 bg-clip-text text-transparent"
-              data-text="RESPAWN"
-            >
-              RESPAWN
-            </span>
-            <br />
-            <span
-              className="glitch bg-gradient-to-b from-cyan-200 via-pink-300 to-pink-600 bg-clip-text text-transparent"
-              data-text="RIOT"
-            >
-              RIOT
-            </span>
-          </h1>
-
-          {/* Subline */}
-          <p className="mt-6 max-w-2xl font-display text-sm tracking-[0.3em] text-white/80 sm:text-base">
-            ANIME · POP PUNK · GAMING · CREATOR DROPS
-          </p>
-          <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-white/65 sm:text-base">
-            {"A loud, glitchy hub for the things we love loudest — and the games we'd rather be playing (or building)."}
-          </p>
-
-          {/* CTAs */}
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <Link
-              href="#sections"
-              className="neon-btn rounded-md bg-white px-6 py-3 font-display text-base tracking-[0.25em] text-black shadow-[0_0_24px_rgba(255,255,255,0.25)] hover:scale-[1.04]"
-            >
-              ▶ PICK A CHANNEL
-            </Link>
-            <Link
-              href="/game"
-              className="neon-btn rounded-md border-2 border-lime-400 bg-black px-6 py-3 font-display text-base tracking-[0.25em] text-lime-300 hover:bg-lime-400/10"
-            >
-              ◢ PLAY LUMLING
-            </Link>
-            <Link
-              href="/trading-cards"
-              className="neon-btn rounded-md border-2 border-amber-400 bg-black px-6 py-3 font-display text-base tracking-[0.25em] text-amber-300 hover:bg-amber-400/10"
-            >
-              ✦ OPEN A TDC PACK
-            </Link>
-          </div>
-
-          {/* Stat strip */}
-          <div className="mt-10 grid w-full max-w-3xl grid-cols-2 gap-2 sm:grid-cols-4">
-            {[
-              { k: 'CHANNELS', v: '05' },
-              { k: 'GAMES', v: '02' },
-              { k: 'DEVLOGS', v: '∞' },
-              { k: 'SLEEP', v: 'NONE' },
-            ].map((s) => (
-              <div
-                key={s.k}
-                className="rounded-md border border-white/10 bg-black/50 p-3 text-left"
+            {/* Big Title */}
+            <h1 className="font-display text-[56px] leading-[0.9] tracking-[0.04em] sm:text-[88px] md:text-[96px] lg:text-[128px] xl:text-[148px]">
+              <span
+                className="glitch bg-gradient-to-b from-white via-fuchsia-200 to-fuchsia-500 bg-clip-text text-transparent"
+                data-text="RESPAWN"
               >
-                <p className="font-display text-[11px] tracking-[0.3em] text-fuchsia-300">{s.k}</p>
-                <p className="font-display text-2xl tracking-wider text-white">{s.v}</p>
-              </div>
-            ))}
+                RESPAWN
+              </span>
+              <br />
+              <span
+                className="glitch bg-gradient-to-b from-cyan-200 via-pink-300 to-pink-600 bg-clip-text text-transparent"
+                data-text="RIOT"
+              >
+                RIOT
+              </span>
+            </h1>
+
+            {/* Subline */}
+            <p className="mt-6 font-display text-sm tracking-[0.3em] text-white/80 sm:text-base">
+              ANIME · POP PUNK · GAMING · CREATOR DROPS
+            </p>
+            <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-white/65 sm:text-base md:mx-0">
+              {"A loud, glitchy hub for the things we love loudest — and the games we'd rather be playing (or building)."}
+            </p>
+
+            {/* CTAs */}
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row md:justify-start sm:justify-center md:flex-wrap">
+              <Link
+                href="#sections"
+                className="neon-btn rounded-md bg-white px-6 py-3 font-display text-base tracking-[0.25em] text-black shadow-[0_0_24px_rgba(255,255,255,0.25)] hover:scale-[1.04]"
+              >
+                ▶ PICK A CHANNEL
+              </Link>
+              <Link
+                href="/game"
+                className="neon-btn rounded-md border-2 border-lime-400 bg-black px-6 py-3 font-display text-base tracking-[0.25em] text-lime-300 hover:bg-lime-400/10"
+              >
+                ◢ PLAY LUMLING
+              </Link>
+              <Link
+                href="/trading-cards"
+                className="neon-btn rounded-md border-2 border-amber-400 bg-black px-6 py-3 font-display text-base tracking-[0.25em] text-amber-300 hover:bg-amber-400/10"
+              >
+                ✦ OPEN A TDC PACK
+              </Link>
+            </div>
+
+            {/* Stat strip */}
+            <div className="mt-10 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {[
+                { k: 'CHANNELS', v: '05' },
+                { k: 'GAMES', v: '02' },
+                { k: 'DEVLOGS', v: '∞' },
+                { k: 'SLEEP', v: 'NONE' },
+              ].map((s) => (
+                <div
+                  key={s.k}
+                  className="rounded-md border border-white/10 bg-black/50 p-3 text-left"
+                >
+                  <p className="font-display text-[11px] tracking-[0.3em] text-fuchsia-300">{s.k}</p>
+                  <p className="font-display text-2xl tracking-wider text-white">{s.v}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* RIGHT — Kid Ghost mascot */}
+          <div className="relative order-first mx-auto w-full max-w-[280px] sm:max-w-[360px] md:order-none md:max-w-none">
+            {/* sticker badge floating top */}
+            <span className="sticker absolute -left-3 -top-3 z-20 rounded-md bg-fuchsia-500 px-3 py-1 font-display text-[11px] tracking-[0.25em] text-black shadow-[0_0_18px_rgba(217,70,239,0.7)] sm:-left-4 sm:-top-4">
+              KID GHOST
+            </span>
+            <span className="sticker absolute -right-3 top-6 z-20 rounded-md border-2 border-cyan-300 bg-black px-3 py-1 font-display text-[11px] tracking-[0.25em] text-cyan-300 sm:-right-4">
+              SAVE FILE: KID.GHO$T
+            </span>
+            <div className="relative aspect-square w-full overflow-hidden rounded-2xl border border-fuchsia-500/40 bg-black shadow-[0_0_50px_rgba(217,70,239,0.35)]">
+              {/* glow halo */}
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,rgba(217,70,239,0.45),transparent_60%)]" />
+              <Image
+                src="/mascot/animated.gif"
+                alt="The Kid Ghost — site mascot, animated"
+                fill
+                sizes="(min-width: 1024px) 520px, (min-width: 768px) 420px, 360px"
+                className="object-cover"
+                priority
+                unoptimized
+              />
+              {/* corner tag */}
+              <span className="absolute bottom-2 right-3 font-display text-[10px] tracking-[0.3em] text-white/40">
+                {"◢ R/R // 06"}
+              </span>
+            </div>
           </div>
         </div>
       </section>
