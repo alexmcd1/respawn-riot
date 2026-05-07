@@ -1,12 +1,44 @@
+import Link from "next/link";
+
+const sections = [
+  {
+    href: "/anime",
+    tag: "Anime",
+    title: "Top Tier Characters & Top 5 Drops",
+    body: "Power rankings, the seasons everyone's losing it over, and where to actually watch them.",
+    accent: "from-fuchsia-500/20 to-transparent",
+    border: "hover:border-fuchsia-400/60",
+    chip: "text-fuchsia-300",
+  },
+  {
+    href: "/pop-punk",
+    tag: "Pop Punk",
+    title: "2000s Legends + The New Wave",
+    body: "Tour rumors, comeback albums, and the bands keeping the genre loud in 2026.",
+    accent: "from-pink-500/20 to-transparent",
+    border: "hover:border-pink-400/60",
+    chip: "text-pink-300",
+  },
+  {
+    href: "/gaming",
+    tag: "Gaming",
+    title: "News + The Game We're Building",
+    body: "What's shipping, what's hyped, and a closer look at our own creature in progress.",
+    accent: "from-cyan-500/20 to-transparent",
+    border: "hover:border-cyan-400/60",
+    chip: "text-cyan-300",
+  },
+] as const;
+
 export default function Home() {
   return (
-    <main className="min-h-screen bg-black text-white">
+    <main className="bg-black text-white">
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(120,0,255,0.25),transparent_45%)]" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom,rgba(255,0,100,0.18),transparent_35%)]" />
 
-        <div className="relative mx-auto flex min-h-screen max-w-7xl flex-col items-center justify-center px-6 py-24 text-center">
-          <p className="mb-4 rounded-full border border-white/20 px-4 py-1 text-sm uppercase tracking-[0.3em] text-white/70">
+        <div className="relative mx-auto flex max-w-7xl flex-col items-center justify-center px-6 py-20 text-center sm:py-28">
+          <p className="mb-4 rounded-full border border-white/20 px-4 py-1 text-xs uppercase tracking-[0.3em] text-white/70 sm:text-sm">
             Punk energy for digital worlds
           </p>
 
@@ -15,74 +47,66 @@ export default function Home() {
           </h1>
 
           <p className="mt-6 max-w-2xl text-base leading-7 text-white/75 sm:text-lg">
-            A loud, glitchy, game-inspired brand built for chaos, creativity,
-            and second chances.
+            {"A loud, glitchy hub for the things we love loudest — anime, pop punk, and the games we'd rather be playing (or building)."}
           </p>
 
           <div className="mt-10 flex flex-col gap-4 sm:flex-row">
-            <a
-              href="#join"
+            <Link
+              href="#sections"
               className="rounded-xl bg-white px-6 py-3 font-bold text-black transition hover:scale-105"
             >
-              Join the Riot
-            </a>
-            <a
-              href="#about"
+              Pick a Riot
+            </Link>
+            <Link
+              href="/game"
               className="rounded-xl border border-white/30 px-6 py-3 font-bold text-white transition hover:bg-white/10"
             >
-              Learn More
-            </a>
-          </div>
-
-          <div className="mt-16 grid w-full max-w-5xl gap-6 md:grid-cols-3">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur">
-              <h2 className="mb-3 text-xl font-bold">Game Culture</h2>
-              <p className="text-sm leading-6 text-white/70">
-                Built around gaming, community, competition, and unforgettable
-                moments.
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur">
-              <h2 className="mb-3 text-xl font-bold">Punk Identity</h2>
-              <p className="text-sm leading-6 text-white/70">
-                Bold visuals, rebellious attitude, and a style that does not
-                blend in.
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur">
-              <h2 className="mb-3 text-xl font-bold">Built to Grow</h2>
-              <p className="text-sm leading-6 text-white/70">
-                Start as a sharp one-page launch and expand into content,
-                community, merch, or media.
-              </p>
-            </div>
+              Play the Game
+            </Link>
           </div>
         </div>
       </section>
 
       <section
-        id="about"
+        id="sections"
         className="border-t border-white/10 bg-zinc-950 px-6 py-20"
       >
-        <div className="mx-auto grid max-w-6xl gap-12 md:grid-cols-2">
-          <div>
-            <p className="mb-3 text-sm uppercase tracking-[0.25em] text-fuchsia-400">
-              About
-            </p>
-            <h2 className="text-3xl font-black uppercase sm:text-4xl">
-              Play Loud. Build Fast.
-            </h2>
-          </div>
+        <div className="mx-auto max-w-6xl">
+          <p className="mb-3 text-sm uppercase tracking-[0.25em] text-fuchsia-400">
+            Three Channels
+          </p>
+          <h2 className="text-3xl font-black uppercase sm:text-4xl">
+            Pick your scene.
+          </h2>
 
-          <div>
-            <p className="text-base leading-7 text-white/75">
-              Respawn Riot is a brand concept for people who love games, style,
-              noise, and making things that feel alive. This first version is
-              intentionally focused: one strong homepage, one clear message, and
-              one call to action.
-            </p>
+          <div className="mt-10 grid gap-6 md:grid-cols-3">
+            {sections.map((s) => (
+              <Link
+                key={s.href}
+                href={s.href}
+                className={`group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-6 transition ${s.border} hover:bg-white/[0.06]`}
+              >
+                <div
+                  className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${s.accent} opacity-60 transition group-hover:opacity-100`}
+                />
+                <div className="relative">
+                  <p
+                    className={`text-xs uppercase tracking-[0.3em] ${s.chip}`}
+                  >
+                    {s.tag}
+                  </p>
+                  <h3 className="mt-3 text-xl font-black uppercase">
+                    {s.title}
+                  </h3>
+                  <p className="mt-3 text-sm leading-6 text-white/70">
+                    {s.body}
+                  </p>
+                  <p className="mt-6 text-sm font-bold uppercase tracking-widest text-white/80 group-hover:text-white">
+                    Enter →
+                  </p>
+                </div>
+              </Link>
+            ))}
           </div>
         </div>
       </section>
@@ -96,8 +120,8 @@ export default function Home() {
             Join the Riot
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-white/70">
-            Be the first to hear about drops, updates, launches, and whatever
-            chaos comes next.
+            Drops, tour pickups, anime power rankings, devlogs — the chaos in
+            one inbox.
           </p>
 
           <form className="mx-auto mt-8 flex max-w-xl flex-col gap-4 sm:flex-row">
