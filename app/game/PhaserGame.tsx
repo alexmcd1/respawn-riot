@@ -53,42 +53,128 @@ const NOTE: any = {
   C6:1046.50, D6:1174.66, E6:1318.51, R: 0,
 }
 
-// 16-bar heroic adventure melody in C major (I-V-vi-IV) — 64 beats total.
-const MELODY: [string, number][] = [
-  ['C5',1],['E5',1],['G5',1],['E5',1],          // bar 1  C
-  ['D5',1],['G5',1],['B5',1],['G5',1],          // bar 2  G
-  ['A4',1],['C5',1],['E5',1],['C5',1],          // bar 3  Am
-  ['F5',1],['A5',1],['C6',1],['A5',1],          // bar 4  F
-  ['G5',0.5],['E5',0.5],['C5',1],['E5',1],['G5',1], // bar 5
-  ['A5',1],['G5',1],['D5',1],['G5',1],          // bar 6
-  ['C6',1],['B5',1],['A5',1],['G5',1],          // bar 7
-  ['F5',0.5],['G5',0.5],['A5',1],['G5',1],['C5',1], // bar 8
-  ['G4',1],['C5',1],['E5',1],['G5',1],          // bar 9
-  ['B4',1],['D5',1],['G5',1],['B5',1],          // bar 10
-  ['A4',1],['C5',1],['E5',1],['A5',1],          // bar 11
-  ['F4',1],['A4',1],['C5',1],['F5',1],          // bar 12
-  ['E5',0.5],['F5',0.5],['G5',1],['A5',1],['B5',1], // bar 13
-  ['C6',2],['B5',1],['A5',1],                   // bar 14
-  ['G5',1],['F5',1],['E5',1],['D5',1],          // bar 15
-  ['C5',2],['G4',1],['C5',1],                   // bar 16
-]
+// Sequential chiptune tracks. Theme advances through them after each loop
+// to build variety and let the soundtrack rise/fall in mood.
+type Track = { name: string; bpm: number; melody: [string, number][]; bass: [string, number][] }
 
-const BASS: [string, number][] = [
-  ['C3',4],['G2',4],['A2',4],['F2',4],
-  ['C3',4],['G2',4],['A2',4],['F2',4],
-  ['C3',4],['G2',4],['A2',4],['F2',4],
-  ['C3',4],['F2',4],['G2',4],['C3',4],
+const TRACKS: Track[] = [
+  // 1. Heroic Adventure — C major (I-V-vi-IV), 16 bars
+  {
+    name: 'Heroic Adventure',
+    bpm: 132,
+    melody: [
+      ['C5',1],['E5',1],['G5',1],['E5',1],
+      ['D5',1],['G5',1],['B5',1],['G5',1],
+      ['A4',1],['C5',1],['E5',1],['C5',1],
+      ['F5',1],['A5',1],['C6',1],['A5',1],
+      ['G5',0.5],['E5',0.5],['C5',1],['E5',1],['G5',1],
+      ['A5',1],['G5',1],['D5',1],['G5',1],
+      ['C6',1],['B5',1],['A5',1],['G5',1],
+      ['F5',0.5],['G5',0.5],['A5',1],['G5',1],['C5',1],
+      ['G4',1],['C5',1],['E5',1],['G5',1],
+      ['B4',1],['D5',1],['G5',1],['B5',1],
+      ['A4',1],['C5',1],['E5',1],['A5',1],
+      ['F4',1],['A4',1],['C5',1],['F5',1],
+      ['E5',0.5],['F5',0.5],['G5',1],['A5',1],['B5',1],
+      ['C6',2],['B5',1],['A5',1],
+      ['G5',1],['F5',1],['E5',1],['D5',1],
+      ['C5',2],['G4',1],['C5',1],
+    ],
+    bass: [
+      ['C3',4],['G2',4],['A2',4],['F2',4],
+      ['C3',4],['G2',4],['A2',4],['F2',4],
+      ['C3',4],['G2',4],['A2',4],['F2',4],
+      ['C3',4],['F2',4],['G2',4],['C3',4],
+    ],
+  },
+  // 2. Mystery — A minor, contemplative, 8 bars at slower tempo
+  {
+    name: 'Mystery',
+    bpm: 110,
+    melody: [
+      ['A4',2],['C5',2],
+      ['E5',2],['C5',2],
+      ['F5',2],['E5',2],
+      ['D5',2],['A4',2],
+      ['C5',1],['E5',1],['G5',1],['E5',1],
+      ['A5',2],['G5',2],
+      ['F5',1],['E5',1],['D5',1],['C5',1],
+      ['A4',2],['E4',2],
+    ],
+    bass: [
+      ['A2',4],['F2',4],['D3',4],['A2',4],
+      ['C3',4],['D3',4],['A2',4],['A2',4],
+    ],
+  },
+  // 3. Building Storm — A minor, urgent driving rhythm
+  {
+    name: 'Building Storm',
+    bpm: 130,
+    melody: [
+      ['A4',0.5],['A4',0.5],['C5',1],['E5',1],['A5',1],
+      ['G5',0.5],['F5',0.5],['E5',1],['D5',1],['C5',1],
+      ['F4',0.5],['F4',0.5],['A4',1],['C5',1],['F5',1],
+      ['E5',0.5],['D5',0.5],['C5',1],['B4',1],['A4',1],
+      ['G5',1],['A5',1],['G5',1],['E5',1],
+      ['F5',1],['G5',1],['F5',1],['D5',1],
+      ['E5',1],['C5',1],['A4',1],['C5',1],
+      ['A4',2],['E4',1],['A4',1],
+    ],
+    bass: [
+      ['A2',4],['F2',4],['A2',4],['F2',4],
+      ['G2',4],['F2',4],['A2',4],['A2',4],
+    ],
+  },
+  // 4. Triumphant March — C major, bold and confident
+  {
+    name: 'Triumphant March',
+    bpm: 138,
+    melody: [
+      ['C5',1],['G5',1],['E5',1],['C5',1],
+      ['D5',1],['G5',1],['F5',1],['D5',1],
+      ['E5',1],['A5',1],['G5',1],['E5',1],
+      ['F5',1],['B5',1],['A5',1],['F5',1],
+      ['G5',1],['C6',1],['B5',1],['G5',1],
+      ['F5',1],['E5',1],['D5',1],['C5',1],
+      ['B4',1],['D5',1],['G5',1],['C6',1],
+      ['G4',2],['C5',2],
+    ],
+    bass: [
+      ['C3',4],['G2',4],['A2',4],['F2',4],
+      ['C3',4],['F2',4],['G2',4],['C3',4],
+    ],
+  },
+  // 5. Wonder — C major, slow and dreamy
+  {
+    name: 'Wonder',
+    bpm: 96,
+    melody: [
+      ['C5',2],['E5',2],
+      ['G5',2],['E5',2],
+      ['F5',2],['A5',2],
+      ['G5',2],['C5',2],
+      ['E5',1],['G5',1],['C6',1],['G5',1],
+      ['A5',2],['F5',2],
+      ['E5',1],['D5',1],['C5',1],['G4',1],
+      ['C5',2],['G4',2],
+    ],
+    bass: [
+      ['C3',4],['C3',4],['F2',4],['C3',4],
+      ['C3',4],['F2',4],['G2',4],['C3',4],
+    ],
+  },
 ]
 
 class Theme {
   ctx?: any
   master?: any
   isMuted = false
-  bpm = 132
+  trackIdx = 0
   melodyAt = 0; bassAt = 0
   melodyTime = 0; bassTime = 0
   schedTimer: any = null
-  beatLen() { return 60 / this.bpm }
+  curTrack(): Track { return TRACKS[this.trackIdx] }
+  beatLen() { return 60 / this.curTrack().bpm }
 
   start() {
     if (this.ctx) return
@@ -102,7 +188,7 @@ class Theme {
       this.master.connect(this.ctx.destination)
       const now = this.ctx.currentTime + 0.05
       this.melodyTime = now; this.bassTime = now
-      this.melodyAt = 0; this.bassAt = 0
+      this.melodyAt = 0; this.bassAt = 0; this.trackIdx = 0
       this.tick()
     } catch (e) {}
   }
@@ -110,22 +196,37 @@ class Theme {
   tick = () => {
     if (!this.ctx || !this.master) return
     const cutoff = this.ctx.currentTime + 1.5
+
+    // Schedule melody notes; advance to the next track when current loop ends.
     while (this.melodyTime < cutoff) {
-      const [n, b] = MELODY[this.melodyAt]
+      const t = this.curTrack()
+      const [n, b] = t.melody[this.melodyAt]
       const dur = b * this.beatLen()
       const f = NOTE[n] || 0
       if (f > 0) this.note('square', f, this.melodyTime, dur, 0.18)
       this.melodyTime += dur
-      this.melodyAt = (this.melodyAt + 1) % MELODY.length
+      this.melodyAt += 1
+      if (this.melodyAt >= t.melody.length) {
+        this.trackIdx = (this.trackIdx + 1) % TRACKS.length
+        this.melodyAt = 0
+        // Bass restarts in lockstep with the new track.
+        this.bassAt = 0
+        this.bassTime = this.melodyTime
+      }
     }
+
+    // Bass uses whatever the current track is at the time it's scheduled.
     while (this.bassTime < cutoff) {
-      const [n, b] = BASS[this.bassAt]
+      const t = this.curTrack()
+      const [n, b] = t.bass[this.bassAt]
       const dur = b * this.beatLen()
       const f = NOTE[n] || 0
       if (f > 0) this.note('triangle', f, this.bassTime, dur, 0.22)
       this.bassTime += dur
-      this.bassAt = (this.bassAt + 1) % BASS.length
+      this.bassAt += 1
+      if (this.bassAt >= t.bass.length) this.bassAt = 0
     }
+
     this.schedTimer = setTimeout(this.tick, 250)
   }
 
@@ -1574,24 +1675,48 @@ function createHomeScene(Phaser: any) {
     tryActivate() { if (this.nearZone) this.nearZone.action() }
 
     // Reset transform + cancel pending tweens before kicking off a new bounce.
-    // Without this, rapid SPACE presses stacked tweens and cGfx.y drifted away
-    // from 0, leaving the creature stuck off-screen.
     resetSprite() {
       this.tweens.killTweensOf(this.cGfx)
       this.cGfx.x = 0
       this.cGfx.y = 0
     }
 
+    // Floating "+N STAT" label near the creature, with the matching bar pulsed.
+    showStatGain(stat: string, amount: number) {
+      const palette: any = { HP: '#44ff88', HUNGER: '#ff9944', HAPPY: '#ff44bb', XP: '#44aaff', 'MAX HP': '#ffdd44' }
+      const color = palette[stat] || '#ffffff'
+      const t = this.add.text(
+        this.cX + 16 + Phaser.Math.Between(-4, 4),
+        this.floorY - 36 + Phaser.Math.Between(-4, 4),
+        '+' + amount + ' ' + stat,
+        { fontSize: '11px', color, fontStyle: 'bold', stroke: '#000814', strokeThickness: 2 }
+      ).setOrigin(0, 0.5).setDepth(15)
+      this.tweens.add({ targets: t, y: t.y - 32, alpha: 0, duration: 1200, ease: 'Quad.easeOut', onComplete: () => t.destroy() })
+      // Pulse the corresponding bar
+      const bar = this.bars[stat === 'MAX HP' ? 'HP' : stat]
+      if (bar?.f) {
+        const orig = bar.f.fillColor
+        bar.f.setFillStyle(0xffffff)
+        this.time.delayedCall(140, () => bar.f.setFillStyle(orig))
+      }
+    }
+
     pickFruit() {
       const r = Math.random()
       const itemId = r < 0.55 ? 'berry' : (r < 0.85 ? 'apple' : 'herb')
       const item = ITEMS[itemId]
-      // Eat one immediately so the player doesn't have to open the bag to feed.
-      const ate = item.effect()
-      let line = ate
-        ? `Ate a ${item.name}   ${item.desc}`
-        : `Picked a ${item.name}, but already maxed`
-      // Always also drop one in the bag if there's room.
+      let line: string
+      // Apply effect manually so we can give specific +HP/+Hunger/+Happy feedback.
+      if (itemId === 'berry') {
+        if (G.hp >= G.maxHp) line = 'HP already full'
+        else { const gained = Math.min(5, G.maxHp - G.hp); G.hp += gained; this.showStatGain('HP', gained); line = 'Ate a Berry' }
+      } else if (itemId === 'apple') {
+        if (G.hunger >= 100) line = 'Hunger already full'
+        else { const gained = Math.min(12, 100 - G.hunger); G.hunger += gained; this.showStatGain('HUNGER', gained); line = 'Ate an Apple' }
+      } else {
+        if (G.happy >= 100) line = 'Happy already full'
+        else { const gained = Math.min(8, 100 - G.happy); G.happy += gained; this.showStatGain('HAPPY', gained); line = 'Ate a Herb' }
+      }
       if (invAdd(itemId, 1)) line += '   (+1 in bag)'
       this.msg(line); this.updHUD()
       this.resetSprite()
@@ -1601,12 +1726,44 @@ function createHomeScene(Phaser: any) {
     train() {
       if (G.hunger <= 10) { this.msg('Too hungry to train! Eat at the Fruit Tree first.'); return }
       G.hunger = Math.max(0, G.hunger - 10); G.happy = Math.min(100, G.happy + 5)
-      let line = '+10 XP   -10 Hunger'
-      if (Math.random() < 0.25) { G.maxHp += 1; G.hp = Math.min(G.maxHp, G.hp + 1); line = '+10 XP   +1 MAX HP!' }
-      const r = gainXp(10)
-      this.msg(line); this.updHUD()
+      const xpAmt = 6
+      let maxHpGain = 0
+      if (Math.random() < 0.25) {
+        G.maxHp += 1; G.hp = Math.min(G.maxHp, G.hp + 1); maxHpGain = 1
+      }
+      const r = gainXp(xpAmt)
+      this.showStatGain('XP', xpAmt)
+      if (maxHpGain) this.showStatGain('MAX HP', maxHpGain)
+      this.msg(maxHpGain ? `+${xpAmt} XP   +1 MAX HP!` : `+${xpAmt} XP   -10 Hunger`)
+      this.updHUD()
+
+      // Player jab + camera shake
       this.resetSprite()
-      this.tweens.add({ targets: this.cGfx, x: 8, duration: 80, yoyo: true, repeat: 2 })
+      this.tweens.add({ targets: this.cGfx, x: 8, duration: 70, yoyo: true, repeat: 2 })
+      this.cameras.main.shake(120, 0.005)
+
+      // Bag swing animation + impact sparks
+      const bagZone = this.zones.find((z: any) => z.label === 'Punching Bag')
+      if (bagZone?.gfx) {
+        this.tweens.killTweensOf(bagZone.gfx)
+        bagZone.gfx.x = 0
+        this.tweens.add({ targets: bagZone.gfx, x: { from: -3, to: 3 }, duration: 70, yoyo: true, repeat: 4, ease: 'Sine.easeInOut',
+          onComplete: () => { bagZone.gfx.x = 0 } })
+        for (let i = 0; i < 7; i++) {
+          const sx = bagZone.x + Phaser.Math.Between(-10, 10)
+          const sy = this.floorY - 28 + Phaser.Math.Between(-8, 8)
+          const sp = this.add.circle(sx, sy, Phaser.Math.Between(1, 2), 0xffdd44).setDepth(12)
+          this.tweens.add({
+            targets: sp,
+            x: sx + Phaser.Math.Between(-22, 22),
+            y: sy - Phaser.Math.Between(8, 20),
+            alpha: 0,
+            duration: Phaser.Math.Between(300, 500),
+            onComplete: () => sp.destroy(),
+          })
+        }
+      }
+
       if (r.leveled) this.showLevelUp(r.levelsGained)
       if (r.shouldEvolve) this.time.delayedCall(900, () => this.evolve())
     }
@@ -2157,7 +2314,7 @@ function createCodexScene(Phaser: any) {
       this.add.text(W/2, 234, nextEvo, { fontSize: '9px', color: '#ffdd44', fontStyle: 'italic' }).setOrigin(0.5)
 
       this.add.text(W/2, 256, 'Each level: +3 HP   +1 ATK   +1 DEF   +1 SPD every 2 levels', { fontSize: '8px', color: '#88aacc' }).setOrigin(0.5)
-      this.add.text(W/2, 272, 'XP from: training (+10), exploring battles (+8-20), bosses (+55), crystals', { fontSize: '8px', color: '#7788aa' }).setOrigin(0.5)
+      this.add.text(W/2, 272, 'XP: training (+6), wild battles (+18-44), bosses (+95-155), crystals (+5)', { fontSize: '8px', color: '#7788aa' }).setOrigin(0.5)
 
       const close = () => { this.scene.stop(); this.scene.resume(this.from) }
       const xBtn = this.add.rectangle(W - 26, 26, 22, 18, 0x4a1010, 0.95).setStrokeStyle(1, 0xaa4444).setInteractive({ useHandCursor: true })
@@ -2353,7 +2510,11 @@ function createBattleScene(Phaser: any) {
 
     end(result: string) {
       if (result === 'win') {
-        const xp = this.isBoss ? 55 : Phaser.Math.Between(8, 20)
+        // Battles should reward more than training. Wild scales with stage,
+        // bosses give a hefty chunk.
+        const xp = this.isBoss
+          ? 80 + this.enemy.stage * 15
+          : 18 + this.enemy.stage * 5 + Phaser.Math.Between(0, 6)
         G.wins++; G.happy = Math.min(100, G.happy + 10)
         G.hp = Math.min(G.maxHp, G.hp + Math.floor(G.maxHp * 0.1))
         const r = gainXp(xp)
