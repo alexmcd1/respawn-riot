@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { devlogPosts } from "./_devlog";
 
 export const metadata: Metadata = {
   title: "Gaming — Respawn Riot",
@@ -132,6 +133,61 @@ export default function GamingPage() {
                 Get devlog updates
               </Link>
             </div>
+          </div>
+
+          {/* ───────── RC DEVLOG ───────── */}
+          <div className="rounded-3xl border border-lime-400/30 bg-gradient-to-br from-lime-500/10 via-cyan-500/5 to-transparent p-6 sm:p-10">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="font-display text-xs tracking-[0.3em] text-lime-400">
+                  ▌ DEVLOG
+                </p>
+                <h2 className="mt-2 font-display text-3xl tracking-[0.04em] sm:text-4xl">
+                  RC // BUILD NOTES
+                </h2>
+              </div>
+              <span className="rounded-md border border-lime-400/40 bg-black px-3 py-1 font-display text-xs tracking-[0.25em] text-lime-300">
+                {devlogPosts.length} ENTRIES
+              </span>
+            </div>
+
+            <ol className="mt-8 space-y-6">
+              {devlogPosts.map((post) => (
+                <li
+                  key={post.issue}
+                  className="grid gap-4 rounded-2xl border border-white/10 bg-black/40 p-5 sm:grid-cols-[120px_1fr] sm:p-6"
+                >
+                  <div className="flex sm:flex-col sm:items-start sm:gap-1 items-baseline gap-3">
+                    <span className="font-display text-3xl tracking-wider text-lime-300">
+                      #{post.issue}
+                    </span>
+                    <span className="font-mono text-xs text-white/50">
+                      {post.date}
+                    </span>
+                    <span className="ml-auto rounded border border-lime-400/40 px-2 py-0.5 font-display text-[10px] tracking-[0.2em] text-lime-300 sm:ml-0">
+                      {post.tag}
+                    </span>
+                  </div>
+                  <div>
+                    <h3 className="font-display text-xl tracking-wide text-white">
+                      {post.title}
+                    </h3>
+                    <div className="mt-3 space-y-2 text-sm leading-6 text-white/75">
+                      {post.body.map((p, i) => (
+                        <p key={i}>{p}</p>
+                      ))}
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ol>
+
+            <p className="mt-6 text-xs text-white/45">
+              {"Devlog updates land here. Want them in your inbox? "}
+              <Link href="/#join" className="text-lime-300 underline-offset-2 hover:underline">
+                Join the riot.
+              </Link>
+            </p>
           </div>
 
           <div className="rounded-3xl border border-amber-400/30 bg-gradient-to-br from-amber-500/15 via-fuchsia-500/10 to-transparent p-6 sm:p-10">
