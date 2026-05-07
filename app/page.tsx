@@ -37,6 +37,15 @@ const sections = [
     border: "hover:border-amber-400/60",
     chip: "text-amber-300",
   },
+  {
+    href: "/orlando",
+    tag: "Orlando",
+    title: "Theme Parks, Weather + Roads",
+    body: "Live NWS weather + alerts, Disney + Universal news, and traffic on I-75 and the Turnpike.",
+    accent: "from-orange-500/20 to-transparent",
+    border: "hover:border-orange-400/60",
+    chip: "text-orange-300",
+  },
 ] as const;
 
 export default function Home() {
@@ -116,7 +125,7 @@ export default function Home() {
           {/* Stat strip */}
           <div className="mt-10 grid w-full max-w-3xl grid-cols-2 gap-2 sm:grid-cols-4">
             {[
-              { k: 'CHANNELS', v: '04' },
+              { k: 'CHANNELS', v: '05' },
               { k: 'GAMES', v: '02' },
               { k: 'DEVLOGS', v: '∞' },
               { k: 'SLEEP', v: 'NONE' },
@@ -145,7 +154,7 @@ export default function Home() {
             PICK YOUR SCENE.
           </h2>
 
-          <div className="mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             {sections.map((s) => (
               <Link
                 key={s.href}
