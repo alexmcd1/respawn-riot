@@ -1344,6 +1344,7 @@ function createHomeScene(Phaser: any) {
     private nameT: any; private dayT: any; private bagT: any
     private musicT: any
     private SPEED = 1.6
+    private touchLeft = false; private touchRight = false
 
     constructor() { super('HomeScene') }
 
@@ -1452,11 +1453,32 @@ function createHomeScene(Phaser: any) {
       this.promptT = this.add.text(W/2, this.floorY - 76, '', { fontSize: '9px', color: '#ffdd66', fontStyle: 'bold' }).setOrigin(0.5).setAlpha(0)
       this.msgT = this.add.text(W/2, 50, '', { fontSize: '9px', color: '#ffeeaa', backgroundColor: '#000814', padding: { x: 6, y: 3 } as any }).setOrigin(0.5).setAlpha(0)
 
-      // Bottom hint
-      this.add.rectangle(W/2, H - 8, W, 16, 0x080814, 0.85)
-      this.add.text(W/2, H - 8, 'WASD/Arrows move   SPACE interact   B backpack   C codex', { fontSize: '7px', color: '#556677' }).setOrigin(0.5)
+      // Bottom strip + touch controls
+      this.add.rectangle(W/2, H - 16, W, 32, 0x080814, 0.92).setDepth(8)
 
-      // Controls
+      // Movement pad — left
+      const lBtn = this.add.rectangle(28, H - 16, 40, 26, 0x1a2a44, 0.9).setStrokeStyle(1, 0x556699).setInteractive({ useHandCursor: true }).setDepth(9)
+      this.add.text(28, H - 16, '◀', { fontSize: '14px', color: '#aaccee', fontStyle: 'bold' }).setOrigin(0.5).setDepth(10)
+      const startL = () => this.touchLeft = true
+      const stopL  = () => this.touchLeft = false
+      lBtn.on('pointerdown', startL); lBtn.on('pointerup', stopL); lBtn.on('pointerout', stopL); lBtn.on('pointerupoutside', stopL)
+
+      // Movement pad — right
+      const rBtn = this.add.rectangle(72, H - 16, 40, 26, 0x1a2a44, 0.9).setStrokeStyle(1, 0x556699).setInteractive({ useHandCursor: true }).setDepth(9)
+      this.add.text(72, H - 16, '▶', { fontSize: '14px', color: '#aaccee', fontStyle: 'bold' }).setOrigin(0.5).setDepth(10)
+      const startR = () => this.touchRight = true
+      const stopR  = () => this.touchRight = false
+      rBtn.on('pointerdown', startR); rBtn.on('pointerup', stopR); rBtn.on('pointerout', stopR); rBtn.on('pointerupoutside', stopR)
+
+      // Action button
+      const aBtn = this.add.rectangle(W - 40, H - 16, 70, 26, 0x2a4a1a, 0.92).setStrokeStyle(1, 0x66aa44).setInteractive({ useHandCursor: true }).setDepth(9)
+      this.add.text(W - 40, H - 16, 'ACTION', { fontSize: '9px', color: '#ccffaa', fontStyle: 'bold', letterSpacing: 1 }).setOrigin(0.5).setDepth(10)
+      aBtn.on('pointerdown', () => this.tryActivate())
+
+      // Tiny hint between pads and action
+      this.add.text(W/2, H - 16, 'tap a zone, hit ACTION', { fontSize: '7px', color: '#556677' }).setOrigin(0.5).setDepth(10)
+
+      // Keyboard (still works)
       this.cursors = this.input.keyboard.createCursorKeys()
       this.wasd = this.input.keyboard.addKeys('W,A,S,D')
       this.input.keyboard.on('keydown-SPACE', () => this.tryActivate())
@@ -1662,8 +1684,8 @@ function createHomeScene(Phaser: any) {
       }
 
       let dx = 0
-      if (this.cursors.left.isDown  || this.wasd.A.isDown) dx -= 1
-      if (this.cursors.right.isDown || this.wasd.D.isDown) dx += 1
+      if (this.cursors.left.isDown  || this.wasd.A.isDown || this.touchLeft)  dx -= 1
+      if (this.cursors.right.isDown || this.wasd.D.isDown || this.touchRight) dx += 1
       if (dx !== 0) this.cX = Math.max(20, Math.min(W - 20, this.cX + dx * this.SPEED))
       this.drawC()
 
@@ -1696,6 +1718,7 @@ function createWorldScene(Phaser: any) {
     private hpT: any; private bagT: any
     private prompt: any; private msgT: any; private msgTime = 0
     private nearTarget: any = null
+    private touchLeft = false; private touchRight = false
 
     constructor() { super('WorldScene') }
 
@@ -1817,9 +1840,26 @@ function createWorldScene(Phaser: any) {
       const mt = this.add.text(W - 30, 13, theme.isMuted ? '♪ OFF' : '♪ ON', { fontSize: '7px', color: theme.isMuted ? '#778899' : '#aaccee' }).setOrigin(0.5).setScrollFactor(0)
       mb.on('pointerdown', () => { theme.toggleMute(); mt.setText(theme.isMuted ? '♪ OFF' : '♪ ON').setColor(theme.isMuted ? '#778899' : '#aaccee') })
 
-      // Bottom hint
-      this.add.rectangle(W/2, H - 8, W, 16, 0x080814, 0.85).setScrollFactor(0)
-      this.add.text(W/2, H - 8, 'A/D Arrows move   SPACE interact   B backpack   ESC home', { fontSize: '7px', color: '#556677' }).setOrigin(0.5).setScrollFactor(0)
+      // Bottom strip + touch controls
+      this.add.rectangle(W/2, H - 16, W, 32, 0x080814, 0.92).setScrollFactor(0).setDepth(8)
+
+      const lBtn = this.add.rectangle(28, H - 16, 40, 26, 0x1a2a44, 0.9).setScrollFactor(0).setStrokeStyle(1, 0x556699).setInteractive({ useHandCursor: true }).setDepth(9)
+      this.add.text(28, H - 16, '◀', { fontSize: '14px', color: '#aaccee', fontStyle: 'bold' }).setOrigin(0.5).setScrollFactor(0).setDepth(10)
+      const startL = () => this.touchLeft = true
+      const stopL  = () => this.touchLeft = false
+      lBtn.on('pointerdown', startL); lBtn.on('pointerup', stopL); lBtn.on('pointerout', stopL); lBtn.on('pointerupoutside', stopL)
+
+      const rBtn = this.add.rectangle(72, H - 16, 40, 26, 0x1a2a44, 0.9).setScrollFactor(0).setStrokeStyle(1, 0x556699).setInteractive({ useHandCursor: true }).setDepth(9)
+      this.add.text(72, H - 16, '▶', { fontSize: '14px', color: '#aaccee', fontStyle: 'bold' }).setOrigin(0.5).setScrollFactor(0).setDepth(10)
+      const startR = () => this.touchRight = true
+      const stopR  = () => this.touchRight = false
+      rBtn.on('pointerdown', startR); rBtn.on('pointerup', stopR); rBtn.on('pointerout', stopR); rBtn.on('pointerupoutside', stopR)
+
+      const aBtn = this.add.rectangle(W - 40, H - 16, 70, 26, 0x2a4a1a, 0.92).setScrollFactor(0).setStrokeStyle(1, 0x66aa44).setInteractive({ useHandCursor: true }).setDepth(9)
+      this.add.text(W - 40, H - 16, 'ACTION', { fontSize: '9px', color: '#ccffaa', fontStyle: 'bold', letterSpacing: 1 }).setOrigin(0.5).setScrollFactor(0).setDepth(10)
+      aBtn.on('pointerdown', () => this.tryActivate())
+
+      this.add.text(W/2, H - 16, 'walk to a chest, hit ACTION', { fontSize: '7px', color: '#556677' }).setOrigin(0.5).setScrollFactor(0).setDepth(10)
 
       // Prompt + msg
       this.prompt = this.add.text(0, 0, '', { fontSize: '9px', color: '#ffdd66', fontStyle: 'bold' }).setOrigin(0.5).setAlpha(0)
@@ -1882,8 +1922,8 @@ function createWorldScene(Phaser: any) {
       if (Phaser.Input.Keyboard.JustDown(this.escK)) { this.scene.start('HomeScene'); return }
 
       let dx = 0
-      if (this.cursors.left.isDown  || this.wasd.A.isDown) dx -= 1
-      if (this.cursors.right.isDown || this.wasd.D.isDown) dx += 1
+      if (this.cursors.left.isDown  || this.wasd.A.isDown || this.touchLeft)  dx -= 1
+      if (this.cursors.right.isDown || this.wasd.D.isDown || this.touchRight) dx += 1
       if (dx !== 0) {
         this.pX = Math.max(20, Math.min(this.wWidth - 20, this.pX + dx * 1.7))
         this.drawPlayer()
@@ -1979,8 +2019,12 @@ function createInventoryScene(Phaser: any) {
         }
       }
 
-      this.add.text(W/2, H/2 + 102, 'Click an item to use it   ESC or B to close', { fontSize: '8px', color: '#7788aa' }).setOrigin(0.5)
+      this.add.text(W/2, H/2 + 102, 'Tap an item to use it', { fontSize: '8px', color: '#7788aa' }).setOrigin(0.5)
       const close = () => { this.scene.stop(); this.scene.resume(this.from) }
+      // Tappable close button
+      const xBtn = this.add.rectangle(W/2 + 188, H/2 - 106, 22, 18, 0x4a1010, 0.95).setStrokeStyle(1, 0xaa4444).setInteractive({ useHandCursor: true })
+      this.add.text(W/2 + 188, H/2 - 106, '✕', { fontSize: '11px', color: '#ffaaaa', fontStyle: 'bold' }).setOrigin(0.5)
+      xBtn.on('pointerdown', close)
       this.input.keyboard.on('keydown-ESC', close)
       this.input.keyboard.on('keydown-B',   close)
     }
@@ -2007,9 +2051,12 @@ function createChestScene(Phaser: any) {
       this.add.text(W/2, H/2 - 107, 'CHEST', { fontSize: '11px', color: '#ffdd99', fontStyle: 'bold', letterSpacing: 2 }).setOrigin(0.5)
 
       this.refresh()
-      this.add.text(W/2, H/2 + 105, 'Click to transfer   ESC/B to close', { fontSize: '8px', color: '#7788aa' }).setOrigin(0.5)
+      this.add.text(W/2, H/2 + 105, 'Tap an item to transfer', { fontSize: '8px', color: '#7788aa' }).setOrigin(0.5)
 
       const close = () => { this.scene.stop(); this.scene.resume(this.from) }
+      const xBtn = this.add.rectangle(W/2 + 208, H/2 - 107, 22, 18, 0x4a1010, 0.95).setStrokeStyle(1, 0xaa4444).setInteractive({ useHandCursor: true })
+      this.add.text(W/2 + 208, H/2 - 107, '✕', { fontSize: '11px', color: '#ffaaaa', fontStyle: 'bold' }).setOrigin(0.5)
+      xBtn.on('pointerdown', close)
       this.input.keyboard.on('keydown-ESC', close)
       this.input.keyboard.on('keydown-B',   close)
     }
@@ -2111,9 +2158,11 @@ function createCodexScene(Phaser: any) {
 
       this.add.text(W/2, 256, 'Each level: +3 HP   +1 ATK   +1 DEF   +1 SPD every 2 levels', { fontSize: '8px', color: '#88aacc' }).setOrigin(0.5)
       this.add.text(W/2, 272, 'XP from: training (+10), exploring battles (+8-20), bosses (+55), crystals', { fontSize: '8px', color: '#7788aa' }).setOrigin(0.5)
-      this.add.text(W/2, H - 12, 'ESC or C to close', { fontSize: '8px', color: '#556677' }).setOrigin(0.5)
 
       const close = () => { this.scene.stop(); this.scene.resume(this.from) }
+      const xBtn = this.add.rectangle(W - 26, 26, 22, 18, 0x4a1010, 0.95).setStrokeStyle(1, 0xaa4444).setInteractive({ useHandCursor: true })
+      this.add.text(W - 26, 26, '✕', { fontSize: '11px', color: '#ffaaaa', fontStyle: 'bold' }).setOrigin(0.5)
+      xBtn.on('pointerdown', close)
       this.input.keyboard.on('keydown-ESC', close)
       this.input.keyboard.on('keydown-C',   close)
     }
