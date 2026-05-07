@@ -91,18 +91,18 @@ export default function GamingPage() {
               Now Building
             </p>
             <h2 className="mt-3 text-3xl font-black uppercase sm:text-4xl">
-              Lumling: A Pocket Creature
+              RC: Respawn Creatures
             </h2>
             <p className="mt-4 max-w-2xl text-white/75">
-              {"Our in-progress browser game. Hatch a Lumling, keep it fed, win fights, and watch it evolve through five stages — Egg, Lumling, Lumora, Lumorex, Lumaxis. It's a Tamagotchi with combat in the back room."}
+              {"Our in-progress browser game. Pick a species — dino, water, or lion — hatch your egg, feed and train it, and watch it evolve through six stages. It's a Tamagotchi with combat in the back room."}
             </p>
 
             <div className="mt-6 grid gap-3 sm:grid-cols-3">
               <div className="rounded-xl border border-white/10 bg-black/40 p-4">
                 <p className="text-xs uppercase tracking-[0.25em] text-cyan-300">
-                  Stages
+                  Species
                 </p>
-                <p className="mt-1 text-2xl font-black">5</p>
+                <p className="mt-1 text-2xl font-black">3</p>
               </div>
               <div className="rounded-xl border border-white/10 bg-black/40 p-4">
                 <p className="text-xs uppercase tracking-[0.25em] text-cyan-300">

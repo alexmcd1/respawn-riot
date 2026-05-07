@@ -62,7 +62,7 @@ export default function NotFound() {
               href="/game"
               className="neon-btn rounded-md border-2 border-lime-400 bg-black px-6 py-3 font-display text-base tracking-[0.25em] text-lime-300 hover:bg-lime-400/10"
             >
-              ◢ PLAY LUMLING
+              ◢ PLAY RC
             </Link>
           </div>
         </div>
