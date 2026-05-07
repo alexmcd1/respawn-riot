@@ -9,7 +9,8 @@ const links: { href: string; label: string; accent: string }[] = [
   { href: '/anime', label: 'Anime', accent: 'text-fuchsia-400' },
   { href: '/pop-punk', label: 'Pop Punk', accent: 'text-pink-400' },
   { href: '/gaming', label: 'Gaming', accent: 'text-cyan-400' },
-  { href: '/game', label: 'Play', accent: 'text-lime-400' },
+  { href: '/game', label: 'Lumling', accent: 'text-lime-400' },
+  { href: '/trading-cards', label: 'TDC', accent: 'text-amber-400' },
 ]
 
 export default function NavBar() {

@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Rajdhani:wght@400;600;700&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Rajdhani',sans-serif;background:#0a0a12;color:#e8e0ff;min-height:100vh;overflow-x:hidden;}
+  #app{max-width:900px;margin:0 auto;padding:16px;}
+  .header{text-align:center;padding:20px 0 10px;}
+  .logo{font-family:'Bebas Neue',sans-serif;font-size:52px;letter-spacing:6px;background:linear-gradient(135deg,#ffd700,#ff6b35,#a855f7,#3b82f6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;line-height:1;}
+  .tagline{font-size:13px;color:#8b7fc7;letter-spacing:4px;text-transform:uppercase;margin-top:4px;}
+  .currency-bar{display:flex;align-items:center;justify-content:center;gap:24px;margin:12px auto;background:#13131f;border:1px solid #2a2845;border-radius:40px;padding:8px 24px;width:fit-content;}
+  .currency-item{display:flex;align-items:center;gap:6px;font-size:15px;font-weight:700;}
+  .coin{color:#ffd700;font-size:18px;}.gem{color:#a855f7;font-size:18px;}.luck-icon{color:#f59e0b;font-size:18px;}
+  .nav{display:flex;gap:6px;justify-content:center;margin:14px 0;flex-wrap:wrap;}
+  .nav-btn{font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:2px;padding:8px 20px;border:1px solid #2a2845;background:#13131f;color:#8b7fc7;border-radius:6px;cursor:pointer;transition:all .2s;}
+  .nav-btn:hover{border-color:#a855f7;color:#e8e0ff;}
+  .nav-btn.active{border-color:#a855f7;background:#1e1535;color:#fff;}
+  .section{display:none;}.section.active{display:block;}
+  .section-title{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:3px;text-align:center;color:#e8e0ff;margin-bottom:16px;}
+  .packs-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:14px;margin-bottom:24px;}
+  .pack-card{border-radius:12px;padding:16px 12px;text-align:center;cursor:pointer;border:2px solid transparent;transition:all .25s;position:relative;overflow:hidden;}
+  .pack-card:hover{transform:translateY(-4px);border-color:rgba(255,255,255,.3);}
+  .pack-card.selected{border-color:#ffd700;}
+  .pack-icon{font-size:42px;margin-bottom:8px;display:block;}
+  .pack-name{font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:1px;color:#fff;margin-bottom:4px;}
+  .pack-cost{font-size:13px;font-weight:600;color:#ffd700;}
+  .pack-limit{font-size:11px;color:#ec4899;font-weight:700;margin-top:3px;letter-spacing:1px;}
+  .open-btn{display:block;width:100%;max-width:320px;margin:0 auto 24px;font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:3px;padding:14px;border-radius:10px;border:none;background:linear-gradient(135deg,#7c3aed,#3b82f6);color:#fff;cursor:pointer;transition:all .2s;}
+  .open-btn:hover{transform:scale(1.02);opacity:.95;}
+  .open-btn:disabled{opacity:.4;cursor:not-allowed;transform:none;}
+  .cards-row{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin:10px 0;}
+  .card{width:120px;min-height:170px;border-radius:10px;border:2px solid;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:10px 8px;transition:all .35s;animation:flipIn .5s ease forwards;position:relative;overflow:hidden;text-align:center;}
+  .card::before{content:'';position:absolute;inset:0;opacity:.08;background:repeating-linear-gradient(45deg,#fff 0px,#fff 1px,transparent 1px,transparent 8px);pointer-events:none;}
+  @keyframes flipIn{from{transform:rotateY(90deg) scale(.8);opacity:0}to{transform:rotateY(0deg) scale(1);opacity:1}}
+  .card:nth-child(1){animation-delay:.05s}.card:nth-child(2){animation-delay:.2s}.card:nth-child(3){animation-delay:.35s}.card:nth-child(4){animation-delay:.5s}.card:nth-child(5){animation-delay:.65s}
+  .card-emoji{font-size:36px;line-height:1;}
+  .card-name{font-family:'Bebas Neue',sans-serif;font-size:13px;letter-spacing:1px;color:#fff;word-break:break-word;line-height:1.2;}
+  .card-series{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;opacity:.8;}
+  .card-rarity{font-size:10px;font-weight:700;letter-spacing:1px;padding:2px 6px;border-radius:4px;background:rgba(0,0,0,.4);color:#fff;}
+  .card-power{font-size:11px;color:rgba(255,255,255,.7);}
+  .rarity-common{border-color:#4b5563;background:linear-gradient(160deg,#1c1f26,#111318);}
+  .rarity-rare{border-color:#3b82f6;background:linear-gradient(160deg,#0f1e3d,#0a1628);}
+  .rarity-epic{border-color:#a855f7;background:linear-gradient(160deg,#2d1348,#1a0b2e);}
+  .rarity-legendary{border-color:#f59e0b;background:linear-gradient(160deg,#3d2200,#1f1100);}
+  .rarity-secret{border-color:#ec4899;background:linear-gradient(160deg,#3d0a2a,#200515);}
+  .shimmer{background:linear-gradient(90deg,transparent,rgba(255,215,0,.15),transparent);animation:shimmerAnim 2s infinite;position:absolute;inset:0;pointer-events:none;}
+  @keyframes shimmerAnim{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+  .card-stats{display:flex;justify-content:center;gap:16px;margin:12px 0 18px;flex-wrap:wrap;}
+  .stat-pill{background:#13131f;border:1px solid #2a2845;border-radius:20px;padding:5px 14px;font-size:13px;color:#a0a0c8;}
+  .stat-pill span{color:#fff;font-weight:700;}
+  .shop-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;}
+  .shop-item{background:#13131f;border:1px solid #2a2845;border-radius:12px;padding:18px 14px;text-align:center;transition:all .2s;}
+  .shop-item:hover{border-color:#7c3aed;}
+  .shop-item-icon{font-size:36px;margin-bottom:10px;}
+  .shop-item-name{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;color:#e8e0ff;margin-bottom:4px;}
+  .shop-item-desc{font-size:12px;color:#8b7fc7;margin-bottom:12px;line-height:1.4;}
+  .shop-buy-btn{font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:2px;padding:7px 16px;border-radius:8px;border:none;cursor:pointer;transition:all .2s;width:100%;}
+  .shop-buy-btn:hover{opacity:.85;}
+  .luck-meter{background:#13131f;border:1px solid #2a2845;border-radius:12px;padding:16px;margin-bottom:20px;text-align:center;}
+  .luck-bar-wrap{background:#1e1b30;border-radius:20px;height:14px;overflow:hidden;margin:8px 0;}
+  .luck-bar-fill{height:100%;border-radius:20px;background:linear-gradient(90deg,#f59e0b,#ffd700);transition:width .5s ease;}
+  .luck-label{font-size:13px;color:#8b7fc7;}
+  .luck-value{font-family:'Bebas Neue',sans-serif;font-size:22px;color:#ffd700;letter-spacing:2px;}
+  .collection-filters{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:16px;}
+  .filter-btn{font-size:12px;font-weight:700;letter-spacing:1px;padding:5px 14px;border-radius:20px;border:1px solid #2a2845;background:#13131f;color:#8b7fc7;cursor:pointer;transition:all .2s;}
+  .filter-btn:hover,.filter-btn.active{border-color:#a855f7;color:#e8e0ff;background:#1e1535;}
+  .collection-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:10px;}
+  .coll-card{border-radius:8px;border:1.5px solid;padding:10px 6px;text-align:center;transition:transform .2s;position:relative;overflow:hidden;cursor:pointer;}
+  .coll-card::before{content:'';position:absolute;inset:0;opacity:.06;background:repeating-linear-gradient(45deg,#fff 0px,#fff 1px,transparent 1px,transparent 8px);}
+  .coll-card:hover{transform:scale(1.04);}
+  .coll-card.trade-selected{outline:2px solid #ffd700;outline-offset:2px;}
+  .coll-emoji{font-size:28px;}
+  .coll-name{font-family:'Bebas Neue',sans-serif;font-size:11px;letter-spacing:.5px;color:#fff;margin-top:4px;word-break:break-word;line-height:1.2;}
+  .coll-count{position:absolute;top:4px;right:4px;background:rgba(0,0,0,.6);color:#fff;font-size:10px;font-weight:700;border-radius:8px;padding:1px 5px;}
+  .empty-state{text-align:center;color:#4b4670;padding:40px 20px;grid-column:1/-1;}
+  .empty-state-icon{font-size:48px;margin-bottom:12px;}
+  .empty-state-text{font-size:15px;}
+  .pack-one-piece{background:linear-gradient(135deg,#1a0a00,#3d1a00);}
+  .pack-jjk{background:linear-gradient(135deg,#0a0a1a,#1a0033);}
+  .pack-pokemon{background:linear-gradient(135deg,#001a00,#003300);}
+  .pack-naruto{background:linear-gradient(135deg,#1a0f00,#3d2200);}
+  .pack-bleach{background:linear-gradient(135deg,#001833,#000a1f);}
+  .pack-tadc{background:linear-gradient(135deg,#2d0033,#1a0027);box-shadow:0 0 20px rgba(236,72,153,.3);}
+  .badge-new{position:absolute;top:6px;right:6px;background:#ec4899;color:#fff;font-size:9px;font-weight:700;letter-spacing:1px;padding:2px 5px;border-radius:4px;}
+  .total-count{text-align:center;font-size:13px;color:#8b7fc7;margin-bottom:12px;}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1e1535;border:1px solid #7c3aed;color:#fff;padding:10px 24px;border-radius:30px;font-weight:600;font-size:14px;z-index:100;animation:toastIn .3s ease,toastOut .3s ease 1.7s forwards;pointer-events:none;}
+  @keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+  @keyframes toastOut{to{opacity:0;transform:translateX(-50%) translateY(20px)}}
+  .pack-shininess{animation:shine 1.5s ease infinite alternate;}
+  @keyframes shine{from{filter:brightness(1)}to{filter:brightness(1.3) saturate(1.2)}}
+
+  /* TRADE STYLES */
+  .trade-layout{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:start;margin-bottom:20px;}
+  .trade-side{background:#13131f;border:1px solid #2a2845;border-radius:12px;padding:14px;}
+  .trade-side-title{font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:2px;color:#a855f7;margin-bottom:10px;text-align:center;}
+  .trade-middle{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:10px 0;}
+  .trade-arrow{font-size:28px;color:#4b4670;}
+  .trade-confirm-btn{font-family:'Bebas Neue',sans-serif;font-size:14px;letter-spacing:2px;padding:10px 16px;border-radius:8px;border:none;background:#16a34a;color:#fff;cursor:pointer;transition:all .2s;white-space:nowrap;}
+  .trade-confirm-btn:hover{opacity:.85;}
+  .trade-confirm-btn:disabled{opacity:.4;cursor:not-allowed;}
+  .trade-slot{min-height:80px;border:1.5px dashed #2a2845;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#4b4670;font-size:12px;margin-bottom:8px;text-align:center;padding:8px;cursor:pointer;transition:all .2s;}
+  .trade-slot:hover{border-color:#7c3aed;color:#8b7fc7;}
+  .trade-slot.filled{border-style:solid;border-color:#a855f7;background:#1a0b2e;}
+  .trade-slot-card{display:flex;flex-direction:column;align-items:center;gap:3px;width:100%;}
+  .trade-slot-emoji{font-size:24px;}
+  .trade-slot-name{font-family:'Bebas Neue',sans-serif;font-size:11px;color:#fff;text-align:center;line-height:1.1;}
+  .trade-slot-rarity{font-size:9px;font-weight:700;}
+  .trade-remove{font-size:9px;color:#ef4444;cursor:pointer;margin-top:2px;font-weight:700;letter-spacing:1px;}
+  .trade-value-bar{display:flex;justify-content:space-between;align-items:center;background:#0a0a12;border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:13px;}
+  .trade-val{font-family:'Bebas Neue',sans-serif;font-size:18px;}
+  .trade-val.good{color:#22c55e;}
+  .trade-val.bad{color:#ef4444;}
+  .trade-val.neutral{color:#ffd700;}
+  .trade-hint{font-size:11px;color:#4b4670;text-align:center;margin-top:6px;}
+  .market-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;max-height:300px;overflow-y:auto;padding:4px;}
+  .market-card{border-radius:8px;border:1.5px solid;padding:8px 6px;text-align:center;cursor:pointer;transition:all .2s;position:relative;overflow:hidden;}
+  .market-card::before{content:'';position:absolute;inset:0;opacity:.06;background:repeating-linear-gradient(45deg,#fff 0px,#fff 1px,transparent 1px,transparent 8px);}
+  .market-card:hover{transform:scale(1.04);}
+  .market-card.selected-offer{outline:2px solid #22c55e;outline-offset:2px;}
+  .market-emoji{font-size:24px;}
+  .market-name{font-family:'Bebas Neue',sans-serif;font-size:10px;color:#fff;margin-top:3px;word-break:break-word;line-height:1.1;}
+  .market-price{font-size:10px;color:#ffd700;font-weight:700;margin-top:2px;}
+  .trade-tabs{display:flex;gap:6px;margin-bottom:14px;border-bottom:1px solid #2a2845;padding-bottom:10px;}
+  .trade-tab{font-family:'Bebas Neue',sans-serif;font-size:14px;letter-spacing:2px;padding:6px 16px;border-radius:6px 6px 0 0;border:1px solid #2a2845;border-bottom:none;background:#13131f;color:#8b7fc7;cursor:pointer;transition:all .2s;}
+  .trade-tab.active{background:#1e1535;color:#fff;border-color:#a855f7;}
+  .sell-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;}
+  .sell-card{border-radius:8px;border:1.5px solid;padding:10px 6px;text-align:center;cursor:pointer;transition:all .2s;position:relative;overflow:hidden;}
+  .sell-card::before{content:'';position:absolute;inset:0;opacity:.06;background:repeating-linear-gradient(45deg,#fff 0px,#fff 1px,transparent 1px,transparent 8px);}
+  .sell-card:hover{transform:scale(1.04);}
+  .sell-btn{font-family:'Bebas Neue',sans-serif;font-size:11px;letter-spacing:1px;padding:4px 8px;border-radius:5px;border:none;background:#ca8a04;color:#fff;cursor:pointer;margin-top:4px;transition:all .2s;width:100%;}
+  .sell-btn:hover{opacity:.85;}
+  .sell-price{font-size:10px;color:#ffd700;font-weight:700;margin-top:2px;}
+  .trade-npc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:16px;}
+  .npc-card{background:#13131f;border:1px solid #2a2845;border-radius:12px;padding:14px;transition:all .2s;}
+  .npc-card:hover{border-color:#7c3aed;}
+  .npc-avatar{font-size:32px;text-align:center;margin-bottom:6px;}
+  .npc-name{font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:2px;color:#e8e0ff;text-align:center;margin-bottom:4px;}
+  .npc-wants{font-size:11px;color:#8b7fc7;text-align:center;margin-bottom:10px;line-height:1.4;}
+  .npc-offer{font-size:11px;color:#22c55e;text-align:center;margin-bottom:10px;font-weight:700;}
+  .npc-trade-btn{font-family:'Bebas Neue',sans-serif;font-size:13px;letter-spacing:1px;padding:7px;border-radius:7px;border:none;background:#7c3aed;color:#fff;cursor:pointer;width:100%;transition:all .2s;}
+  .npc-trade-btn:hover{opacity:.85;}
+  .npc-trade-btn:disabled{opacity:.4;cursor:not-allowed;}
+  .section-sub{font-size:12px;color:#8b7fc7;text-align:center;margin-bottom:14px;}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="header">
+    <div class="logo">TDC</div>
+    <div class="tagline">Trading Digital Cards</div>
+  </div>
+
+  <div class="currency-bar">
+    <div class="currency-item"><span class="coin">🪙</span><span id="coins-display">1000</span></div>
+    <div class="currency-item"><span class="gem">💎</span><span id="gems-display">5</span></div>
+    <div class="currency-item"><span class="luck-icon">🍀</span><span id="luck-display">0</span>% Luck</div>
+  </div>
+
+  <div class="nav">
+    <button class="nav-btn active" onclick="showSection('packs',this)">⚡ PACKS</button>
+    <button class="nav-btn" onclick="showSection('trade',this)">🔄 TRADE</button>
+    <button class="nav-btn" onclick="showSection('shop',this)">🛒 SHOP</button>
+    <button class="nav-btn" onclick="showSection('collection',this)">📚 COLLECTION</button>
+  </div>
+
+  <!-- PACKS -->
+  <div id="packs" class="section active">
+    <div class="section-title">CHOOSE YOUR PACK</div>
+    <div class="packs-grid" id="packs-grid"></div>
+    <button class="open-btn" id="open-btn" onclick="openPack()" disabled>SELECT A PACK</button>
+    <div id="reveal-area"></div>
+  </div>
+
+  <!-- TRADE -->
+  <div id="trade" class="section">
+    <div class="section-title">TRADE POST</div>
+    <div class="trade-tabs">
+      <button class="trade-tab active" onclick="showTradeTab('npc',this)">NPC TRADES</button>
+      <button class="trade-tab" onclick="showTradeTab('sell',this)">SELL CARDS</button>
+      <button class="trade-tab" onclick="showTradeTab('swap',this)">CARD SWAP</button>
+    </div>
+    <div id="trade-npc" class="trade-tab-content">
+      <div class="section-sub">Trade cards with NPCs for coins, gems, or rare cards</div>
+      <div class="trade-npc-grid" id="npc-grid"></div>
+    </div>
+    <div id="trade-sell" class="trade-tab-content" style="display:none">
+      <div class="section-sub">Sell duplicate cards for coins. Higher rarity = more coins.</div>
+      <div class="sell-grid" id="sell-grid"></div>
+    </div>
+    <div id="trade-swap" class="trade-tab-content" style="display:none">
+      <div class="section-sub">Swap cards 1-for-1. Higher rarity gives better value.</div>
+      <div class="trade-layout">
+        <div class="trade-side">
+          <div class="trade-side-title">YOUR OFFER</div>
+          <div class="trade-slot" id="your-slot" onclick="openYourPicker()">
+            <span>Tap to pick a card from your collection</span>
+          </div>
+          <div id="your-slot-info"></div>
+        </div>
+        <div class="trade-middle">
+          <div class="trade-arrow">⇄</div>
+          <div id="swap-value-info" style="text-align:center;font-size:12px;color:#4b4670;">Select cards to see value</div>
+          <button class="trade-confirm-btn" id="swap-btn" onclick="doSwap()" disabled>SWAP</button>
+        </div>
+        <div class="trade-side">
+          <div class="trade-side-title">YOU RECEIVE</div>
+          <div class="trade-slot" id="their-slot" onclick="openTheirPicker()">
+            <span>Tap to pick a card to receive</span>
+          </div>
+          <div id="their-slot-info"></div>
+        </div>
+      </div>
+      <div id="swap-picker" style="display:none">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:2px;" id="picker-title">SELECT CARD</div>
+          <button onclick="closePicker()" style="background:none;border:1px solid #2a2845;color:#8b7fc7;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;">CLOSE</button>
+        </div>
+        <div class="market-grid" id="picker-grid"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SHOP -->
+  <div id="shop" class="section">
+    <div class="section-title">LUCK SHOP</div>
+    <div class="luck-meter">
+      <div class="luck-value" id="luck-meter-val">0% Luck</div>
+      <div class="luck-bar-wrap"><div class="luck-bar-fill" id="luck-bar" style="width:0%"></div></div>
+      <div class="luck-label">Higher luck = better rarity pulls</div>
+    </div>
+    <div class="shop-grid" id="shop-grid"></div>
+  </div>
+
+  <!-- COLLECTION -->
+  <div id="collection" class="section">
+    <div class="section-title">MY COLLECTION</div>
+    <div class="collection-filters" id="coll-filters"></div>
+    <div class="total-count" id="coll-total"></div>
+    <div class="collection-grid" id="coll-grid"></div>
+  </div>
+</div>
+
+<script>
+const PACKS=[
+  {id:'one-piece',name:'ONE PIECE',icon:'🏴‍☠️',cost:100,cls:'pack-one-piece',series:'ONE PIECE'},
+  {id:'jjk',name:'JJK',icon:'👁',cost:100,cls:'pack-jjk',series:'JJK'},
+  {id:'pokemon',name:'POKÉMON',icon:'⚡',cost:100,cls:'pack-pokemon',series:'POKEMON'},
+  {id:'naruto',name:'NARUTO',icon:'🍃',cost:100,cls:'pack-naruto',series:'NARUTO'},
+  {id:'bleach',name:'BLEACH',icon:'⚔️',cost:100,cls:'pack-bleach',series:'BLEACH'},
+  {id:'tadc',name:'DIGITAL CIRCUS',icon:'🎪',cost:250,cls:'pack-tadc',series:'TADC',limited:true,gem:1}
+];
+
+const ALL_CARDS={
+  'ONE PIECE':[
+    {name:'Monkey D. Luffy',emoji:'🏴‍☠️',rarity:'legendary',power:98},
+    {name:'Roronoa Zoro',emoji:'⚔️',rarity:'epic',power:92},
+    {name:'Nami',emoji:'🗺️',rarity:'rare',power:75},
+    {name:'Usopp',emoji:'🎯',rarity:'common',power:60},
+    {name:'Sanji',emoji:'🔥',rarity:'epic',power:90},
+    {name:'Chopper',emoji:'🦌',rarity:'rare',power:72},
+    {name:'Nico Robin',emoji:'🌸',rarity:'epic',power:88},
+    {name:'Franky',emoji:'🤖',rarity:'rare',power:76},
+    {name:'Brook',emoji:'💀',rarity:'rare',power:74},
+    {name:'Jinbe',emoji:'🐋',rarity:'epic',power:87},
+    {name:'Shanks',emoji:'🦁',rarity:'legendary',power:99},
+    {name:'Blackbeard',emoji:'🌑',rarity:'legendary',power:97},
+    {name:'Whitebeard',emoji:'💎',rarity:'legendary',power:100},
+    {name:'Trafalgar Law',emoji:'🏥',rarity:'epic',power:89},
+    {name:'Buggy',emoji:'🤡',rarity:'common',power:55},
+    {name:'Marine Ford',emoji:'🌊',rarity:'rare',power:70},
+  ],
+  'JJK':[
+    {name:'Yuji Itadori',emoji:'👊',rarity:'epic',power:91},
+    {name:'Megumi Fushiguro',emoji:'🐕',rarity:'epic',power:89},
+    {name:'Nobara Kugisaki',emoji:'🔨',rarity:'rare',power:78},
+    {name:'Satoru Gojo',emoji:'🔵',rarity:'legendary',power:100},
+    {name:'Ryomen Sukuna',emoji:'👹',rarity:'legendary',power:99},
+    {name:'Aoi Todo',emoji:'🌸',rarity:'epic',power:88},
+    {name:'Nanami Kento',emoji:'🔪',rarity:'epic',power:87},
+    {name:'Toge Inumaki',emoji:'🍙',rarity:'rare',power:80},
+    {name:'Panda',emoji:'🐼',rarity:'rare',power:75},
+    {name:'Suguru Geto',emoji:'🌑',rarity:'epic',power:90},
+    {name:'Yuta Okkotsu',emoji:'⚡',rarity:'legendary',power:97},
+    {name:'Mahito',emoji:'💀',rarity:'epic',power:85},
+    {name:'Jogo',emoji:'🌋',rarity:'rare',power:76},
+    {name:'Choso',emoji:'🩸',rarity:'epic',power:84},
+  ],
+  'POKEMON':[
+    {name:'Pikachu',emoji:'⚡',rarity:'rare',power:70},
+    {name:'Charizard',emoji:'🔥',rarity:'legendary',power:97},
+    {name:'Mewtwo',emoji:'🧬',rarity:'legendary',power:100},
+    {name:'Gengar',emoji:'👻',rarity:'epic',power:85},
+    {name:'Snorlax',emoji:'😴',rarity:'rare',power:72},
+    {name:'Eevee',emoji:'🦊',rarity:'common',power:50},
+    {name:'Rayquaza',emoji:'🐉',rarity:'legendary',power:99},
+    {name:'Lucario',emoji:'🐾',rarity:'epic',power:88},
+    {name:'Greninja',emoji:'🐸',rarity:'epic',power:87},
+    {name:'Bulbasaur',emoji:'🌿',rarity:'common',power:52},
+    {name:'Squirtle',emoji:'💧',rarity:'common',power:51},
+    {name:'Gyarados',emoji:'🌊',rarity:'epic',power:83},
+    {name:'Arceus',emoji:'✨',rarity:'legendary',power:100},
+    {name:'Garchomp',emoji:'🦈',rarity:'epic',power:86},
+    {name:'Magikarp',emoji:'🐟',rarity:'common',power:10},
+    {name:'Umbreon',emoji:'🌙',rarity:'rare',power:74},
+  ],
+  'NARUTO':[
+    {name:'Naruto Uzumaki',emoji:'🦊',rarity:'legendary',power:98},
+    {name:'Sasuke Uchiha',emoji:'🌑',rarity:'legendary',power:97},
+    {name:'Sakura Haruno',emoji:'🌸',rarity:'rare',power:78},
+    {name:'Kakashi Hatake',emoji:'📖',rarity:'epic',power:91},
+    {name:'Itachi Uchiha',emoji:'🦅',rarity:'legendary',power:99},
+    {name:'Jiraiya',emoji:'🐸',rarity:'epic',power:90},
+    {name:'Tsunade',emoji:'💪',rarity:'epic',power:88},
+    {name:'Gaara',emoji:'🏜️',rarity:'epic',power:89},
+    {name:'Rock Lee',emoji:'🥊',rarity:'rare',power:80},
+    {name:'Hinata Hyuga',emoji:'💜',rarity:'rare',power:76},
+    {name:'Obito Uchiha',emoji:'🌀',rarity:'legendary',power:96},
+    {name:'Pain',emoji:'⚡',rarity:'legendary',power:95},
+    {name:'Minato Namikaze',emoji:'💨',rarity:'legendary',power:97},
+    {name:'Choji',emoji:'🍖',rarity:'common',power:65},
+    {name:'Shikamaru',emoji:'♟️',rarity:'rare',power:77},
+  ],
+  'BLEACH':[
+    {name:'Ichigo Kurosaki',emoji:'⚔️',rarity:'legendary',power:98},
+    {name:'Rukia Kuchiki',emoji:'❄️',rarity:'epic',power:87},
+    {name:'Byakuya Kuchiki',emoji:'🌸',rarity:'epic',power:91},
+    {name:'Hitsugaya',emoji:'🧊',rarity:'epic',power:90},
+    {name:'Kenpachi Zaraki',emoji:'🗡️',rarity:'legendary',power:96},
+    {name:'Renji Abarai',emoji:'🔴',rarity:'rare',power:79},
+    {name:'Sosuke Aizen',emoji:'🌑',rarity:'legendary',power:100},
+    {name:'Grimmjow',emoji:'🐺',rarity:'epic',power:88},
+    {name:'Ulquiorra',emoji:'👁',rarity:'legendary',power:95},
+    {name:'Orihime Inoue',emoji:'🌼',rarity:'rare',power:74},
+    {name:'Kisuke Urahara',emoji:'🎩',rarity:'epic',power:93},
+    {name:'Yhwach',emoji:'👑',rarity:'legendary',power:99},
+    {name:'Chad',emoji:'💪',rarity:'rare',power:77},
+    {name:'Uryu Ishida',emoji:'🏹',rarity:'rare',power:78},
+  ],
+  'TADC':[
+    {name:'Pomni',emoji:'🃏',rarity:'secret',power:100},
+    {name:'Jax',emoji:'🐰',rarity:'secret',power:98},
+    {name:'Caine',emoji:'🎩',rarity:'legendary',power:95},
+    {name:'Gangle',emoji:'😢',rarity:'epic',power:82},
+    {name:'Ragatha',emoji:'🎀',rarity:'epic',power:84},
+    {name:'Kinger',emoji:'♟️',rarity:'legendary',power:93},
+    {name:'Bubble',emoji:'🫧',rarity:'rare',power:70},
+    {name:'Zooble',emoji:'🧩',rarity:'epic',power:86},
+    {name:'The Void',emoji:'🌀',rarity:'secret',power:100},
+    {name:'Abstracted',emoji:'💀',rarity:'legendary',power:97},
+  ]
+};
+
+const RARITY_VALUE={common:30,rare:80,epic:200,legendary:500,secret:1500};
+const RARITY_COLOR={common:'#9ca3af',rare:'#60a5fa',epic:'#c084fc',legendary:'#fbbf24',secret:'#f472b6'};
+const RARITY_LABEL={common:'Common',rare:'Rare',epic:'Epic',legendary:'Legendary',secret:'★ Secret'};
+
+const SHOP_ITEMS=[
+  {id:'luck_sm',name:'LUCKY CHARM',icon:'🍀',desc:'Boost luck by 10%.',cost_coins:200,luck:10,color:'#16a34a'},
+  {id:'luck_md',name:'FORTUNE BOOST',icon:'⭐',desc:'Boost luck by 25%.',cost_coins:450,luck:25,color:'#d97706'},
+  {id:'luck_lg',name:'DIVINE FAVOR',icon:'🌟',desc:'Boost luck by 50%.',cost_gems:2,luck:50,color:'#7c3aed'},
+  {id:'luck_max',name:'GODLY LUCK',icon:'✨',desc:'Max luck to 100%! Every pull is legendary+.',cost_gems:5,luck:100,color:'#ec4899'},
+  {id:'coins_sm',name:'COIN BUNDLE',icon:'🪙',desc:'Get 500 coins.',cost_gems:1,coins:500,color:'#ca8a04'},
+  {id:'coins_lg',name:'COIN CHEST',icon:'💰',desc:'Get 1500 coins.',cost_gems:3,coins:1500,color:'#ca8a04'},
+];
+
+const NPC_TRADERS=[
+  {id:'npc1',avatar:'🧙',name:'CARD WIZARD',wants:{rarity:'common',count:3},wantsLabel:'3 Common cards',gives:{type:'coins',amount:150},givesLabel:'150 🪙 coins'},
+  {id:'npc2',avatar:'🦊',name:'FOXY DEALER',wants:{rarity:'rare',count:2},wantsLabel:'2 Rare cards',gives:{type:'coins',amount:300},givesLabel:'300 🪙 coins'},
+  {id:'npc3',avatar:'👑',name:'ROYAL BROKER',wants:{rarity:'epic',count:1},wantsLabel:'1 Epic card',gives:{type:'coins',amount:400},givesLabel:'400 🪙 coins'},
+  {id:'npc4',avatar:'🌟',name:'STAR HUNTER',wants:{rarity:'legendary',count:1},wantsLabel:'1 Legendary card',gives:{type:'gems',amount:2},givesLabel:'2 💎 gems'},
+  {id:'npc5',avatar:'🎪',name:'CIRCUS CLOWN',wants:{rarity:'rare',count:3},wantsLabel:'3 Rare cards',gives:{type:'coins',amount:500},givesLabel:'500 🪙 coins'},
+  {id:'npc6',avatar:'🐉',name:'DRAGON LORD',wants:{rarity:'epic',count:2},wantsLabel:'2 Epic cards',gives:{type:'gems',amount:1},givesLabel:'1 💎 gem'},
+];
+
+let state={
+  coins:1000,gems:5,luck:0,selectedPack:null,
+  collection:{},totalPulls:0,
+  swapYour:null,swapTheir:null,pickerMode:null
+};
+
+function cardKey(c){return c.series+':'+c.name;}
+
+function getRarityByLuck(luck,isSecret){
+  const roll=Math.random()*100;
+  if(isSecret){
+    const s=Math.min(luck*.8,60),l=Math.min(20+luck*.3,35),e=Math.min(25+luck*.15,35),r=20,c=Math.max(100-s-l-e-r,0);
+    const t=[c,r,e,l,s];let cum=0;
+    for(let i=0;i<t.length;i++){cum+=t[i];if(roll<cum)return['common','rare','epic','legendary','secret'][i];}
+    return'legendary';
+  }
+  const lb=Math.min(luck*.3,30),eb=Math.min(luck*.2,20);
+  const t=[Math.max(55-luck*.5,5),Math.max(30-luck*.1,10),Math.min(10+eb,35),Math.min(4+lb,35),0];
+  let cum=0;
+  for(let i=0;i<t.length;i++){cum+=t[i];if(roll<cum)return['common','rare','epic','legendary','secret'][i];}
+  return'legendary';
+}
+
+function drawCard(series){
+  const pool=ALL_CARDS[series]||[];
+  const isSecret=series==='TADC';
+  const rarity=getRarityByLuck(state.luck,isSecret);
+  const eligible=pool.filter(c=>{
+    if(rarity==='secret')return c.rarity==='secret'||c.rarity==='legendary';
+    if(rarity==='legendary')return c.rarity==='legendary'||c.rarity==='epic';
+    if(rarity==='epic')return c.rarity==='epic'||c.rarity==='rare';
+    if(rarity==='rare')return c.rarity==='rare'||c.rarity==='common';
+    return c.rarity==='common';
+  });
+  const p2=eligible.length>0?eligible:pool;
+  const card=p2[Math.floor(Math.random()*p2.length)];
+  return{...card,series};
+}
+
+function addToCollection(card){
+  const k=cardKey(card);
+  if(!state.collection[k])state.collection[k]={...card,count:0};
+  state.collection[k].count++;
+}
+
+function removeFromCollection(card,count=1){
+  const k=cardKey(card);
+  if(!state.collection[k])return false;
+  if(state.collection[k].count<count)return false;
+  state.collection[k].count-=count;
+  if(state.collection[k].count===0)delete state.collection[k];
+  return true;
+}
+
+function getCollectionArr(){return Object.values(state.collection).filter(c=>c.count>0);}
+function getByRarity(rarity){return getCollectionArr().filter(c=>c.rarity===rarity);}
+
+function renderPacks(){
+  document.getElementById('packs-grid').innerHTML=PACKS.map(p=>`
+    <div class="pack-card ${p.cls}${p.limited?' pack-shininess':''}" onclick="selectPack('${p.id}')" id="pack-${p.id}">
+      ${p.limited?'<div class="badge-new">LIMITED</div>':''}
+      <span class="pack-icon">${p.icon}</span>
+      <div class="pack-name">${p.name}</div>
+      <div class="pack-cost">${p.gem?'💎 '+p.gem:'🪙 '+p.cost}</div>
+      ${p.limited?'<div class="pack-limit">✦ EXCLUSIVE ✦</div>':''}
+    </div>`).join('');
+}
+
+function selectPack(id){
+  state.selectedPack=id;
+  document.querySelectorAll('.pack-card').forEach(e=>e.classList.remove('selected'));
+  document.getElementById('pack-'+id).classList.add('selected');
+  const btn=document.getElementById('open-btn');
+  btn.disabled=false;btn.textContent='OPEN PACK';
+}
+
+function openPack(){
+  const pack=PACKS.find(p=>p.id===state.selectedPack);if(!pack)return;
+  if(pack.gem){if(state.gems<pack.gem){showToast('Not enough 💎 gems!');return;}state.gems-=pack.gem;}
+  else{if(state.coins<pack.cost){showToast('Not enough 🪙 coins!');return;}state.coins-=pack.cost;}
+  const cards=[];
+  for(let i=0;i<5;i++)cards.push(drawCard(pack.series));
+  state.totalPulls+=5;
+  state.luck=Math.max(0,state.luck-10);
+  cards.forEach(c=>addToCollection(c));
+  updateUI();renderReveal(cards);
+}
+
+function renderReveal(cards){
+  const stats={common:0,rare:0,epic:0,legendary:0,secret:0};
+  cards.forEach(c=>stats[c.rarity]++);
+  const statsHtml=Object.entries(stats).filter(([,v])=>v>0)
+    .map(([k,v])=>`<div class="stat-pill">${RARITY_LABEL[k]}: <span>${v}</span></div>`).join('');
+  document.getElementById('reveal-area').innerHTML=`
+    <div class="cards-row">${cards.map((c,i)=>`
+      <div class="card rarity-${c.rarity}" style="animation-delay:${i*.15}s">
+        ${c.rarity==='legendary'||c.rarity==='secret'?'<div class="shimmer"></div>':''}
+        <div class="card-series" style="color:${RARITY_COLOR[c.rarity]}">${c.series}</div>
+        <div class="card-emoji">${c.emoji}</div>
+        <div class="card-name">${c.name}</div>
+        <div class="card-rarity" style="color:${RARITY_COLOR[c.rarity]}">${RARITY_LABEL[c.rarity]}</div>
+        <div class="card-power">⚡ ${c.power}</div>
+      </div>`).join('')}
+    </div>
+    <div class="card-stats">${statsHtml}</div>`;
+}
+
+function renderNPCTrades(){
+  document.getElementById('npc-grid').innerHTML=NPC_TRADERS.map(npc=>{
+    const canTrade=checkNPCCanTrade(npc);
+    return`<div class="npc-card">
+      <div class="npc-avatar">${npc.avatar}</div>
+      <div class="npc-name">${npc.name}</div>
+      <div class="npc-wants">Wants: <strong>${npc.wantsLabel}</strong></div>
+      <div class="npc-offer">Gives: ${npc.givesLabel}</div>
+      <button class="npc-trade-btn" onclick="doNPCTrade('${npc.id}')" ${canTrade?'':'disabled'}>
+        ${canTrade?'TRADE NOW':'NOT ENOUGH CARDS'}
+      </button>
+    </div>`;
+  }).join('');
+}
+
+function checkNPCCanTrade(npc){
+  const byRarity=getByRarity(npc.wants.rarity);
+  const total=byRarity.reduce((a,c)=>a+c.count,0);
+  return total>=npc.wants.count;
+}
+
+function doNPCTrade(npcId){
+  const npc=NPC_TRADERS.find(n=>n.id===npcId);if(!npc)return;
+  const byRarity=getByRarity(npc.wants.rarity).sort((a,b)=>a.power-b.power);
+  let need=npc.wants.count;
+  for(const card of byRarity){
+    while(card.count>0&&need>0){removeFromCollection(card,1);need--;}
+    if(need===0)break;
+  }
+  if(npc.gives.type==='coins')state.coins+=npc.gives.amount;
+  else if(npc.gives.type==='gems')state.gems+=npc.gives.amount;
+  showToast(`Trade complete! Received ${npc.givesLabel}`);
+  updateUI();renderNPCTrades();
+}
+
+function renderSellGrid(){
+  const cards=getCollectionArr().sort((a,b)=>{
+    const o={secret:0,legendary:1,epic:2,rare:3,common:4};
+    return o[a.rarity]-o[b.rarity];
+  });
+  if(cards.length===0){
+    document.getElementById('sell-grid').innerHTML='<div class="empty-state"><div class="empty-state-icon">📦</div><div class="empty-state-text">No cards to sell. Open some packs first!</div></div>';
+    return;
+  }
+  document.getElementById('sell-grid').innerHTML=cards.map(c=>{
+    const price=Math.round(RARITY_VALUE[c.rarity]*0.6);
+    return`<div class="sell-card rarity-${c.rarity}">
+      <div class="coll-count">×${c.count}</div>
+      <div class="coll-emoji">${c.emoji}</div>
+      <div class="coll-name">${c.name}</div>
+      <div class="sell-price">🪙 ${price}</div>
+      <button class="sell-btn" onclick="sellCard('${c.series}','${c.name}')">SELL 1</button>
+    </div>`;
+  }).join('');
+}
+
+function sellCard(series,name){
+  const k=series+':'+name;
+  const card=state.collection[k];if(!card)return;
+  const price=Math.round(RARITY_VALUE[card.rarity]*0.6);
+  removeFromCollection(card,1);
+  state.coins+=price;
+  showToast(`Sold ${card.emoji} ${name} for 🪙 ${price}`);
+  updateUI();renderSellGrid();
+}
+
+let swapYourCard=null,swapTheirCard=null;
+
+function openYourPicker(){
+  state.pickerMode='your';
+  const cards=getCollectionArr();
+  document.getElementById('picker-title').textContent='YOUR OFFER';
+  const grid=document.getElementById('picker-grid');
+  grid.innerHTML=cards.map(c=>`
+    <div class="market-card rarity-${c.rarity}" onclick="selectSwapCard('your','${c.series}','${c.name}')">
+      <div class="market-emoji">${c.emoji}</div>
+      <div class="market-name">${c.name}</div>
+      <div class="market-price" style="color:${RARITY_COLOR[c.rarity]}">${RARITY_LABEL[c.rarity]}</div>
+      <div style="font-size:9px;color:#8b7fc7">×${c.count} owned</div>
+    </div>`).join('');
+  if(cards.length===0)grid.innerHTML='<div class="empty-state"><div class="empty-state-icon">🃏</div><div class="empty-state-text">No cards yet!</div></div>';
+  document.getElementById('swap-picker').style.display='block';
+}
+
+function openTheirPicker(){
+  state.pickerMode='their';
+  document.getElementById('picker-title').textContent='CARD TO RECEIVE';
+  const allCards=[];
+  Object.entries(ALL_CARDS).forEach(([series,cards])=>cards.forEach(c=>allCards.push({...c,series})));
+  const grid=document.getElementById('picker-grid');
+  grid.innerHTML=allCards.map(c=>`
+    <div class="market-card rarity-${c.rarity}" onclick="selectSwapCard('their','${c.series}','${c.name}')">
+      <div class="market-emoji">${c.emoji}</div>
+      <div class="market-name">${c.name}</div>
+      <div class="market-price" style="color:${RARITY_COLOR[c.rarity]}">${RARITY_LABEL[c.rarity]}</div>
+      <div style="font-size:9px;color:#8b7fc7">⚡ ${c.power}</div>
+    </div>`).join('');
+  document.getElementById('swap-picker').style.display='block';
+}
+
+function selectSwapCard(mode,series,name){
+  const pool=mode==='your'?getCollectionArr():Object.entries(ALL_CARDS).flatMap(([s,cards])=>cards.map(c=>({...c,series:s})));
+  const found=pool.find(c=>c.series===series&&c.name===name);
+  if(!found)return;
+  if(mode==='your'){swapYourCard=found;renderYourSlot();}
+  else{swapTheirCard=found;renderTheirSlot();}
+  closePicker();updateSwapValue();
+}
+
+function renderYourSlot(){
+  const slot=document.getElementById('your-slot');
+  if(swapYourCard){
+    slot.className='trade-slot filled';
+    slot.onclick=null;
+    slot.innerHTML=`<div class="trade-slot-card">
+      <div class="trade-slot-emoji">${swapYourCard.emoji}</div>
+      <div class="trade-slot-name">${swapYourCard.name}</div>
+      <div class="trade-slot-rarity" style="color:${RARITY_COLOR[swapYourCard.rarity]}">${RARITY_LABEL[swapYourCard.rarity]}</div>
+      <div class="trade-remove" onclick="clearSwapCard('your')">✕ REMOVE</div>
+    </div>`;
+  }else{
+    slot.className='trade-slot';slot.onclick=openYourPicker;
+    slot.innerHTML='<span>Tap to pick a card from your collection</span>';
+  }
+}
+
+function renderTheirSlot(){
+  const slot=document.getElementById('their-slot');
+  if(swapTheirCard){
+    slot.className='trade-slot filled';
+    slot.onclick=null;
+    slot.innerHTML=`<div class="trade-slot-card">
+      <div class="trade-slot-emoji">${swapTheirCard.emoji}</div>
+      <div class="trade-slot-name">${swapTheirCard.name}</div>
+      <div class="trade-slot-rarity" style="color:${RARITY_COLOR[swapTheirCard.rarity]}">${RARITY_LABEL[swapTheirCard.rarity]}</div>
+      <div class="trade-remove" onclick="clearSwapCard('their')">✕ REMOVE</div>
+    </div>`;
+  }else{
+    slot.className='trade-slot';slot.onclick=openTheirPicker;
+    slot.innerHTML='<span>Tap to pick a card to receive</span>';
+  }
+}
+
+function clearSwapCard(mode){
+  if(mode==='your'){swapYourCard=null;renderYourSlot();}
+  else{swapTheirCard=null;renderTheirSlot();}
+  updateSwapValue();
+}
+
+function updateSwapValue(){
+  const info=document.getElementById('swap-value-info');
+  const btn=document.getElementById('swap-btn');
+  if(!swapYourCard||!swapTheirCard){info.textContent='Select cards to see value';btn.disabled=true;return;}
+  const yourVal=RARITY_VALUE[swapYourCard.rarity];
+  const theirVal=RARITY_VALUE[swapTheirCard.rarity];
+  const diff=yourVal-theirVal;
+  const coinCost=diff<0?Math.abs(diff):0;
+  const coinGain=diff>0?Math.round(diff*0.5):0;
+  let txt='';
+  if(coinCost>0)txt=`Pay 🪙 ${coinCost} to cover value gap`;
+  else if(coinGain>0)txt=`Gain 🪙 ${coinGain} bonus`;
+  else txt='Fair trade!';
+  info.textContent=txt;
+  if(coinCost>0&&state.coins<coinCost){btn.disabled=true;info.textContent+=` (need ${coinCost} coins)`;}
+  else btn.disabled=false;
+}
+
+function doSwap(){
+  if(!swapYourCard||!swapTheirCard)return;
+  const yourVal=RARITY_VALUE[swapYourCard.rarity];
+  const theirVal=RARITY_VALUE[swapTheirCard.rarity];
+  const diff=yourVal-theirVal;
+  const coinCost=diff<0?Math.abs(diff):0;
+  const coinGain=diff>0?Math.round(diff*0.5):0;
+  if(coinCost>state.coins){showToast('Not enough coins!');return;}
+  const k=cardKey(swapYourCard);
+  if(!state.collection[k]||state.collection[k].count<1){showToast('You no longer have that card!');renderYourSlot();swapYourCard=null;updateSwapValue();return;}
+  removeFromCollection(swapYourCard,1);
+  addToCollection(swapTheirCard);
+  if(coinCost)state.coins-=coinCost;
+  if(coinGain)state.coins+=coinGain;
+  showToast(`Swapped for ${swapTheirCard.emoji} ${swapTheirCard.name}!${coinGain?' +🪙'+coinGain:''}`);
+  swapYourCard=null;swapTheirCard=null;
+  renderYourSlot();renderTheirSlot();updateSwapValue();updateUI();
+}
+
+function closePicker(){document.getElementById('swap-picker').style.display='none';}
+
+function renderShop(){
+  document.getElementById('shop-grid').innerHTML=SHOP_ITEMS.map(item=>`
+    <div class="shop-item">
+      <div class="shop-item-icon">${item.icon}</div>
+      <div class="shop-item-name">${item.name}</div>
+      <div class="shop-item-desc">${item.desc}</div>
+      <button class="shop-buy-btn" onclick="buyItem('${item.id}')" style="background:${item.color};color:#fff;">
+        BUY — ${item.cost_coins?'🪙 '+item.cost_coins:'💎 '+item.cost_gems}
+      </button>
+    </div>`).join('');
+}
+
+function buyItem(id){
+  const item=SHOP_ITEMS.find(i=>i.id===id);if(!item)return;
+  if(item.cost_coins){if(state.coins<item.cost_coins){showToast('Not enough 🪙 coins!');return;}state.coins-=item.cost_coins;}
+  else{if(state.gems<item.cost_gems){showToast('Not enough 💎 gems!');return;}state.gems-=item.cost_gems;}
+  if(item.luck){state.luck=Math.min(100,state.luck+item.luck);showToast(`🍀 Luck boosted to ${state.luck}%!`);}
+  if(item.coins){state.coins+=item.coins;showToast(`🪙 +${item.coins} coins added!`);}
+  updateUI();
+}
+
+function renderCollection(filter){
+  const series=['ALL',...PACKS.map(p=>p.series)];
+  document.getElementById('coll-filters').innerHTML=series.map(s=>`
+    <button class="filter-btn ${filter===s?'active':''}" onclick="renderCollection('${s}')">${s}</button>`).join('');
+  const cards=getCollectionArr().filter(c=>filter==='ALL'||c.series===filter);
+  document.getElementById('coll-total').textContent=`${cards.length} unique · ${cards.reduce((a,c)=>a+c.count,0)} total`;
+  const sorted=cards.sort((a,b)=>({secret:0,legendary:1,epic:2,rare:3,common:4}[a.rarity]-{secret:0,legendary:1,epic:2,rare:3,common:4}[b.rarity]));
+  document.getElementById('coll-grid').innerHTML=sorted.length===0
+    ?'<div class="empty-state"><div class="empty-state-icon">🃏</div><div class="empty-state-text">No cards. Open some packs!</div></div>'
+    :sorted.map(c=>`<div class="coll-card rarity-${c.rarity}">
+      <div class="coll-count">×${c.count}</div>
+      <div class="coll-emoji">${c.emoji}</div>
+      <div class="coll-name">${c.name}</div>
+    </div>`).join('');
+}
+
+function showTradeTab(tab,el){
+  document.querySelectorAll('.trade-tab-content').forEach(t=>t.style.display='none');
+  document.querySelectorAll('.trade-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('trade-'+tab).style.display='block';
+  el.classList.add('active');
+  if(tab==='sell')renderSellGrid();
+  if(tab==='npc')renderNPCTrades();
+}
+
+function showSection(id,el){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  el.classList.add('active');
+  if(id==='collection')renderCollection('ALL');
+  if(id==='trade')renderNPCTrades();
+  if(id==='shop')updateUI();
+}
+
+function updateUI(){
+  document.getElementById('coins-display').textContent=state.coins;
+  document.getElementById('gems-display').textContent=state.gems;
+  document.getElementById('luck-display').textContent=state.luck;
+  const lb=document.getElementById('luck-bar');if(lb)lb.style.width=state.luck+'%';
+  const lv=document.getElementById('luck-meter-val');if(lv)lv.textContent=state.luck+'% Luck';
+}
+
+function showToast(msg){
+  const old=document.querySelector('.toast');if(old)old.remove();
+  const t=document.createElement('div');t.className='toast';t.textContent=msg;
+  document.body.appendChild(t);setTimeout(()=>t.remove(),2100);
+}
+
+renderPacks();renderShop();updateUI();
+</script>
+</body>
+</html>

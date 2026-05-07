@@ -28,6 +28,15 @@ const sections = [
     border: "hover:border-cyan-400/60",
     chip: "text-cyan-300",
   },
+  {
+    href: "/trading-cards",
+    tag: "TDC",
+    title: "Trading Digital Cards by A Zoku21",
+    body: "Open anime-themed packs, trade with NPCs, build a collection. Hosted creator game.",
+    accent: "from-amber-500/20 to-transparent",
+    border: "hover:border-amber-400/60",
+    chip: "text-amber-300",
+  },
 ] as const;
 
 export default function Home() {
@@ -73,13 +82,13 @@ export default function Home() {
       >
         <div className="mx-auto max-w-6xl">
           <p className="mb-3 text-sm uppercase tracking-[0.25em] text-fuchsia-400">
-            Three Channels
+            Channels
           </p>
           <h2 className="text-3xl font-black uppercase sm:text-4xl">
             Pick your scene.
           </h2>
 
-          <div className="mt-10 grid gap-6 md:grid-cols-3">
+          <div className="mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
             {sections.map((s) => (
               <Link
                 key={s.href}
