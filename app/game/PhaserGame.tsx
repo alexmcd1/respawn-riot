@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react'
 
 // ─── Shared game state ────────────────────────────────────────────────────────
 const G: any = {
+  species: 0,            // 0=dino, 1=water, 2=lion
   stage: 0,
   name: '???',
   hp: 20, maxHp: 20,
@@ -11,17 +12,127 @@ const G: any = {
   xp: 0,
   xpNeeded: [30, 100, 250, 500, 9999999],
   level: 1, wins: 0, lastFed: 0,
-  stageNames: ['Egg', 'Hatchling', 'Saurling', 'Raptus', 'Tyranex'],
-  stageColors: [0xd4c5f9, 0x77dd66, 0x44aa55, 0x4488cc, 0xcc4422],
-  stagePulse:  [0xeeeeff, 0xaaff99, 0x88dd77, 0x77bbdd, 0xff8844],
 }
 
 const W = 480, H = 320
 
-// ─── Creature drawing (dinosaur evolution line) ───────────────────────────────
-function drawCreature(g: any, stage: number, x: number, y: number) {
-  const c = G.stageColors[stage]
-  const p = G.stagePulse[stage]
+// ─── Audio: chiptune theme song ───────────────────────────────────────────────
+const NOTE: any = {
+  C2:65.41, D2:73.42, E2:82.41, F2:87.31, G2:98.00, A2:110.00, B2:123.47,
+  C3:130.81, D3:146.83, E3:164.81, F3:174.61, G3:196.00, A3:220.00, B3:246.94,
+  C4:261.63, D4:293.66, E4:329.63, F4:349.23, G4:392.00, A4:440.00, B4:493.88,
+  C5:523.25, D5:587.33, E5:659.25, F5:698.46, G5:783.99, A5:880.00, B5:987.77,
+  C6:1046.50, D6:1174.66, E6:1318.51, R: 0,
+}
+
+// 16-bar heroic adventure melody in C major (I-V-vi-IV) — 64 beats total.
+const MELODY: [string, number][] = [
+  ['C5',1],['E5',1],['G5',1],['E5',1],          // bar 1  C
+  ['D5',1],['G5',1],['B5',1],['G5',1],          // bar 2  G
+  ['A4',1],['C5',1],['E5',1],['C5',1],          // bar 3  Am
+  ['F5',1],['A5',1],['C6',1],['A5',1],          // bar 4  F
+  ['G5',0.5],['E5',0.5],['C5',1],['E5',1],['G5',1], // bar 5
+  ['A5',1],['G5',1],['D5',1],['G5',1],          // bar 6
+  ['C6',1],['B5',1],['A5',1],['G5',1],          // bar 7
+  ['F5',0.5],['G5',0.5],['A5',1],['G5',1],['C5',1], // bar 8
+  ['G4',1],['C5',1],['E5',1],['G5',1],          // bar 9
+  ['B4',1],['D5',1],['G5',1],['B5',1],          // bar 10
+  ['A4',1],['C5',1],['E5',1],['A5',1],          // bar 11
+  ['F4',1],['A4',1],['C5',1],['F5',1],          // bar 12
+  ['E5',0.5],['F5',0.5],['G5',1],['A5',1],['B5',1], // bar 13
+  ['C6',2],['B5',1],['A5',1],                   // bar 14
+  ['G5',1],['F5',1],['E5',1],['D5',1],          // bar 15
+  ['C5',2],['G4',1],['C5',1],                   // bar 16
+]
+
+const BASS: [string, number][] = [
+  ['C3',4],['G2',4],['A2',4],['F2',4],
+  ['C3',4],['G2',4],['A2',4],['F2',4],
+  ['C3',4],['G2',4],['A2',4],['F2',4],
+  ['C3',4],['F2',4],['G2',4],['C3',4],
+]
+
+class Theme {
+  ctx?: any
+  master?: any
+  isMuted = false
+  bpm = 132
+  melodyAt = 0; bassAt = 0
+  melodyTime = 0; bassTime = 0
+  schedTimer: any = null
+  beatLen() { return 60 / this.bpm }
+
+  start() {
+    if (this.ctx) return
+    if (typeof window === 'undefined') return
+    const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext
+    if (!Ctx) return
+    try {
+      this.ctx = new Ctx()
+      this.master = this.ctx.createGain()
+      this.master.gain.value = this.isMuted ? 0 : 0.16
+      this.master.connect(this.ctx.destination)
+      const now = this.ctx.currentTime + 0.05
+      this.melodyTime = now; this.bassTime = now
+      this.melodyAt = 0; this.bassAt = 0
+      this.tick()
+    } catch (e) {}
+  }
+
+  tick = () => {
+    if (!this.ctx || !this.master) return
+    const cutoff = this.ctx.currentTime + 1.5
+    while (this.melodyTime < cutoff) {
+      const [n, b] = MELODY[this.melodyAt]
+      const dur = b * this.beatLen()
+      const f = NOTE[n] || 0
+      if (f > 0) this.note('square', f, this.melodyTime, dur, 0.18)
+      this.melodyTime += dur
+      this.melodyAt = (this.melodyAt + 1) % MELODY.length
+    }
+    while (this.bassTime < cutoff) {
+      const [n, b] = BASS[this.bassAt]
+      const dur = b * this.beatLen()
+      const f = NOTE[n] || 0
+      if (f > 0) this.note('triangle', f, this.bassTime, dur, 0.22)
+      this.bassTime += dur
+      this.bassAt = (this.bassAt + 1) % BASS.length
+    }
+    this.schedTimer = setTimeout(this.tick, 250)
+  }
+
+  note(type: string, freq: number, t: number, dur: number, peak: number) {
+    if (!this.ctx || !this.master) return
+    const osc = this.ctx.createOscillator()
+    const gain = this.ctx.createGain()
+    osc.type = type
+    osc.frequency.value = freq
+    gain.gain.setValueAtTime(0, t)
+    gain.gain.linearRampToValueAtTime(peak, t + 0.005)
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + Math.max(dur * 0.95, 0.05))
+    osc.connect(gain).connect(this.master)
+    osc.start(t)
+    osc.stop(t + dur + 0.05)
+  }
+
+  toggleMute() {
+    this.isMuted = !this.isMuted
+    if (this.master && this.ctx) this.master.gain.setValueAtTime(this.isMuted ? 0 : 0.16, this.ctx.currentTime)
+  }
+
+  stop() {
+    if (this.schedTimer) clearTimeout(this.schedTimer)
+    try { this.ctx?.close() } catch (e) {}
+    this.ctx = undefined; this.master = undefined
+  }
+}
+
+const theme = new Theme()
+
+// ─── Creature drawing — dinosaur lineage (Egg → Tyranex) ──────────────────────
+function drawDino(g: any, stage: number, x: number, y: number) {
+  const c = SPECIES[0].stageColors[stage]
+  const p = SPECIES[0].stagePulse[stage]
   g.clear()
 
   if (stage === 0) {
@@ -317,6 +428,486 @@ function drawCreature(g: any, stage: number, x: number, y: number) {
   }
 }
 
+// ─── Creature drawing — water dragon lineage (Egg → Leviarus) ─────────────────
+function drawWater(g: any, stage: number, x: number, y: number) {
+  const c = SPECIES[1].stageColors[stage]
+  const p = SPECIES[1].stagePulse[stage]
+  g.clear()
+
+  if (stage === 0) {
+    g.fillStyle(0x000000, 0.18); g.fillEllipse(x, y + 22, 30, 8)
+    g.fillStyle(0xeef9ff);       g.fillEllipse(x, y, 30, 38)
+    g.fillStyle(0xffffff, 0.6);  g.fillEllipse(x - 6, y - 8, 10, 14)
+    g.fillStyle(0x4488dd, 0.85)
+    g.fillCircle(x + 5, y + 3, 4); g.fillCircle(x - 7, y + 8, 3); g.fillCircle(x + 3, y - 6, 3)
+    g.fillStyle(0x88ccee, 0.8); g.fillCircle(x - 4, y, 2); g.fillCircle(x + 8, y + 7, 2)
+    g.lineStyle(1, 0x4488dd, 0.7)
+    g.beginPath(); g.moveTo(x - 10, y + 12); g.lineTo(x - 6, y + 10); g.lineTo(x - 2, y + 12); g.lineTo(x + 2, y + 10); g.lineTo(x + 6, y + 12); g.lineTo(x + 10, y + 10); g.strokePath()
+
+  } else if (stage === 1) {
+    // Tadrake — round tadpole-y dragon baby
+    g.fillStyle(0x000000, 0.2); g.fillEllipse(x, y + 18, 26, 6)
+    // Tail
+    g.fillStyle(c); g.fillTriangle(x - 8, y, x - 22, y - 4, x - 18, y + 6)
+    g.fillStyle(p); g.fillTriangle(x - 16, y - 3, x - 26, y - 8, x - 18, y + 1)
+    g.fillTriangle(x - 16, y + 2, x - 26, y + 6, x - 18, y - 2)
+    // Body
+    g.fillStyle(c); g.fillEllipse(x, y, 24, 20)
+    g.fillStyle(p, 0.55); g.fillEllipse(x - 1, y + 4, 14, 10)
+    // Side fins
+    g.fillStyle(c)
+    g.fillTriangle(x - 4, y + 8, x - 10, y + 14, x + 2, y + 12)
+    g.fillTriangle(x + 4, y + 8, x + 12, y + 12, x, y + 12)
+    // Top dorsal
+    g.fillStyle(p); g.fillTriangle(x - 4, y - 8, x, y - 14, x + 4, y - 8)
+    // Eyes
+    g.fillStyle(0xffffff); g.fillCircle(x - 5, y - 4, 4); g.fillCircle(x + 5, y - 4, 4)
+    g.fillStyle(0x1a1a3a); g.fillCircle(x - 4, y - 4, 2.2); g.fillCircle(x + 6, y - 4, 2.2)
+    g.fillStyle(0xffffff); g.fillCircle(x - 3, y - 5, 0.9); g.fillCircle(x + 7, y - 5, 0.9)
+    // Mouth
+    g.fillStyle(0xff8888, 0.55); g.fillEllipse(x, y + 4, 5, 2)
+    // Bubbles
+    g.fillStyle(0xddffff, 0.6); g.fillCircle(x + 12, y - 12, 2)
+    g.fillStyle(0xddffff, 0.4); g.fillCircle(x + 14, y - 16, 1)
+
+  } else if (stage === 2) {
+    // Aquilis — small dragon-fish
+    g.fillStyle(0x000000, 0.22); g.fillEllipse(x, y + 22, 32, 7)
+    // Tail
+    g.fillStyle(c); g.fillTriangle(x + 8, y + 4, x + 22, y - 4, x + 18, y + 12)
+    g.fillStyle(p)
+    g.fillTriangle(x + 16, y - 4, x + 26, y - 12, x + 22, y - 4)
+    g.fillTriangle(x + 16, y + 8, x + 26, y + 14, x + 22, y + 4)
+    // Body
+    g.fillStyle(c); g.fillEllipse(x - 2, y + 4, 28, 22)
+    // Dorsal fin run
+    g.fillStyle(p)
+    g.fillTriangle(x - 12, y - 4, x - 8, y - 12, x - 4, y - 4)
+    g.fillTriangle(x - 4, y - 4, x, y - 14, x + 4, y - 4)
+    g.fillTriangle(x + 4, y - 4, x + 8, y - 12, x + 12, y - 4)
+    g.fillStyle(p, 0.55); g.fillEllipse(x - 2, y + 8, 18, 12)
+    // Side fins
+    g.fillStyle(c)
+    g.fillTriangle(x - 6, y + 10, x - 14, y + 18, x, y + 14)
+    g.fillTriangle(x + 4, y + 10, x + 12, y + 18, x - 2, y + 14)
+    // Gills
+    g.lineStyle(1, 0x1a3a5a, 0.7)
+    for (let i = 0; i < 3; i++) { g.beginPath(); g.moveTo(x - 12 + i*2, y + 2); g.lineTo(x - 12 + i*2, y + 8); g.strokePath() }
+    // Head/snout
+    g.fillStyle(c); g.fillEllipse(x - 14, y + 2, 10, 14)
+    // Whiskers
+    g.lineStyle(1, p, 0.85)
+    g.beginPath(); g.moveTo(x - 18, y + 4); g.lineTo(x - 26, y + 6); g.lineTo(x - 30, y + 12); g.strokePath()
+    g.beginPath(); g.moveTo(x - 18, y + 8); g.lineTo(x - 26, y + 12); g.lineTo(x - 30, y + 16); g.strokePath()
+    // Eye
+    g.fillStyle(0xffffff); g.fillEllipse(x - 14, y - 2, 5, 4)
+    g.fillStyle(0x1a1a3a); g.fillCircle(x - 13, y - 2, 1.8)
+    g.fillStyle(0xffffff); g.fillCircle(x - 12, y - 3, 0.8)
+    // Mouth
+    g.fillStyle(0xff8888, 0.4); g.fillEllipse(x - 16, y + 4, 4, 2)
+
+  } else if (stage === 3) {
+    // Hydrabane — serpentine dragon
+    g.fillStyle(0x000000, 0.25); g.fillEllipse(x, y + 28, 44, 9)
+    // Tail
+    g.fillStyle(c); g.fillEllipse(x + 16, y, 12, 14); g.fillEllipse(x + 26, y - 6, 10, 10)
+    g.fillStyle(p); g.fillTriangle(x + 28, y - 12, x + 38, y - 20, x + 32, y - 6)
+    g.fillTriangle(x + 28, y, x + 38, y + 8, x + 32, y - 4)
+    // Body
+    g.fillStyle(c); g.fillEllipse(x, y + 6, 30, 26)
+    // Scale dots
+    g.fillStyle(p, 0.55)
+    for (let i = 0; i < 5; i++) for (let j = 0; j < 3; j++) g.fillCircle(x - 12 + i*5, y + j*5 - 2, 1)
+    g.fillStyle(p, 0.5); g.fillEllipse(x - 2, y + 12, 18, 16)
+    // Dorsal spikes
+    g.fillStyle(p)
+    for (let i = 0; i < 5; i++) {
+      const sx = x - 12 + i*5; const sh = i === 2 ? 14 : 10
+      g.fillTriangle(sx - 2, y - 4, sx, y - 4 - sh, sx + 2, y - 4)
+    }
+    // Side fin
+    g.fillStyle(c); g.fillTriangle(x - 8, y + 12, x - 18, y + 22, x, y + 16)
+    // Head
+    g.fillStyle(c); g.fillEllipse(x - 14, y + 2, 16, 14)
+    g.fillStyle(c); g.fillRoundedRect(x - 22, y - 2, 14, 10, 3)
+    // Horns
+    g.fillStyle(p)
+    g.fillTriangle(x - 12, y - 8, x - 10, y - 16, x - 6, y - 6)
+    g.fillTriangle(x - 10, y - 6, x - 14, y - 14, x - 18, y - 6)
+    // Whiskers
+    g.lineStyle(1, p, 0.85)
+    g.beginPath(); g.moveTo(x - 22, y + 4); g.lineTo(x - 32, y + 8); g.lineTo(x - 38, y + 18); g.strokePath()
+    g.beginPath(); g.moveTo(x - 22, y + 8); g.lineTo(x - 32, y + 14); g.lineTo(x - 38, y + 22); g.strokePath()
+    // Eye
+    g.fillStyle(0xffdd33); g.fillEllipse(x - 14, y - 2, 5, 4)
+    g.fillStyle(0x1a1a3a); g.fillEllipse(x - 13, y - 2, 3, 4)
+    g.fillStyle(0xffffff); g.fillCircle(x - 12, y - 3, 0.8)
+    // Teeth
+    g.fillStyle(0xffffff)
+    for (let i = 0; i < 3; i++) g.fillTriangle(x - 21 + i*4, y + 6, x - 20 + i*4, y + 9, x - 19 + i*4, y + 6)
+    g.lineStyle(1, 0x1a1a3a, 0.7)
+    g.beginPath(); g.moveTo(x - 22, y + 6); g.lineTo(x - 8, y + 6); g.strokePath()
+    g.fillStyle(0x1a1a3a); g.fillCircle(x - 22, y + 1, 1)
+
+  } else {
+    // Leviarus — apex water dragon with antlers and pearl
+    g.fillStyle(c, 0.12); g.fillCircle(x, y, 60)
+    g.fillStyle(c, 0.08); g.fillCircle(x, y, 75)
+    g.fillStyle(0x000000, 0.28); g.fillEllipse(x, y + 36, 56, 12)
+    // Tail (multiple coils)
+    g.fillStyle(c)
+    g.fillEllipse(x + 22, y + 4, 16, 18); g.fillEllipse(x + 36, y - 6, 14, 12); g.fillEllipse(x + 46, y - 18, 10, 10)
+    g.fillStyle(p)
+    g.fillTriangle(x + 46, y - 22, x + 60, y - 36, x + 52, y - 18)
+    g.fillTriangle(x + 46, y - 14, x + 60, y - 28, x + 52, y - 14)
+    // Side fins
+    g.fillStyle(c, 0.7)
+    g.fillTriangle(x - 6, y + 12, x - 18, y + 28, x + 6, y + 24)
+    g.fillTriangle(x + 8, y + 16, x + 22, y + 32, x + 16, y + 20)
+    // Body
+    g.fillStyle(c); g.fillEllipse(x, y + 6, 38, 36)
+    // Scale shimmer
+    g.fillStyle(p, 0.55)
+    for (let i = 0; i < 6; i++) for (let j = 0; j < 4; j++) g.fillCircle(x - 14 + i*6, y - 6 + j*5, 1.5)
+    g.fillStyle(p, 0.55); g.fillEllipse(x - 2, y + 14, 24, 22)
+    g.lineStyle(1, p, 0.7)
+    for (let i = 0; i < 4; i++) { g.beginPath(); g.moveTo(x - 10, y + 4 + i*5); g.lineTo(x + 6, y + 4 + i*5); g.strokePath() }
+    // Dorsal mane
+    g.fillStyle(p)
+    for (let i = 0; i < 7; i++) {
+      const sx = x - 18 + i*6; const sh = (i === 2 || i === 3 || i === 4) ? 20 : 14
+      g.fillTriangle(sx - 3, y - 8, sx, y - 8 - sh, sx + 3, y - 8)
+    }
+    g.fillStyle(0xddffff, 0.65)
+    for (let i = 0; i < 7; i++) {
+      const sx = x - 18 + i*6; const sh = (i === 2 || i === 3 || i === 4) ? 14 : 10
+      g.fillTriangle(sx - 1, y - 8, sx, y - 8 - sh, sx + 1, y - 8)
+    }
+    // Head
+    g.fillStyle(c); g.fillEllipse(x - 18, y, 22, 18)
+    g.fillStyle(c); g.fillRoundedRect(x - 30, y - 4, 18, 12, 4)
+    g.fillStyle(p, 0.4); g.fillRoundedRect(x - 30, y + 1, 16, 5, 2)
+    // Antlers
+    g.fillStyle(p)
+    g.fillTriangle(x - 14, y - 12, x - 10, y - 24, x - 6, y - 10)
+    g.fillTriangle(x - 18, y - 10, x - 22, y - 22, x - 14, y - 8)
+    g.fillTriangle(x - 22, y - 6, x - 30, y - 18, x - 22, y - 4)
+    g.fillStyle(0xffdd66, 0.7); g.fillTriangle(x - 12, y - 12, x - 9, y - 21, x - 7, y - 10)
+    // Whiskers
+    g.lineStyle(1.5, p, 0.9)
+    g.beginPath(); g.moveTo(x - 30, y); g.lineTo(x - 44, y - 4); g.lineTo(x - 52, y + 8); g.strokePath()
+    g.beginPath(); g.moveTo(x - 30, y + 6); g.lineTo(x - 44, y + 12); g.lineTo(x - 50, y + 24); g.strokePath()
+    // Glowing eye
+    g.fillStyle(0x88eeff); g.fillEllipse(x - 18, y - 4, 7, 6)
+    g.fillStyle(0xffffff); g.fillCircle(x - 17, y - 4, 2)
+    g.fillStyle(0x1a1a3a); g.fillCircle(x - 16, y - 5, 0.6)
+    // Teeth
+    g.fillStyle(0xffffff)
+    for (let i = 0; i < 5; i++) g.fillTriangle(x - 28 + i*4, y + 6, x - 27 + i*4, y + 10, x - 26 + i*4, y + 6)
+    g.fillStyle(0x1a1a3a); g.fillCircle(x - 28, y + 1, 1.2)
+    // Pearl orb
+    g.fillStyle(0xffffff, 0.9); g.fillCircle(x - 38, y + 18, 5)
+    g.fillStyle(0x88eeff, 0.5); g.fillCircle(x - 38, y + 18, 7)
+  }
+}
+
+// ─── Creature drawing — lion turtle lineage (Egg → Lion Turtle) ───────────────
+function drawLion(g: any, stage: number, x: number, y: number) {
+  const c = SPECIES[2].stageColors[stage]
+  const p = SPECIES[2].stagePulse[stage]
+  g.clear()
+
+  const hex = (cx: number, cy: number, r: number) => {
+    g.beginPath()
+    for (let i = 0; i < 6; i++) {
+      const a = i * Math.PI / 3
+      const px = cx + Math.cos(a) * r, py = cy + Math.sin(a) * r
+      if (i === 0) g.moveTo(px, py); else g.lineTo(px, py)
+    }
+    g.closePath(); g.strokePath()
+  }
+
+  if (stage === 0) {
+    g.fillStyle(0x000000, 0.18); g.fillEllipse(x, y + 22, 30, 8)
+    g.fillStyle(0xf0e0c4);       g.fillEllipse(x, y, 30, 38)
+    g.fillStyle(0xffffff, 0.5);  g.fillEllipse(x - 6, y - 8, 10, 14)
+    g.fillStyle(0x668844, 0.75); g.fillEllipse(x + 4, y + 4, 8, 5); g.fillEllipse(x - 7, y + 10, 6, 4); g.fillEllipse(x + 6, y - 8, 5, 4)
+    g.fillStyle(0x4a6a3a, 0.7); g.fillCircle(x + 6, y + 4, 2); g.fillCircle(x - 8, y + 11, 1.5)
+    g.lineStyle(1, 0x886030, 0.65); hex(x, y + 2, 5)
+
+  } else if (stage === 1) {
+    // Cubshell — baby lion turtle peeking out of shell
+    g.fillStyle(0x000000, 0.22); g.fillEllipse(x, y + 22, 30, 7)
+    // Shell
+    g.fillStyle(c); g.fillEllipse(x, y, 28, 22)
+    g.fillStyle(p, 0.55); g.fillEllipse(x - 4, y - 4, 14, 10)
+    g.lineStyle(1, 0x886030, 0.7); hex(x, y + 2, 6)
+    // Head
+    g.fillStyle(0xddc090); g.fillCircle(x, y + 12, 8)
+    // Tiny mane
+    g.fillStyle(0xc89460, 0.85); g.fillCircle(x - 6, y + 8, 4); g.fillCircle(x + 6, y + 8, 4); g.fillCircle(x, y + 6, 4)
+    g.fillStyle(0xeed6a8); g.fillEllipse(x, y + 12, 12, 10)
+    // Eyes
+    g.fillStyle(0x1a1a3a); g.fillCircle(x - 3, y + 11, 1.6); g.fillCircle(x + 3, y + 11, 1.6)
+    g.fillStyle(0xffffff); g.fillCircle(x - 2, y + 10, 0.6); g.fillCircle(x + 4, y + 10, 0.6)
+    // Nose
+    g.fillStyle(0x1a1a3a); g.fillTriangle(x - 1, y + 14, x + 1, y + 14, x, y + 16)
+    // Mouth
+    g.lineStyle(1, 0x1a1a3a, 0.7)
+    g.beginPath(); g.moveTo(x, y + 16); g.lineTo(x - 2, y + 18); g.strokePath()
+    g.beginPath(); g.moveTo(x, y + 16); g.lineTo(x + 2, y + 18); g.strokePath()
+    // Front legs
+    g.fillStyle(0xddc090); g.fillRoundedRect(x - 13, y + 8, 5, 8, 2); g.fillRoundedRect(x + 8, y + 8, 5, 8, 2)
+    g.fillStyle(0x1a1a3a); g.fillRect(x - 14, y + 14, 7, 3); g.fillRect(x + 7, y + 14, 7, 3)
+
+  } else if (stage === 2) {
+    // Maneshield — bigger shell, full mane, visible legs
+    g.fillStyle(0x000000, 0.25); g.fillEllipse(x, y + 26, 36, 8)
+    // Shell
+    g.fillStyle(c); g.fillEllipse(x, y - 4, 32, 24)
+    g.fillStyle(p, 0.5); g.fillEllipse(x - 6, y - 10, 16, 10)
+    g.lineStyle(1, 0x886030, 0.75); hex(x, y - 4, 5); hex(x - 9, y - 1, 4); hex(x + 9, y - 1, 4)
+    // Mane ring
+    g.fillStyle(0xc89460)
+    g.fillCircle(x - 8, y + 6, 5); g.fillCircle(x + 8, y + 6, 5)
+    g.fillCircle(x - 4, y + 2, 5); g.fillCircle(x + 4, y + 2, 5); g.fillCircle(x, y + 8, 5)
+    g.fillStyle(0xddb070, 0.7); g.fillCircle(x - 6, y + 4, 3); g.fillCircle(x + 6, y + 4, 3)
+    // Head
+    g.fillStyle(0xddc090); g.fillCircle(x, y + 8, 9)
+    g.fillStyle(0xeed6a8); g.fillEllipse(x, y + 10, 14, 10)
+    // Eyes
+    g.fillStyle(0xffeebb); g.fillEllipse(x - 4, y + 8, 4, 3); g.fillEllipse(x + 4, y + 8, 4, 3)
+    g.fillStyle(0x1a1a3a); g.fillCircle(x - 4, y + 8, 1.5); g.fillCircle(x + 4, y + 8, 1.5)
+    g.fillStyle(0xffffff); g.fillCircle(x - 3, y + 7, 0.6); g.fillCircle(x + 5, y + 7, 0.6)
+    // Nose
+    g.fillStyle(0x1a1a3a); g.fillTriangle(x - 1, y + 12, x + 1, y + 12, x, y + 14)
+    // Whiskers
+    g.lineStyle(0.5, 0x885e2e, 0.6)
+    for (let i = 0; i < 3; i++) {
+      g.beginPath(); g.moveTo(x - 4, y + 12 + i); g.lineTo(x - 11, y + 13 + i*1.5); g.strokePath()
+      g.beginPath(); g.moveTo(x + 4, y + 12 + i); g.lineTo(x + 11, y + 13 + i*1.5); g.strokePath()
+    }
+    // Legs
+    g.fillStyle(c); g.fillRoundedRect(x - 16, y + 12, 6, 10, 2); g.fillRoundedRect(x + 10, y + 12, 6, 10, 2)
+    g.fillStyle(0x1a1a3a); g.fillRect(x - 17, y + 20, 8, 3); g.fillRect(x + 9, y + 20, 8, 3)
+    g.fillStyle(0xeeeeff)
+    for (let i = 0; i < 3; i++) {
+      g.fillTriangle(x - 17 + i*3, y + 23, x - 16 + i*3, y + 25, x - 15 + i*3, y + 23)
+      g.fillTriangle(x + 9 + i*3, y + 23, x + 10 + i*3, y + 25, x + 11 + i*3, y + 23)
+    }
+    // Tail
+    g.fillStyle(0xddc090); g.fillTriangle(x - 18, y - 2, x - 24, y - 4, x - 18, y + 4)
+
+  } else if (stage === 3) {
+    // Roarshell — large lion-faced turtle with full mane
+    g.fillStyle(0x000000, 0.25); g.fillEllipse(x, y + 30, 44, 10)
+    // Shell
+    g.fillStyle(c); g.fillEllipse(x, y - 4, 40, 30)
+    g.fillStyle(p, 0.5); g.fillEllipse(x - 8, y - 12, 18, 12)
+    g.lineStyle(1, 0x886030, 0.85)
+    hex(x, y - 8, 6); hex(x - 11, y - 4, 5); hex(x + 11, y - 4, 5); hex(x - 6, y + 4, 4); hex(x + 6, y + 4, 4)
+    // Full mane
+    g.fillStyle(0xb88040)
+    for (let i = 0; i < 12; i++) {
+      const a = i * Math.PI / 6 - Math.PI / 2
+      g.fillCircle(x + Math.cos(a) * 11, y + 10 + Math.sin(a) * 7.7, 5)
+    }
+    g.fillStyle(0xc89460, 0.7)
+    for (let i = 0; i < 8; i++) {
+      const a = i * Math.PI / 4 - Math.PI / 2
+      g.fillCircle(x + Math.cos(a) * 8, y + 10 + Math.sin(a) * 5.6, 3)
+    }
+    // Head
+    g.fillStyle(0xddc090); g.fillEllipse(x, y + 10, 18, 16)
+    g.fillStyle(0xeed6a8); g.fillEllipse(x, y + 13, 14, 10)
+    // Eyes
+    g.fillStyle(0xffdd55); g.fillEllipse(x - 5, y + 9, 5, 4); g.fillEllipse(x + 5, y + 9, 5, 4)
+    g.fillStyle(0x1a1a3a); g.fillEllipse(x - 4, y + 9, 3, 4); g.fillEllipse(x + 6, y + 9, 3, 4)
+    g.fillStyle(0xffffff); g.fillCircle(x - 3, y + 8, 0.8); g.fillCircle(x + 7, y + 8, 0.8)
+    // Nose
+    g.fillStyle(0x1a1a3a); g.fillTriangle(x - 2, y + 13, x + 2, y + 13, x, y + 16)
+    // Mouth + fangs
+    g.lineStyle(1, 0x1a1a3a, 0.85)
+    g.beginPath(); g.moveTo(x - 4, y + 17); g.lineTo(x, y + 16); g.lineTo(x + 4, y + 17); g.strokePath()
+    g.fillStyle(0xffffff)
+    g.fillTriangle(x - 2, y + 16, x - 1, y + 19, x, y + 16)
+    g.fillTriangle(x, y + 16, x + 1, y + 19, x + 2, y + 16)
+    // Whiskers
+    g.lineStyle(0.5, 0x885e2e, 0.7)
+    for (let i = 0; i < 3; i++) {
+      g.beginPath(); g.moveTo(x - 5, y + 14 + i); g.lineTo(x - 14, y + 14 + i*2); g.strokePath()
+      g.beginPath(); g.moveTo(x + 5, y + 14 + i); g.lineTo(x + 14, y + 14 + i*2); g.strokePath()
+    }
+    // Strong front legs
+    g.fillStyle(c); g.fillEllipse(x - 16, y + 18, 8, 14); g.fillEllipse(x + 16, y + 18, 8, 14)
+    g.fillStyle(0x1a1a3a); g.fillRect(x - 21, y + 26, 11, 4); g.fillRect(x + 11, y + 26, 11, 4)
+    g.fillStyle(0xeeeeff)
+    for (let i = 0; i < 3; i++) {
+      g.fillTriangle(x - 21 + i*4, y + 30, x - 19 + i*4, y + 33, x - 17 + i*4, y + 30)
+      g.fillTriangle(x + 11 + i*4, y + 30, x + 13 + i*4, y + 33, x + 15 + i*4, y + 30)
+    }
+    // Tail with tuft
+    g.fillStyle(0xddc090); g.fillTriangle(x - 22, y, x - 30, y - 2, x - 22, y + 6)
+    g.fillStyle(0xb88040); g.fillCircle(x - 30, y, 3)
+
+  } else {
+    // Lion Turtle — ancient guardian
+    g.fillStyle(c, 0.15); g.fillCircle(x, y, 65)
+    g.fillStyle(0xddc090, 0.1); g.fillCircle(x, y, 80)
+    g.fillStyle(0x000000, 0.3); g.fillEllipse(x, y + 38, 60, 12)
+    // Shell
+    g.fillStyle(c); g.fillEllipse(x, y - 6, 56, 40)
+    g.fillStyle(p, 0.55); g.fillEllipse(x - 12, y - 16, 22, 14)
+    g.lineStyle(2, 0x4a3a1a, 0.85); g.strokeEllipse(x, y - 6, 56, 40)
+    g.lineStyle(1, 0x4a3a1a, 0.85)
+    hex(x, y - 12, 7); hex(x - 14, y - 10, 6); hex(x + 14, y - 10, 6)
+    hex(x - 6, y - 2, 5); hex(x + 6, y - 2, 5); hex(x - 18, y + 2, 5); hex(x + 18, y + 2, 5); hex(x, y + 8, 5)
+    // City spires on shell
+    g.fillStyle(0x886030, 0.85)
+    g.fillTriangle(x - 8, y - 26, x - 4, y - 32, x, y - 26)
+    g.fillTriangle(x - 2, y - 26, x + 2, y - 30, x + 6, y - 26)
+    g.fillTriangle(x + 4, y - 26, x + 8, y - 32, x + 12, y - 26)
+    g.fillStyle(0x4a3a1a, 0.6); g.fillRect(x - 10, y - 24, 22, 2)
+    // Magnificent mane
+    g.fillStyle(0xa07030)
+    for (let i = 0; i < 16; i++) {
+      const a = i * Math.PI / 8 - Math.PI / 2
+      const r = 16 + (i % 3) * 2
+      g.fillCircle(x + Math.cos(a) * r * 0.9, y + 12 + Math.sin(a) * r * 0.7, 6)
+    }
+    g.fillStyle(0xb88040, 0.85)
+    for (let i = 0; i < 12; i++) {
+      const a = i * Math.PI / 6 - Math.PI / 2
+      g.fillCircle(x + Math.cos(a) * 12 * 0.9, y + 12 + Math.sin(a) * 12 * 0.7, 5)
+    }
+    g.fillStyle(0xddb070, 0.6)
+    for (let i = 0; i < 8; i++) {
+      const a = i * Math.PI / 4 - Math.PI / 2
+      g.fillCircle(x + Math.cos(a) * 7, y + 12 + Math.sin(a) * 7 * 0.7, 3)
+    }
+    // Head
+    g.fillStyle(0xc8a878); g.fillEllipse(x, y + 14, 22, 18)
+    g.fillStyle(0xeed6a8); g.fillEllipse(x, y + 16, 18, 12)
+    // Glowing wise eyes
+    g.fillStyle(0x44ff88); g.fillEllipse(x - 6, y + 12, 6, 5); g.fillEllipse(x + 6, y + 12, 6, 5)
+    g.fillStyle(0xffffff); g.fillCircle(x - 5, y + 11, 1); g.fillCircle(x + 7, y + 11, 1)
+    // Nose
+    g.fillStyle(0x1a1a3a); g.fillTriangle(x - 3, y + 16, x + 3, y + 16, x, y + 19)
+    // Mouth (wise expression)
+    g.lineStyle(1, 0x4a2a0a, 0.85)
+    g.beginPath(); g.moveTo(x - 5, y + 21); g.lineTo(x, y + 20); g.lineTo(x + 5, y + 21); g.strokePath()
+    // Long whiskers
+    g.lineStyle(1, 0x4a2a0a, 0.7)
+    for (let i = 0; i < 3; i++) {
+      g.beginPath(); g.moveTo(x - 6, y + 17 + i); g.lineTo(x - 18, y + 18 + i*2); g.strokePath()
+      g.beginPath(); g.moveTo(x + 6, y + 17 + i); g.lineTo(x + 18, y + 18 + i*2); g.strokePath()
+    }
+    // Legs
+    g.fillStyle(c); g.fillEllipse(x - 22, y + 24, 12, 18); g.fillEllipse(x + 22, y + 24, 12, 18)
+    g.fillStyle(p, 0.4); g.fillEllipse(x - 22, y + 22, 8, 12); g.fillEllipse(x + 22, y + 22, 8, 12)
+    g.fillStyle(0x1a1a3a); g.fillRect(x - 28, y + 34, 14, 5); g.fillRect(x + 14, y + 34, 14, 5)
+    g.fillStyle(0xffdd44)
+    for (let i = 0; i < 3; i++) {
+      g.fillTriangle(x - 28 + i*5, y + 39, x - 26 + i*5, y + 43, x - 24 + i*5, y + 39)
+      g.fillTriangle(x + 14 + i*5, y + 39, x + 16 + i*5, y + 43, x + 18 + i*5, y + 39)
+    }
+    // Tail
+    g.fillStyle(0xc8a878); g.fillEllipse(x + 32, y, 14, 8); g.fillTriangle(x + 36, y, x + 48, y - 4, x + 40, y + 6)
+    g.fillStyle(0xffdd44, 0.85); g.fillCircle(x + 48, y - 2, 4)
+    g.fillStyle(0xb88040, 0.7); g.fillCircle(x + 48, y - 2, 2)
+  }
+}
+
+// ─── Species registry + dispatcher ────────────────────────────────────────────
+const SPECIES = [
+  {
+    label: 'DINO',
+    desc: 'Fierce hunter',
+    stageNames:  ['Egg', 'Hatchling', 'Saurling', 'Raptus', 'Tyranex'],
+    stageColors: [0xd4c5f9, 0x77dd66, 0x44aa55, 0x4488cc, 0xcc4422],
+    stagePulse:  [0xeeeeff, 0xaaff99, 0x88dd77, 0x77bbdd, 0xff8844],
+    draw: drawDino,
+  },
+  {
+    label: 'WATER DRAGON',
+    desc: 'Mystic serpent',
+    stageNames:  ['Egg', 'Tadrake', 'Aquilis', 'Hydrabane', 'Leviarus'],
+    stageColors: [0xc5e8f9, 0x66ccdd, 0x4499bb, 0x2266aa, 0x66ccff],
+    stagePulse:  [0xddf5ff, 0xaaeeff, 0x88ddee, 0x77aaff, 0xddffff],
+    draw: drawWater,
+  },
+  {
+    label: 'LION TURTLE',
+    desc: 'Ancient guardian',
+    stageNames:  ['Egg', 'Cubshell', 'Maneshield', 'Roarshell', 'Lion Turtle'],
+    stageColors: [0xf0e0c4, 0xc8a878, 0xb8884a, 0x886a3a, 0x6a8a4a],
+    stagePulse:  [0xfff0d0, 0xddc090, 0xddb070, 0xc09858, 0xaacc77],
+    draw: drawLion,
+  },
+]
+
+function sp() { return SPECIES[G.species] }
+function drawCreature(g: any, stage: number, x: number, y: number) { sp().draw(g, stage, x, y) }
+
+// ─── PickScene — choose your companion ────────────────────────────────────────
+function createPickScene(Phaser: any) {
+  return class PickScene extends Phaser.Scene {
+    constructor() { super('PickScene') }
+
+    create() {
+      this.add.rectangle(W / 2, H / 2, W, H, 0x0d0d1a)
+      // Twinkling stars
+      for (let i = 0; i < 50; i++) {
+        const s = this.add.circle(
+          Phaser.Math.Between(0, W), Phaser.Math.Between(0, H),
+          Phaser.Math.Between(1, 2), 0xffffff, Math.random() * 0.6 + 0.1
+        )
+        this.tweens.add({ targets: s, alpha: 0.1, duration: Phaser.Math.Between(800, 2200), yoyo: true, repeat: -1 })
+      }
+
+      this.add.text(W / 2, 24, 'CHOOSE YOUR COMPANION', { fontSize: '13px', color: '#ffdd66', letterSpacing: 4, fontStyle: 'bold' }).setOrigin(0.5)
+      this.add.text(W / 2, 42, '— a partner for adventures ahead —', { fontSize: '8px', color: '#888899', letterSpacing: 2 }).setOrigin(0.5)
+
+      const cardX = [80, 240, 400]
+      const cardY = H / 2 + 18
+
+      SPECIES.forEach((s: any, idx: number) => {
+        const cx = cardX[idx]
+        const card = this.add.rectangle(cx, cardY, 140, 200, 0x10142a, 0.9).setStrokeStyle(1, 0x33446a).setInteractive({ useHandCursor: true })
+
+        // Sprite preview (stage 1 of this species)
+        const g = this.add.graphics()
+        s.draw(g, 1, cx, cardY - 38)
+
+        // Subtle floating animation per card
+        this.tweens.add({ targets: g, y: -4, duration: 1500 + idx * 200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' })
+
+        // Name
+        this.add.text(cx, cardY + 32, s.label, { fontSize: '11px', color: '#eeeeff', fontStyle: 'bold', letterSpacing: 1 }).setOrigin(0.5)
+        this.add.text(cx, cardY + 48, s.desc, { fontSize: '8px', color: '#99aacc' }).setOrigin(0.5)
+
+        // Final-form preview text
+        this.add.text(cx, cardY + 68, '→ ' + s.stageNames[4], { fontSize: '8px', color: '#ffdd66', fontStyle: 'italic' }).setOrigin(0.5)
+
+        // Tap-to-pick label
+        const pickT = this.add.text(cx, cardY + 86, '[ TAP TO CHOOSE ]', { fontSize: '8px', color: '#66aaff' }).setOrigin(0.5)
+        this.tweens.add({ targets: pickT, alpha: 0.4, duration: 800, yoyo: true, repeat: -1 })
+
+        card.on('pointerover', () => card.setStrokeStyle(2, 0x88ccff))
+        card.on('pointerout',  () => card.setStrokeStyle(1, 0x33446a))
+        card.on('pointerdown', () => {
+          theme.start()
+          G.species = idx
+          this.cameras.main.flash(400, 200, 200, 255)
+          this.time.delayedCall(450, () => this.scene.start('EggScene'))
+        })
+      })
+
+      this.add.text(W / 2, H - 12, 'A retro adventure awaits — be brave, be curious.', { fontSize: '8px', color: '#556677', fontStyle: 'italic' }).setOrigin(0.5)
+    }
+  }
+}
+
 // ─── EggScene ─────────────────────────────────────────────────────────────────
 function createEggScene(Phaser: any) {
   return class EggScene extends Phaser.Scene {
@@ -385,7 +976,7 @@ function createEggScene(Phaser: any) {
         this.cameras.main.flash(500, 180, 140, 255)
         this.cameras.main.shake(500, 0.02)
         this.time.delayedCall(700, () => {
-          G.stage = 1; G.name = G.stageNames[1]
+          G.stage = 1; G.name = sp().stageNames[1]
           this.scene.start('HomeScene')
         })
       }
@@ -412,7 +1003,7 @@ function createHomeScene(Phaser: any) {
       for (let i = 0; i < 10; i++) {
         const p = this.add.circle(
           Phaser.Math.Between(0, W - 120), Phaser.Math.Between(H * 0.3, H * 0.9),
-          Phaser.Math.Between(1, 3), G.stageColors[G.stage], 0.22
+          Phaser.Math.Between(1, 3), sp().stageColors[G.stage], 0.22
         )
         this.tweens.add({ targets: p, y: p.y - Phaser.Math.Between(30, 70), alpha: 0, duration: Phaser.Math.Between(2000, 4000), repeat: -1, repeatDelay: Phaser.Math.Between(0, 2000) })
       }
@@ -438,10 +1029,20 @@ function createHomeScene(Phaser: any) {
       this.winTxt = this.add.text(px + 2, 173, 'WINS: ' + G.wins, { fontSize: '8px', color: '#ffdd55' })
       this.add.rectangle(px + 46, 186, 90, 1, 0x1a3050)
 
-      this.mkBtn(px + 46, 206, 'Feed',    0x0d3322, 0x44ff88, () => this.feed())
-      this.mkBtn(px + 46, 231, 'Train',   0x0d1a33, 0x44aaff, () => this.train())
-      this.mkBtn(px + 46, 256, 'Explore', 0x1a0d33, 0xaa44ff, () => this.scene.start('WorldScene'))
-      this.mkBtn(px + 46, 282, 'Info',    0x1a1a0a, 0xffdd44, () => this.showInfo())
+      this.mkBtn(px + 46, 200, 'Feed',    0x0d3322, 0x44ff88, () => this.feed())
+      this.mkBtn(px + 46, 220, 'Rest',    0x33220d, 0xffaa55, () => this.rest())
+      this.mkBtn(px + 46, 240, 'Train',   0x0d1a33, 0x44aaff, () => this.train())
+      this.mkBtn(px + 46, 260, 'Explore', 0x1a0d33, 0xaa44ff, () => this.scene.start('WorldScene'))
+      this.mkBtn(px + 46, 280, 'Info',    0x1a1a0a, 0xffdd44, () => this.showInfo())
+
+      // Music toggle
+      const mb = this.add.rectangle(px + 46, H - 8, 96, 12, 0x0a1020, 0.9).setInteractive({ useHandCursor: true }).setStrokeStyle(1, 0x445566)
+      const mt = this.add.text(px + 46, H - 8, theme.isMuted ? '♪ MUSIC: OFF' : '♪ MUSIC: ON', { fontSize: '7px', color: theme.isMuted ? '#778899' : '#aaccee', letterSpacing: 1 }).setOrigin(0.5)
+      mb.on('pointerdown', () => {
+        theme.toggleMute()
+        mt.setText(theme.isMuted ? '♪ MUSIC: OFF' : '♪ MUSIC: ON')
+        mt.setColor(theme.isMuted ? '#778899' : '#aaccee')
+      })
 
       this.cX = (W - 114) / 2; this.cY = H / 2 - 10
       this.cGfx = this.add.graphics()
@@ -503,10 +1104,27 @@ function createHomeScene(Phaser: any) {
     train() {
       if (G.hunger <= 10) { this.msg('Too hungry to train!'); return }
       G.hunger = Math.max(0, G.hunger - 10); G.xp += 10; G.happy = Math.min(100, G.happy + 5)
-      this.msg('+10 XP  -10 Hunger')
+      let line = '+10 XP  -10 Hunger'
+      // 25% chance: training also strengthens the body, raising maxHP
+      if (Math.random() < 0.25) {
+        G.maxHp += 1; G.hp = Math.min(G.maxHp, G.hp + 1)
+        line = '+10 XP  +1 MAX HP!'
+      }
+      this.msg(line)
       this.updAll()
       this.tweens.add({ targets: this.cGfx, y: -28, duration: 280, yoyo: true, ease: 'Quad.easeOut' })
       this.chkEvo()
+    }
+
+    rest() {
+      if (G.hp >= G.maxHp) { this.msg('Already at full HP!'); return }
+      if (G.hunger < 25)   { this.msg('Too hungry to rest!'); return }
+      G.hunger = Math.max(0, G.hunger - 25)
+      G.hp = G.maxHp
+      G.happy = Math.min(100, G.happy + 5)
+      this.msg('Fully rested  HP restored')
+      this.updAll()
+      this.tweens.add({ targets: this.cGfx, alpha: 0.4, duration: 320, yoyo: true, repeat: 1 })
     }
 
     showInfo() {
@@ -520,7 +1138,7 @@ function createHomeScene(Phaser: any) {
 
     evolve() {
       if (G.stage >= 4) return
-      G.stage++; G.name = G.stageNames[G.stage]; G.xp = 0
+      G.stage++; G.name = sp().stageNames[G.stage]; G.xp = 0
       G.maxHp += 15; G.hp = G.maxHp; G.atk += 4; G.def += 3; G.spd += 2; G.level++
       this.cameras.main.flash(700, 255, 200, 100)
       this.cameras.main.shake(400, 0.015)
@@ -707,9 +1325,9 @@ function createWorldScene(Phaser: any) {
       const wy = this.pR * this.TS - this.camY + 28 + this.TS / 2
       g.fillStyle(0x000000, 0.25); g.fillEllipse(wx, wy + 10, 22, 6)
       // Mini dino sprite (matches current stage color)
-      g.fillStyle(G.stageColors[G.stage]); g.fillCircle(wx, wy - 1, 9)
+      g.fillStyle(sp().stageColors[G.stage]); g.fillCircle(wx, wy - 1, 9)
       // Snout hint
-      g.fillStyle(G.stageColors[G.stage]); g.fillEllipse(wx + 5, wy + 1, 8, 5)
+      g.fillStyle(sp().stageColors[G.stage]); g.fillEllipse(wx + 5, wy + 1, 8, 5)
       g.fillStyle(0x1a1a3a); g.fillCircle(wx - 2, wy - 3, 2); g.fillCircle(wx + 3, wy - 3, 2)
       g.fillStyle(0xffffff); g.fillCircle(wx - 1, wy - 4, 0.7); g.fillCircle(wx + 4, wy - 4, 0.7)
       // Highlight ring
@@ -932,7 +1550,7 @@ function createBattleScene(Phaser: any) {
         this.cameras.main.flash(600, 255, 210, 50)
         this.setLog('Victory! +' + xp + ' XP', this.isBoss ? 'Boss defeated!' : '')
         if (G.stage < 4 && G.xp >= G.xpNeeded[G.stage]) {
-          G.stage++; G.name = G.stageNames[G.stage]; G.xp = 0
+          G.stage++; G.name = sp().stageNames[G.stage]; G.xp = 0
           G.maxHp += 15; G.hp = G.maxHp; G.atk += 4; G.def += 3; G.spd += 2; G.level++
           this.time.delayedCall(500, () => this.setLog('EVOLVED into ' + G.name + '!', 'Stats increased!'))
         }
@@ -959,7 +1577,7 @@ export default function PhaserGame() {
     if (!containerRef.current || gameRef.current) return
 
     Object.assign(G, {
-      stage: 0, name: '???', hp: 20, maxHp: 20,
+      species: 0, stage: 0, name: '???', hp: 20, maxHp: 20,
       atk: 5, def: 3, spd: 4, hunger: 80, happy: 80,
       xp: 0, level: 1, wins: 0, lastFed: 0,
     })
@@ -976,6 +1594,7 @@ export default function PhaserGame() {
         pixelArt:        true,
         roundPixels:     true,
         scene: [
+          createPickScene(Phaser),
           createEggScene(Phaser),
           createHomeScene(Phaser),
           createWorldScene(Phaser),
@@ -987,7 +1606,6 @@ export default function PhaserGame() {
         },
       })
 
-      // Keep upscaled canvas crisp instead of bilinear-blurry
       const applyCrisp = () => {
         const canvas = containerRef.current?.querySelector('canvas') as HTMLCanvasElement | null
         if (canvas) canvas.style.imageRendering = 'pixelated'
@@ -999,6 +1617,7 @@ export default function PhaserGame() {
     return () => {
       gameRef.current?.destroy(true)
       gameRef.current = null
+      theme.stop()
     }
   }, [])
 
