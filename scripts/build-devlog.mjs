@@ -2,22 +2,29 @@
 // app/gaming/_devlog-auto.json so the devlog section can render them
 // alongside manual entries. Runs as a `prebuild` step.
 //
-// Hybrid filter:
-//   - Include commits that touched any path in INCLUDE_PATHS
-//   - OR commits whose subject contains [devlog]
-//   - Skip commits with [skip devlog]
+// Marker-only filter (intentionally narrow to keep the devlog curated):
+//   - Include commits whose subject contains [devlog]
+//   - Skip commits with [skip devlog] anywhere in the message
+//   - Skip commits in EXCLUDE_SHAS (for retroactively hiding meta commits)
 //
 // Fails open: if GitHub is unreachable or returns errors, leaves the
 // existing JSON in place (so old data persists rather than wiping).
 
-import { writeFileSync, existsSync, readFileSync } from "fs";
+import { writeFileSync, existsSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO = process.env.DEVLOG_REPO || "alexmcd1/respawn-riot";
-const INCLUDE_PATHS = ["app/game", "public/games"];
-const PER_PAGE = 50;
+const PER_PAGE = 100;
+
+// Hide specific commits even if they're tagged [devlog]. Use full SHA.
+// Useful for hiding tooling/meta commits we don't want in the public feed.
+const EXCLUDE_SHAS = new Set([
+  // The commit that wired up auto-devlog itself (meta tooling)
+  "1bb13c509601df06aae71bc15c2c9c04928b31a5",
+]);
+
 const OUT_PATH = join(
   __dirname,
   "..",
@@ -95,31 +102,21 @@ function parseCommit(c) {
 async function main() {
   let entries;
   try {
-    const pathResults = await Promise.all(
-      INCLUDE_PATHS.map((p) => fetchCommits(p))
-    );
     const allRecent = await fetchCommits(null);
-
-    const seen = new Set();
     const out = [];
+    const seen = new Set();
 
-    const consider = (c, requireMarker) => {
-      if (!c?.sha) return;
+    for (const c of allRecent) {
+      if (!c?.sha) continue;
+      if (EXCLUDE_SHAS.has(c.sha)) continue;
       const message = c.commit?.message ?? "";
-      if (/\[skip devlog\]/i.test(message)) return;
-      if (requireMarker && !/\[devlog\]/i.test(message)) return;
-      if (seen.has(c.sha)) return;
+      if (/\[skip devlog\]/i.test(message)) continue;
+      if (!/\[devlog\]/i.test(message)) continue;
+      if (seen.has(c.sha)) continue;
       seen.add(c.sha);
       const parsed = parseCommit(c);
       if (parsed.title) out.push(parsed);
-    };
-
-    // Path-touched commits — auto-include
-    for (const list of pathResults) {
-      for (const c of list) consider(c, false);
     }
-    // Marker-only commits — opt-in via [devlog] in subject
-    for (const c of allRecent) consider(c, true);
 
     out.sort((a, b) => b.date.localeCompare(a.date));
     entries = out;
@@ -127,10 +124,7 @@ async function main() {
     console.warn(
       `[build-devlog] GitHub fetch failed: ${err.message}. Keeping existing JSON.`
     );
-    if (existsSync(OUT_PATH)) {
-      // Leave existing file alone
-      return;
-    }
+    if (existsSync(OUT_PATH)) return; // Leave existing file alone
     entries = [];
   }
 
