@@ -10,12 +10,36 @@ const G: any = {
   atk: 5, def: 3, spd: 4,
   hunger: 80, happy: 80,
   xp: 0,
-  xpNeeded: [30, 100, 250, 500, 9999999],
   level: 1, wins: 0, lastFed: 0,
   day: 1,
   inventory: [] as any[],
   maxInv: 100,
   chests: {} as any,
+}
+
+// ─── Level / XP / evolution helpers ───────────────────────────────────────────
+// Level required to evolve OUT of each stage. Index = current stage.
+//   stage 1 -> 2 at lvl 4, 2 -> 3 at lvl 9, 3 -> 4 at lvl 16,
+//   4 -> 5 at lvl 26, 5 is the final ascended form.
+const EVO_LEVEL = [0, 4, 9, 16, 26, 999]
+function xpToLevel(level: number) { return 20 + level * 10 }
+
+// Apply XP gain. Returns flags so callers can show feedback / evolve.
+function gainXp(amount: number) {
+  const prevLevel = G.level
+  G.xp += amount
+  while (G.xp >= xpToLevel(G.level)) {
+    G.xp -= xpToLevel(G.level)
+    G.level += 1
+    G.maxHp += 3; G.hp = Math.min(G.maxHp, G.hp + 3)
+    G.atk += 1; G.def += 1
+    if (G.level % 2 === 0) G.spd += 1
+  }
+  return {
+    leveled: G.level > prevLevel,
+    levelsGained: G.level - prevLevel,
+    shouldEvolve: G.stage < 5 && G.level >= EVO_LEVEL[G.stage],
+  }
 }
 
 const W = 480, H = 320
@@ -124,6 +148,18 @@ class Theme {
     if (this.master && this.ctx) this.master.gain.setValueAtTime(this.isMuted ? 0 : 0.16, this.ctx.currentTime)
   }
 
+  // Triumphant ascending arpeggio for level-ups
+  chime() {
+    if (!this.ctx || !this.master) return
+    const t = this.ctx.currentTime + 0.02
+    this.note('square', NOTE.C5, t,        0.10, 0.30)
+    this.note('square', NOTE.E5, t + 0.08, 0.10, 0.30)
+    this.note('square', NOTE.G5, t + 0.16, 0.10, 0.30)
+    this.note('square', NOTE.C6, t + 0.24, 0.22, 0.35)
+    this.note('triangle', NOTE.C4, t,        0.30, 0.25)
+    this.note('triangle', NOTE.G4, t + 0.24, 0.30, 0.25)
+  }
+
   stop() {
     if (this.schedTimer) clearTimeout(this.schedTimer)
     try { this.ctx?.close() } catch (e) {}
@@ -137,7 +173,7 @@ const theme = new Theme()
 const ITEMS: any = {
   berry: { name: 'Berry',   color: 0xff5577, desc: '+5 HP',      effect: () => { if (G.hp < G.maxHp) { G.hp = Math.min(G.maxHp, G.hp + 5); return true } return false } },
   apple: { name: 'Apple',   color: 0xff8844, desc: '+12 Hunger', effect: () => { if (G.hunger < 100) { G.hunger = Math.min(100, G.hunger + 12); return true } return false } },
-  shard: { name: 'Crystal', color: 0x88ddff, desc: '+5 XP',      effect: () => { G.xp += 5; return true } },
+  shard: { name: 'Crystal', color: 0x88ddff, desc: '+5 XP',      effect: () => { gainXp(5); return true } },
   herb:  { name: 'Herb',    color: 0x88dd66, desc: '+8 Happy',   effect: () => { if (G.happy < 100) { G.happy = Math.min(100, G.happy + 8); return true } return false } },
   coin:  { name: 'Coin',    color: 0xffdd44, desc: 'Currency',   effect: () => false },
 }
@@ -362,7 +398,7 @@ function drawDino(g: any, stage: number, x: number, y: number) {
     // Brow horn
     g.fillStyle(p); g.fillTriangle(x - 9, y - 20, x - 5, y - 27, x - 1, y - 20)
 
-  } else {
+  } else if (stage === 4) {
     // Tyranex — apex predator, glowing eyes, wings, huge spikes
     g.fillStyle(c, 0.12); g.fillCircle(x, y, 60)
     g.fillStyle(c, 0.08); g.fillCircle(x, y, 72)
@@ -461,6 +497,96 @@ function drawDino(g: any, stage: number, x: number, y: number) {
     g.fillTriangle(x - 16, y - 22, x - 18, y - 36, x - 8, y - 22)
     g.fillStyle(0xffdd44, 0.7)
     g.fillTriangle(x - 11, y - 24, x - 8, y - 34, x - 5, y - 22)
+
+  } else { // stage 5 — Goraxis, ascended apex
+    // Triple aura
+    g.fillStyle(c, 0.14); g.fillCircle(x, y, 78)
+    g.fillStyle(c, 0.10); g.fillCircle(x, y, 92)
+    g.fillStyle(p, 0.06); g.fillCircle(x, y, 110)
+    g.fillStyle(0x000000, 0.32); g.fillEllipse(x, y + 42, 64, 14)
+
+    // Massive tail
+    g.fillStyle(c)
+    g.fillTriangle(x + 10, y + 18, x + 44, y + 4, x + 22, y + 30)
+    g.fillTriangle(x + 26, y + 4, x + 56, y - 14, x + 38, y + 8)
+    g.fillTriangle(x + 36, y - 12, x + 64, y - 36, x + 50, y - 4)
+    g.fillStyle(p)
+    g.fillTriangle(x + 56, y - 32, x + 70, y - 46, x + 62, y - 28)
+
+    // Four wings: outer + inner pair on each side
+    g.fillStyle(c, 0.6)
+    g.fillTriangle(x - 16, y - 12, x - 46, y - 42, x - 8, y + 12)
+    g.fillTriangle(x + 16, y - 12, x + 46, y - 42, x + 8, y + 12)
+    g.fillStyle(p, 0.55)
+    g.fillTriangle(x - 14, y - 4, x - 32, y - 26, x - 6, y + 12)
+    g.fillTriangle(x + 14, y - 4, x + 32, y - 26, x + 6, y + 12)
+
+    // Body
+    g.fillStyle(c); g.fillEllipse(x - 2, y + 6, 42, 46)
+    g.fillStyle(p, 0.55); g.fillEllipse(x - 2, y + 14, 26, 32)
+    g.lineStyle(1, p, 0.7)
+    for (let i = 0; i < 5; i++) { g.beginPath(); g.moveTo(x - 10, y + 4 + i * 6); g.lineTo(x + 6, y + 4 + i * 6); g.strokePath() }
+
+    // Eight back spikes with golden cores
+    g.fillStyle(p)
+    for (let i = 0; i < 8; i++) {
+      const sx = x - 22 + i * 6, sh = (i === 3 || i === 4) ? 22 : 14
+      g.fillTriangle(sx - 3, y - 12, sx, y - 12 - sh, sx + 3, y - 12)
+    }
+    g.fillStyle(0xffdd44, 0.75)
+    for (let i = 0; i < 8; i++) {
+      const sx = x - 22 + i * 6, sh = (i === 3 || i === 4) ? 14 : 9
+      g.fillTriangle(sx - 1, y - 12, sx, y - 12 - sh, sx + 1, y - 12)
+    }
+
+    // Strong legs
+    g.fillStyle(c); g.fillEllipse(x - 14, y + 28, 14, 20); g.fillEllipse(x + 8, y + 28, 14, 20)
+    g.fillStyle(0x1a1a3a); g.fillRect(x - 21, y + 38, 16, 5); g.fillRect(x + 1, y + 38, 16, 5)
+    g.fillStyle(0xffdd44)
+    for (let i = 0; i < 4; i++) {
+      g.fillTriangle(x - 21 + i*4, y + 43, x - 19 + i*4, y + 47, x - 17 + i*4, y + 43)
+      g.fillTriangle(x + 1 + i*4, y + 43, x + 3 + i*4, y + 47, x + 5 + i*4, y + 43)
+    }
+
+    // Arms
+    g.fillStyle(c); g.fillEllipse(x - 20, y + 4, 8, 16); g.fillEllipse(x + 16, y + 4, 8, 16)
+    g.fillStyle(0xffdd44)
+    g.fillTriangle(x - 24, y + 12, x - 20, y + 18, x - 16, y + 12)
+    g.fillTriangle(x + 12, y + 12, x + 16, y + 18, x + 20, y + 12)
+
+    // Head
+    g.fillStyle(c); g.fillEllipse(x - 6, y - 18, 24, 20)
+    g.fillStyle(c); g.fillRoundedRect(x, y - 20, 24, 14, 5)
+    g.fillStyle(p, 0.4); g.fillRoundedRect(x, y - 14, 22, 5, 2)
+    // Teeth
+    g.fillStyle(0xffffff)
+    for (let i = 0; i < 6; i++) {
+      g.fillTriangle(x + 2 + i*4, y - 6, x + 3 + i*4, y - 2, x + 4 + i*4, y - 6)
+      g.fillTriangle(x + 2 + i*4, y - 8, x + 3 + i*4, y - 12, x + 4 + i*4, y - 8)
+    }
+    // Glowing eyes (hot magenta)
+    g.fillStyle(0xffffff); g.fillEllipse(x - 7, y - 20, 8, 7)
+    g.fillStyle(0xff44dd); g.fillEllipse(x - 7, y - 20, 5, 5)
+    g.fillStyle(0xffaaff); g.fillCircle(x - 7, y - 20, 2)
+    g.fillStyle(0xffffff); g.fillCircle(x - 6, y - 21, 1.2)
+    g.fillStyle(0x1a1a3a); g.fillCircle(x + 20, y - 16, 1.5)
+
+    // Crown of three horns
+    g.fillStyle(p)
+    g.fillTriangle(x - 18, y - 24, x - 22, y - 40, x - 12, y - 22)
+    g.fillTriangle(x - 12, y - 26, x - 8, y - 44, x - 4, y - 24)
+    g.fillTriangle(x - 4, y - 24, x + 2, y - 38, x + 6, y - 22)
+    g.fillStyle(0xffdd44, 0.75)
+    g.fillTriangle(x - 8, y - 26, x - 6, y - 40, x - 4, y - 24)
+
+    // Forehead crystal
+    g.fillStyle(0xff66dd); g.fillCircle(x - 6, y - 30, 4)
+    g.fillStyle(0xffaaff); g.fillCircle(x - 6, y - 30, 2)
+    g.fillStyle(0xffffff); g.fillCircle(x - 5, y - 31, 0.8)
+
+    // Floating aura particles
+    g.fillStyle(p, 0.7); g.fillCircle(x + 32, y - 24, 1.5); g.fillCircle(x - 34, y + 18, 1.5)
+    g.fillStyle(0xffffff, 0.65); g.fillCircle(x + 28, y + 28, 1); g.fillCircle(x - 28, y - 32, 1)
   }
 }
 
@@ -585,7 +711,7 @@ function drawWater(g: any, stage: number, x: number, y: number) {
     g.beginPath(); g.moveTo(x - 22, y + 6); g.lineTo(x - 8, y + 6); g.strokePath()
     g.fillStyle(0x1a1a3a); g.fillCircle(x - 22, y + 1, 1)
 
-  } else {
+  } else if (stage === 4) {
     // Leviarus — apex water dragon with antlers and pearl
     g.fillStyle(c, 0.12); g.fillCircle(x, y, 60)
     g.fillStyle(c, 0.08); g.fillCircle(x, y, 75)
@@ -644,6 +770,97 @@ function drawWater(g: any, stage: number, x: number, y: number) {
     // Pearl orb
     g.fillStyle(0xffffff, 0.9); g.fillCircle(x - 38, y + 18, 5)
     g.fillStyle(0x88eeff, 0.5); g.fillCircle(x - 38, y + 18, 7)
+
+  } else { // stage 5 — Abyssarus, abyssal sovereign with three orbs and storm aura
+    // Layered cyan + violet aura
+    g.fillStyle(c, 0.14); g.fillCircle(x, y, 78)
+    g.fillStyle(0x66ccff, 0.10); g.fillCircle(x, y, 92)
+    g.fillStyle(p, 0.07); g.fillCircle(x, y, 108)
+    g.fillStyle(0x000000, 0.3); g.fillEllipse(x, y + 40, 60, 14)
+
+    // Three flowing tail coils
+    g.fillStyle(c)
+    g.fillEllipse(x + 22, y + 4, 18, 22)
+    g.fillEllipse(x + 38, y - 8, 16, 14)
+    g.fillEllipse(x + 50, y - 22, 12, 12)
+    g.fillStyle(p)
+    g.fillTriangle(x + 50, y - 26, x + 64, y - 42, x + 56, y - 22)
+    g.fillTriangle(x + 48, y - 16, x + 62, y - 32, x + 56, y - 14)
+    g.fillTriangle(x + 54, y - 26, x + 60, y - 8, x + 64, y - 32)
+
+    // Larger flowing fins
+    g.fillStyle(c, 0.7)
+    g.fillTriangle(x - 8, y + 14, x - 22, y + 34, x + 8, y + 28)
+    g.fillTriangle(x + 10, y + 18, x + 28, y + 36, x + 18, y + 22)
+    g.fillStyle(p, 0.5)
+    g.fillTriangle(x - 6, y + 16, x - 16, y + 30, x + 4, y + 24)
+
+    // Body
+    g.fillStyle(c); g.fillEllipse(x, y + 6, 42, 40)
+    g.fillStyle(p, 0.55)
+    for (let i = 0; i < 7; i++) for (let j = 0; j < 5; j++) g.fillCircle(x - 16 + i*6, y - 8 + j*5, 1.5)
+    g.fillStyle(p, 0.55); g.fillEllipse(x - 2, y + 14, 26, 26)
+    g.lineStyle(1, p, 0.7)
+    for (let i = 0; i < 5; i++) { g.beginPath(); g.moveTo(x - 12, y + 4 + i*5); g.lineTo(x + 6, y + 4 + i*5); g.strokePath() }
+
+    // Tall dorsal mane
+    g.fillStyle(p)
+    for (let i = 0; i < 8; i++) {
+      const sx = x - 22 + i * 6, sh = (i === 3 || i === 4) ? 22 : 14
+      g.fillTriangle(sx - 3, y - 8, sx, y - 8 - sh, sx + 3, y - 8)
+    }
+    g.fillStyle(0xddeeff, 0.7)
+    for (let i = 0; i < 8; i++) {
+      const sx = x - 22 + i * 6, sh = (i === 3 || i === 4) ? 14 : 9
+      g.fillTriangle(sx - 1, y - 8, sx, y - 8 - sh, sx + 1, y - 8)
+    }
+
+    // Heads — central + two smaller side heads on stems
+    // Side heads
+    g.fillStyle(c)
+    g.fillEllipse(x - 28, y - 18, 14, 12)  // upper-left head
+    g.fillEllipse(x - 22, y + 16, 14, 12)  // lower-left head
+    g.fillStyle(0x88eeff)
+    g.fillCircle(x - 30, y - 20, 1.5); g.fillCircle(x - 24, y + 14, 1.5)
+
+    // Main head + snout
+    g.fillStyle(c); g.fillEllipse(x - 16, y, 22, 18)
+    g.fillStyle(c); g.fillRoundedRect(x - 28, y - 4, 18, 12, 4)
+    g.fillStyle(p, 0.4); g.fillRoundedRect(x - 28, y + 1, 16, 5, 2)
+
+    // Crown of antlers (3 prongs)
+    g.fillStyle(p)
+    g.fillTriangle(x - 14, y - 14, x - 12, y - 30, x - 8, y - 10)
+    g.fillTriangle(x - 18, y - 10, x - 24, y - 26, x - 14, y - 8)
+    g.fillTriangle(x - 22, y - 6, x - 32, y - 22, x - 22, y - 4)
+    g.fillStyle(0xffdd66, 0.7); g.fillTriangle(x - 13, y - 14, x - 11, y - 28, x - 9, y - 10)
+
+    // Long flowing whiskers
+    g.lineStyle(1.5, p, 0.95)
+    g.beginPath(); g.moveTo(x - 28, y); g.lineTo(x - 44, y - 6); g.lineTo(x - 56, y + 6); g.strokePath()
+    g.beginPath(); g.moveTo(x - 28, y + 6); g.lineTo(x - 44, y + 12); g.lineTo(x - 56, y + 26); g.strokePath()
+
+    // Glowing eye
+    g.fillStyle(0xddccff); g.fillEllipse(x - 16, y - 4, 7, 6)
+    g.fillStyle(0xffffff); g.fillCircle(x - 15, y - 4, 2)
+    g.fillStyle(0x1a1a3a); g.fillCircle(x - 14, y - 5, 0.6)
+    // Teeth
+    g.fillStyle(0xffffff)
+    for (let i = 0; i < 5; i++) g.fillTriangle(x - 26 + i*4, y + 6, x - 25 + i*4, y + 10, x - 24 + i*4, y + 6)
+    g.fillStyle(0x1a1a3a); g.fillCircle(x - 26, y + 1, 1.2)
+
+    // Three guardian pearls (signature)
+    const pearl = (px: number, py: number) => {
+      g.fillStyle(0xffffff, 0.95); g.fillCircle(px, py, 5)
+      g.fillStyle(0xaaeeff, 0.6); g.fillCircle(px, py, 7)
+      g.fillStyle(0xffffff); g.fillCircle(px - 1, py - 1, 1.5)
+    }
+    pearl(x - 36, y + 18)
+    pearl(x + 18, y + 32)
+    pearl(x + 36, y + 18)
+
+    // Aura sparkles
+    g.fillStyle(0xddccff, 0.6); g.fillCircle(x + 26, y - 28, 1.5); g.fillCircle(x - 32, y - 30, 1.5)
   }
 }
 
@@ -786,7 +1003,7 @@ function drawLion(g: any, stage: number, x: number, y: number) {
     g.fillStyle(0xddc090); g.fillTriangle(x - 22, y, x - 30, y - 2, x - 22, y + 6)
     g.fillStyle(0xb88040); g.fillCircle(x - 30, y, 3)
 
-  } else {
+  } else if (stage === 4) {
     // Lion Turtle — ancient guardian
     g.fillStyle(c, 0.15); g.fillCircle(x, y, 65)
     g.fillStyle(0xddc090, 0.1); g.fillCircle(x, y, 80)
@@ -851,6 +1068,96 @@ function drawLion(g: any, stage: number, x: number, y: number) {
     g.fillStyle(0xc8a878); g.fillEllipse(x + 32, y, 14, 8); g.fillTriangle(x + 36, y, x + 48, y - 4, x + 40, y + 6)
     g.fillStyle(0xffdd44, 0.85); g.fillCircle(x + 48, y - 2, 4)
     g.fillStyle(0xb88040, 0.7); g.fillCircle(x + 48, y - 2, 2)
+
+  } else { // stage 5 — World Turtle, vast ancient guardian carrying a forest
+    // Mighty aura
+    g.fillStyle(c, 0.16); g.fillCircle(x, y, 70)
+    g.fillStyle(0xffdd44, 0.10); g.fillCircle(x, y, 86)
+    g.fillStyle(p, 0.06); g.fillCircle(x, y, 102)
+    g.fillStyle(0x000000, 0.32); g.fillEllipse(x, y + 42, 68, 14)
+
+    // Massive shell (wider, taller)
+    g.fillStyle(c); g.fillEllipse(x, y - 8, 64, 46)
+    g.fillStyle(p, 0.55); g.fillEllipse(x - 14, y - 20, 26, 16)
+    g.lineStyle(2, 0x2a2a14, 0.9); g.strokeEllipse(x, y - 8, 64, 46)
+    g.lineStyle(1, 0x2a2a14, 0.85)
+    hex(x, y - 14, 8); hex(x - 16, y - 12, 7); hex(x + 16, y - 12, 7)
+    hex(x - 8, y - 4, 6); hex(x + 8, y - 4, 6)
+    hex(x - 22, y + 4, 5); hex(x + 22, y + 4, 5); hex(x, y + 10, 6)
+
+    // Forest grove on the shell — trunks + canopies
+    g.fillStyle(0x4a2a10)
+    g.fillRect(x - 10, y - 32, 3, 7); g.fillRect(x - 2, y - 36, 3, 8); g.fillRect(x + 6, y - 32, 3, 7)
+    g.fillStyle(0x1a4422, 0.92)
+    g.fillCircle(x - 9, y - 36, 5); g.fillCircle(x - 1, y - 40, 6); g.fillCircle(x + 7, y - 36, 5)
+    g.fillStyle(0x2a6a32, 0.85); g.fillCircle(x - 1, y - 42, 4)
+    g.fillStyle(0xffdd44, 0.6); g.fillCircle(x - 9, y - 36, 1.4); g.fillCircle(x + 7, y - 36, 1.4)
+    // Tiny stream / ground line on shell
+    g.fillStyle(0x88ddff, 0.6); g.fillRect(x - 14, y - 28, 28, 1.5)
+
+    // Magnificent flowing mane (golden)
+    g.fillStyle(0x886020)
+    for (let i = 0; i < 18; i++) {
+      const a = i * Math.PI / 9 - Math.PI / 2
+      const r = 19 + (i % 3) * 3
+      g.fillCircle(x + Math.cos(a) * r * 0.92, y + 14 + Math.sin(a) * r * 0.7, 7)
+    }
+    g.fillStyle(0xb88040, 0.85)
+    for (let i = 0; i < 14; i++) {
+      const a = i * Math.PI / 7 - Math.PI / 2
+      g.fillCircle(x + Math.cos(a) * 14 * 0.9, y + 14 + Math.sin(a) * 14 * 0.7, 5)
+    }
+    g.fillStyle(0xffdd44, 0.7)
+    for (let i = 0; i < 10; i++) {
+      const a = i * Math.PI / 5 - Math.PI / 2
+      g.fillCircle(x + Math.cos(a) * 8, y + 14 + Math.sin(a) * 8 * 0.7, 3)
+    }
+
+    // Head (regal)
+    g.fillStyle(0xc8a878); g.fillEllipse(x, y + 16, 26, 22)
+    g.fillStyle(0xeed6a8); g.fillEllipse(x, y + 18, 22, 14)
+    // Glowing emerald eyes
+    g.fillStyle(0x44ff99); g.fillEllipse(x - 7, y + 13, 7, 6); g.fillEllipse(x + 7, y + 13, 7, 6)
+    g.fillStyle(0xffffff); g.fillCircle(x - 6, y + 11, 1.4); g.fillCircle(x + 8, y + 11, 1.4)
+    g.fillStyle(0x1a1a3a); g.fillCircle(x - 6, y + 12, 0.5); g.fillCircle(x + 8, y + 12, 0.5)
+    // Nose
+    g.fillStyle(0x1a1a3a); g.fillTriangle(x - 3, y + 18, x + 3, y + 18, x, y + 21)
+    // Wise mouth
+    g.lineStyle(1, 0x4a2a0a, 0.9)
+    g.beginPath(); g.moveTo(x - 6, y + 23); g.lineTo(x, y + 22); g.lineTo(x + 6, y + 23); g.strokePath()
+    // Long whiskers
+    g.lineStyle(1, 0x4a2a0a, 0.75)
+    for (let i = 0; i < 4; i++) {
+      g.beginPath(); g.moveTo(x - 7, y + 19 + i); g.lineTo(x - 22, y + 21 + i*2); g.strokePath()
+      g.beginPath(); g.moveTo(x + 7, y + 19 + i); g.lineTo(x + 22, y + 21 + i*2); g.strokePath()
+    }
+    // Crown horns
+    g.fillStyle(p)
+    g.fillTriangle(x - 12, y + 4, x - 8, y - 4, x - 4, y + 4)
+    g.fillTriangle(x + 4, y + 4, x + 8, y - 4, x + 12, y + 4)
+    g.fillStyle(0xffdd44)
+    g.fillTriangle(x - 11, y + 4, x - 8, y - 2, x - 5, y + 4)
+    g.fillTriangle(x + 5, y + 4, x + 8, y - 2, x + 11, y + 4)
+
+    // Massive legs
+    g.fillStyle(c); g.fillEllipse(x - 26, y + 28, 14, 22); g.fillEllipse(x + 26, y + 28, 14, 22)
+    g.fillStyle(p, 0.4); g.fillEllipse(x - 26, y + 24, 10, 14); g.fillEllipse(x + 26, y + 24, 10, 14)
+    g.fillStyle(0x1a1a3a); g.fillRect(x - 33, y + 38, 16, 6); g.fillRect(x + 17, y + 38, 16, 6)
+    g.fillStyle(0xffdd44)
+    for (let i = 0; i < 4; i++) {
+      g.fillTriangle(x - 33 + i*5, y + 44, x - 31 + i*5, y + 48, x - 29 + i*5, y + 44)
+      g.fillTriangle(x + 17 + i*5, y + 44, x + 19 + i*5, y + 48, x + 21 + i*5, y + 44)
+    }
+
+    // Tail with golden tuft
+    g.fillStyle(0xc8a878); g.fillEllipse(x + 36, y - 2, 16, 10)
+    g.fillTriangle(x + 42, y - 2, x + 56, y - 6, x + 48, y + 8)
+    g.fillStyle(0xffdd44, 0.9); g.fillCircle(x + 56, y - 4, 5)
+    g.fillStyle(0x886030, 0.7); g.fillCircle(x + 56, y - 4, 2.5)
+
+    // Aura motes
+    g.fillStyle(0xffdd44, 0.7); g.fillCircle(x + 32, y - 30, 1.5); g.fillCircle(x - 36, y + 14, 1.5)
+    g.fillStyle(0x88ffaa, 0.6); g.fillCircle(x + 40, y + 30, 1); g.fillCircle(x - 36, y - 22, 1)
   }
 }
 
@@ -859,25 +1166,25 @@ const SPECIES = [
   {
     label: 'DINO',
     desc: 'Fierce hunter',
-    stageNames:  ['Egg', 'Hatchling', 'Saurling', 'Raptus', 'Tyranex'],
-    stageColors: [0xd4c5f9, 0x77dd66, 0x44aa55, 0x4488cc, 0xcc4422],
-    stagePulse:  [0xeeeeff, 0xaaff99, 0x88dd77, 0x77bbdd, 0xff8844],
+    stageNames:  ['Egg', 'Hatchling', 'Saurling', 'Raptus', 'Tyranex', 'Goraxis'],
+    stageColors: [0xd4c5f9, 0x77dd66, 0x44aa55, 0x4488cc, 0xcc4422, 0xff66dd],
+    stagePulse:  [0xeeeeff, 0xaaff99, 0x88dd77, 0x77bbdd, 0xff8844, 0xffbbff],
     draw: drawDino,
   },
   {
     label: 'WATER DRAGON',
     desc: 'Mystic serpent',
-    stageNames:  ['Egg', 'Tadrake', 'Aquilis', 'Hydrabane', 'Leviarus'],
-    stageColors: [0xc5e8f9, 0x66ccdd, 0x4499bb, 0x2266aa, 0x66ccff],
-    stagePulse:  [0xddf5ff, 0xaaeeff, 0x88ddee, 0x77aaff, 0xddffff],
+    stageNames:  ['Egg', 'Tadrake', 'Aquilis', 'Hydrabane', 'Leviarus', 'Abyssarus'],
+    stageColors: [0xc5e8f9, 0x66ccdd, 0x4499bb, 0x2266aa, 0x66ccff, 0xaa66ff],
+    stagePulse:  [0xddf5ff, 0xaaeeff, 0x88ddee, 0x77aaff, 0xddffff, 0xddccff],
     draw: drawWater,
   },
   {
     label: 'LION TURTLE',
     desc: 'Ancient guardian',
-    stageNames:  ['Egg', 'Cubshell', 'Maneshield', 'Roarshell', 'Lion Turtle'],
-    stageColors: [0xf0e0c4, 0xc8a878, 0xb8884a, 0x886a3a, 0x6a8a4a],
-    stagePulse:  [0xfff0d0, 0xddc090, 0xddb070, 0xc09858, 0xaacc77],
+    stageNames:  ['Egg', 'Cubshell', 'Maneshield', 'Roarshell', 'Lion Turtle', 'World Turtle'],
+    stageColors: [0xf0e0c4, 0xc8a878, 0xb8884a, 0x886a3a, 0x6a8a4a, 0x4a6a3a],
+    stagePulse:  [0xfff0d0, 0xddc090, 0xddb070, 0xc09858, 0xaacc77, 0xffdd44],
     draw: drawLion,
   },
 ]
@@ -1119,6 +1426,11 @@ function createHomeScene(Phaser: any) {
       this.mkBar(190, 7,  'HAPPY', 0xff44bb)
       this.mkBar(190, 17, 'XP',    0x44aaff)
 
+      // Codex button
+      const codexBtn = this.add.rectangle(W - 165, 13, 56, 16, 0x2a1a44, 0.92).setInteractive({ useHandCursor: true }).setStrokeStyle(1, 0x886699)
+      this.add.text(W - 165, 13, 'CODEX', { fontSize: '8px', color: '#ddccff', fontStyle: 'bold' }).setOrigin(0.5)
+      codexBtn.on('pointerdown', () => this.openCodex())
+
       // Bag button
       const bagBtn = this.add.rectangle(W - 100, 13, 60, 16, 0x1a2a44, 0.92).setInteractive({ useHandCursor: true }).setStrokeStyle(1, 0x556699)
       this.bagT = this.add.text(W - 100, 13, '', { fontSize: '8px', color: '#ddccaa' }).setOrigin(0.5)
@@ -1150,10 +1462,11 @@ function createHomeScene(Phaser: any) {
       this.input.keyboard.on('keydown-SPACE', () => this.tryActivate())
       this.input.keyboard.on('keydown-E',     () => this.tryActivate())
       this.input.keyboard.on('keydown-B',     () => this.openBag())
+      this.input.keyboard.on('keydown-C',     () => this.openCodex())
 
       this.updHUD()
 
-      if (G.stage < 4 && G.xp >= G.xpNeeded[G.stage]) this.time.delayedCall(300, () => this.evolve())
+      if (G.stage < 5 && G.level >= EVO_LEVEL[G.stage]) this.time.delayedCall(300, () => this.evolve())
     }
 
     drawC() {
@@ -1174,7 +1487,7 @@ function createHomeScene(Phaser: any) {
       if (k === 'HP')     p = G.hp / G.maxHp
       if (k === 'HUNGER') p = G.hunger / 100
       if (k === 'HAPPY')  p = G.happy / 100
-      if (k === 'XP')     p = G.stage < 4 ? G.xp / G.xpNeeded[G.stage] : 1
+      if (k === 'XP')     p = G.xp / xpToLevel(G.level)
       b.f.width = Math.max(0, p) * b.mw
     }
     updHUD() {
@@ -1250,12 +1563,14 @@ function createHomeScene(Phaser: any) {
 
     train() {
       if (G.hunger <= 10) { this.msg('Too hungry to train!'); return }
-      G.hunger = Math.max(0, G.hunger - 10); G.xp += 10; G.happy = Math.min(100, G.happy + 5)
+      G.hunger = Math.max(0, G.hunger - 10); G.happy = Math.min(100, G.happy + 5)
       let line = '+10 XP   -10 Hunger'
       if (Math.random() < 0.25) { G.maxHp += 1; G.hp = Math.min(G.maxHp, G.hp + 1); line = '+10 XP   +1 MAX HP!' }
+      const r = gainXp(10)
       this.msg(line); this.updHUD()
       this.tweens.add({ targets: this.cGfx, x: this.cX + 6, duration: 90, yoyo: true, repeat: 2 })
-      this.chkEvo()
+      if (r.leveled) this.showLevelUp(r.levelsGained)
+      if (r.shouldEvolve) this.time.delayedCall(900, () => this.evolve())
     }
 
     fidget() {
@@ -1263,8 +1578,11 @@ function createHomeScene(Phaser: any) {
       G.hunger = Math.max(0, G.hunger - 3)
       let line = 'You played and felt happy!'
       if (Math.random() < 0.3 && invAdd('shard', 1)) line = 'Played +Happy   Found a Crystal!'
+      const r = gainXp(3)
       this.msg(line); this.updHUD()
       this.tweens.add({ targets: this.cGfx, y: this.cGfx.y - 10, duration: 180, yoyo: true, repeat: 1 })
+      if (r.leveled) this.showLevelUp(r.levelsGained)
+      if (r.shouldEvolve) this.time.delayedCall(900, () => this.evolve())
     }
 
     sleep() {
@@ -1280,17 +1598,35 @@ function createHomeScene(Phaser: any) {
       })
     }
 
-    openBag() { this.scene.launch('InventoryScene', { from: 'HomeScene' }); this.scene.pause() }
+    openBag()   { this.scene.launch('InventoryScene', { from: 'HomeScene' }); this.scene.pause() }
+    openCodex() { this.scene.launch('CodexScene',     { from: 'HomeScene' }); this.scene.pause() }
 
-    chkEvo() { if (G.stage < 4 && G.xp >= G.xpNeeded[G.stage]) this.time.delayedCall(400, () => this.evolve()) }
+    showLevelUp(levels: number) {
+      theme.chime()
+      this.cameras.main.flash(450, 255, 230, 120)
+      this.cameras.main.shake(180, 0.005)
+      const lvlTxt = levels > 1 ? `LEVEL UP x${levels}!` : 'LEVEL UP!'
+      const t = this.add.text(this.cX, this.floorY - 90,
+        lvlTxt + '\nLv.' + G.level + '   +HP +ATK +DEF',
+        { fontSize: '12px', color: '#ffdd44', fontStyle: 'bold', align: 'center', stroke: '#5a3a00', strokeThickness: 2 }
+      ).setOrigin(0.5).setDepth(20)
+      this.tweens.add({ targets: t, y: t.y - 50, alpha: 0, duration: 1800, ease: 'Cubic.easeOut', onComplete: () => t.destroy() })
+      // Sparkle particles
+      for (let i = 0; i < 12; i++) {
+        const sp = this.add.circle(this.cX + Phaser.Math.Between(-30, 30), this.floorY - 30, Phaser.Math.Between(1, 2), 0xffdd44)
+        this.tweens.add({ targets: sp, y: sp.y - Phaser.Math.Between(40, 80), alpha: 0, duration: Phaser.Math.Between(700, 1400), onComplete: () => sp.destroy() })
+      }
+      this.updHUD()
+    }
 
     evolve() {
-      if (G.stage >= 4) return
-      G.stage++; G.name = sp().stageNames[G.stage]; G.xp = 0
-      G.maxHp += 15; G.hp = G.maxHp; G.atk += 4; G.def += 3; G.spd += 2; G.level++
+      if (G.stage >= 5) return
+      G.stage++; G.name = sp().stageNames[G.stage]
+      G.maxHp += 15; G.hp = G.maxHp; G.atk += 4; G.def += 3; G.spd += 2
       this.cameras.main.flash(700, 255, 200, 100)
       this.cameras.main.shake(400, 0.015)
-      const et = this.add.text(this.cX, this.floorY - 80, 'EVOLVED!\n' + G.name, { fontSize: '13px', color: '#ffdd44', align: 'center', fontStyle: 'bold' }).setOrigin(0.5)
+      theme.chime()
+      const et = this.add.text(this.cX, this.floorY - 80, 'EVOLVED!\n' + G.name, { fontSize: '13px', color: '#ffdd44', align: 'center', fontStyle: 'bold', stroke: '#3a1a00', strokeThickness: 2 }).setOrigin(0.5).setDepth(20)
       this.tweens.add({ targets: et, y: et.y - 36, alpha: 0, duration: 2000, onComplete: () => et.destroy() })
       this.drawC(); this.updHUD()
     }
@@ -1710,6 +2046,63 @@ function createChestScene(Phaser: any) {
   }
 }
 
+// ─── CodexScene — evolution chain + level info ───────────────────────────────
+function createCodexScene(Phaser: any) {
+  return class CodexScene extends Phaser.Scene {
+    private from = 'HomeScene'
+    constructor() { super('CodexScene') }
+    init(data: any) { this.from = data?.from || 'HomeScene' }
+
+    create() {
+      this.add.rectangle(W/2, H/2, W, H, 0x000000, 0.85)
+      this.add.rectangle(W/2, H/2, W - 24, H - 24, 0x0a0f1e, 0.97).setStrokeStyle(2, 0x886699)
+      this.add.rectangle(W/2, 26, W - 24, 22, 0x2a1a44)
+      this.add.text(W/2, 26, 'CODEX  —  ' + sp().label, { fontSize: '11px', color: '#ddccff', fontStyle: 'bold', letterSpacing: 2 }).setOrigin(0.5)
+
+      // Evolution chain across the top
+      const stages = sp().stageNames
+      const stageY = 90
+      const cellW = (W - 40) / stages.length
+      for (let i = 0; i < stages.length; i++) {
+        const cx = 20 + cellW * (i + 0.5)
+        const isCur = i === G.stage
+        const slotBg = this.add.rectangle(cx, stageY, cellW - 8, 70, isCur ? 0x33224a : 0x14182a, 0.9).setStrokeStyle(1, isCur ? 0xffdd44 : 0x33446a)
+
+        const g = this.add.graphics()
+        sp().draw(g, i, cx, stageY - 4)
+
+        this.add.text(cx, stageY + 22, stages[i], { fontSize: '8px', color: isCur ? '#ffdd44' : '#aaccee', fontStyle: isCur ? 'bold' : 'normal' }).setOrigin(0.5)
+        const req = i === 0 ? 'Hatch' : (i === stages.length - 1 ? 'Final' : 'Lv ' + EVO_LEVEL[i])
+        this.add.text(cx, stageY + 32, req, { fontSize: '7px', color: '#7799cc' }).setOrigin(0.5)
+
+        if (i < stages.length - 1) {
+          this.add.text(20 + cellW * (i + 1), stageY - 4, '→', { fontSize: '12px', color: '#556699' }).setOrigin(0.5)
+        }
+      }
+
+      // Status panel
+      this.add.rectangle(W/2, 200, W - 60, 56, 0x101a30, 0.92).setStrokeStyle(1, 0x33446a)
+      this.add.text(W/2, 178, 'CURRENT STATUS', { fontSize: '9px', color: '#ffdd66', fontStyle: 'bold', letterSpacing: 2 }).setOrigin(0.5)
+      const stat1 = `${G.name}   Lv.${G.level}   HP ${G.hp}/${G.maxHp}   XP ${Math.floor(G.xp)}/${xpToLevel(G.level)}`
+      const stat2 = `ATK ${G.atk}   DEF ${G.def}   SPD ${G.spd}   Wins ${G.wins}   Day ${G.day}`
+      this.add.text(W/2, 196, stat1, { fontSize: '9px', color: '#ddeeff', align: 'center' }).setOrigin(0.5)
+      this.add.text(W/2, 210, stat2, { fontSize: '9px', color: '#aaccee', align: 'center' }).setOrigin(0.5)
+
+      const evoNext = EVO_LEVEL[G.stage]
+      const nextEvo = G.stage < 5 ? `Next evolution at Lv ${evoNext}  (${Math.max(0, evoNext - G.level)} levels to go)` : 'You have reached the final form!'
+      this.add.text(W/2, 234, nextEvo, { fontSize: '9px', color: '#ffdd44', fontStyle: 'italic' }).setOrigin(0.5)
+
+      this.add.text(W/2, 256, 'Each level: +3 HP   +1 ATK   +1 DEF   +1 SPD every 2 levels', { fontSize: '8px', color: '#88aacc' }).setOrigin(0.5)
+      this.add.text(W/2, 272, 'XP from: training (+10), exploring battles (+8-20), bosses (+55), crystals', { fontSize: '8px', color: '#7788aa' }).setOrigin(0.5)
+      this.add.text(W/2, H - 12, 'ESC or C to close', { fontSize: '8px', color: '#556677' }).setOrigin(0.5)
+
+      const close = () => { this.scene.stop(); this.scene.resume(this.from) }
+      this.input.keyboard.on('keydown-ESC', close)
+      this.input.keyboard.on('keydown-C',   close)
+    }
+  }
+}
+
 // ─── BattleScene ──────────────────────────────────────────────────────────────
 function createBattleScene(Phaser: any) {
   return class BattleScene extends Phaser.Scene {
@@ -1744,7 +2137,7 @@ function createBattleScene(Phaser: any) {
 
       this.eX = W * 0.72; this.eY = H * 0.38
       this.eGfx = this.add.graphics()
-      drawCreature(this.eGfx, this.enemy.stage, this.eX, this.eY)
+      SPECIES[this.enemy.species].draw(this.eGfx, this.enemy.stage, this.eX, this.eY)
       this.eGfx.setScale(-1, 1); this.eGfx.x = this.eX * 2
 
       this.add.text(this.eX, H * 0.14, this.enemy.name, { fontSize: '11px', color: '#ffaaaa', fontStyle: 'bold' }).setOrigin(0.5)
@@ -1780,12 +2173,31 @@ function createBattleScene(Phaser: any) {
     }
 
     genEnemy() {
-      const s = this.isBoss ? Math.min(4, G.stage + 1) : Math.max(1, G.stage - 1 + Phaser.Math.Between(0, 2))
-      const wn = ['Sharptooth', 'Crestrunner', 'Spinejaw', 'Clawfoot', 'Frillback', 'Marshcreeper']
-      const bn = ['VORAX', 'TITANEX', 'NECROSAUR', 'SHADOWFANG']
-      const name = this.isBoss ? bn[Phaser.Math.Between(0, bn.length - 1)] : wn[Phaser.Math.Between(0, wn.length - 1)]
+      // Pick a random species (any of the three) so wild enemies look varied.
+      const speciesIdx = Phaser.Math.Between(0, 2)
+      const minStage = this.isBoss ? Math.min(4, G.stage + 1) : Math.max(1, G.stage - 1)
+      const maxStage = this.isBoss ? Math.min(5, G.stage + 1) : Math.min(4, G.stage + 1)
+      const s = Phaser.Math.Between(minStage, Math.max(minStage, maxStage))
+
+      // Themed name pool per species.
+      const namesBySpecies = [
+        ['Sharptooth', 'Crestrunner', 'Spinejaw', 'Clawfoot', 'Frillback', 'Marshcreeper', 'Boneripper'],
+        ['Marshfin', 'Tideling', 'Coralfang', 'Drakefry', 'Brinepup', 'Kelpcrest', 'Stormjaw'],
+        ['Mossback', 'Stoneshell', 'Wildmane', 'Cubguard', 'Driftpaw', 'Grovekeeper', 'Boulderpaw'],
+      ]
+      const bn = ['VORAX', 'TITANEX', 'NECROSAUR', 'SHADOWFANG', 'OBLIVIRA', 'TEMPESTRYX', 'GLOOMHELM']
+      const name = this.isBoss
+        ? bn[Phaser.Math.Between(0, bn.length - 1)]
+        : namesBySpecies[speciesIdx][Phaser.Math.Between(0, namesBySpecies[speciesIdx].length - 1)]
+
       const hp = Math.floor((14 + s * 12) * (this.isBoss ? 2.2 : 1))
-      return { name, stage: s, hp, maxHp: hp, atk: (3 + s * 3) * (this.isBoss ? 1.6 : 1), def: 2 + s * 2, spd: 3 + s, level: G.level + (this.isBoss ? 2 : Phaser.Math.Between(-1, 1)) }
+      return {
+        name, species: speciesIdx, stage: s, hp, maxHp: hp,
+        atk: (3 + s * 3) * (this.isBoss ? 1.6 : 1),
+        def: 2 + s * 2,
+        spd: 3 + s,
+        level: G.level + (this.isBoss ? 2 : Phaser.Math.Between(-1, 1)),
+      }
     }
 
     mkB(x: number, y: number, label: string, bg: number, col: number, cb: () => void) {
@@ -1876,13 +2288,23 @@ function createBattleScene(Phaser: any) {
     end(result: string) {
       if (result === 'win') {
         const xp = this.isBoss ? 55 : Phaser.Math.Between(8, 20)
-        G.xp += xp; G.wins++; G.happy = Math.min(100, G.happy + 10)
+        G.wins++; G.happy = Math.min(100, G.happy + 10)
         G.hp = Math.min(G.maxHp, G.hp + Math.floor(G.maxHp * 0.1))
+        const r = gainXp(xp)
         this.cameras.main.flash(600, 255, 210, 50)
         this.setLog('Victory! +' + xp + ' XP', this.isBoss ? 'Boss defeated!' : '')
-        if (G.stage < 4 && G.xp >= G.xpNeeded[G.stage]) {
-          G.stage++; G.name = sp().stageNames[G.stage]; G.xp = 0
-          G.maxHp += 15; G.hp = G.maxHp; G.atk += 4; G.def += 3; G.spd += 2; G.level++
+        if (r.leveled) {
+          theme.chime()
+          this.cameras.main.flash(450, 255, 230, 120)
+          const lvl = this.add.text(W/2, H/2 - 30,
+            'LEVEL UP!  Lv.' + G.level,
+            { fontSize: '14px', color: '#ffdd44', fontStyle: 'bold', stroke: '#5a3a00', strokeThickness: 2 }
+          ).setOrigin(0.5).setDepth(20)
+          this.tweens.add({ targets: lvl, y: lvl.y - 40, alpha: 0, duration: 2000, onComplete: () => lvl.destroy() })
+        }
+        if (r.shouldEvolve && G.stage < 5) {
+          G.stage++; G.name = sp().stageNames[G.stage]
+          G.maxHp += 15; G.hp = G.maxHp; G.atk += 4; G.def += 3; G.spd += 2
           this.time.delayedCall(500, () => this.setLog('EVOLVED into ' + G.name + '!', 'Stats increased!'))
         }
       } else if (result === 'lose') {
@@ -1933,6 +2355,7 @@ export default function PhaserGame() {
           createBattleScene(Phaser),
           createInventoryScene(Phaser),
           createChestScene(Phaser),
+          createCodexScene(Phaser),
         ],
         scale: {
           mode:       Phaser.Scale.FIT,
