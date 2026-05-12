@@ -2467,7 +2467,11 @@ function createBattleScene(Phaser: any) {
     }
 
     dmg(atk: number, def: number, sp: boolean) {
-      return Math.max(1, Math.floor((sp ? atk * 1.5 : atk) - def * 0.4) * (0.85 + Math.random() * 0.3))
+      // Old code only floored the (atk - def) part, then multiplied by a
+      // 0.85-1.15 random factor — leaving a long decimal in the battle log
+      // ("Dealt 6.506464... dmg"). Floor the whole expression instead.
+      const base = (sp ? atk * 1.5 : atk) - def * 0.4
+      return Math.max(1, Math.floor(base * (0.85 + Math.random() * 0.3)))
     }
 
     act(action: string) {
