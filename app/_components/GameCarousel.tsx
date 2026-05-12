@@ -20,7 +20,7 @@ type Slide = {
 const slides: Slide[] = [
   {
     href: '/game',
-    tag: 'IN-HOUSE GAME',
+    tag: 'IN-HOUSE · KID_GHOST',
     title: 'RC: Respawn Creatures',
     blurb: 'Hatch, feed, train, fight. Pick from three species, evolve through six stages.',
     cta: 'Play RC',

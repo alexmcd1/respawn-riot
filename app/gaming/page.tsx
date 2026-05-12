@@ -89,13 +89,13 @@ export default function GamingPage() {
         <div className="mx-auto max-w-7xl space-y-6">
           <div className="rounded-3xl border border-cyan-400/30 bg-gradient-to-br from-cyan-500/15 via-fuchsia-500/10 to-transparent p-6 sm:p-10">
             <p className="text-xs uppercase tracking-[0.3em] text-lime-400">
-              Now Building
+              Now Building · Built In-House by kid_ghost
             </p>
             <h2 className="mt-3 text-3xl font-black uppercase sm:text-4xl">
               RC: Respawn Creatures
             </h2>
             <p className="mt-4 max-w-2xl text-white/75">
-              {"Our in-progress browser game. Pick a species — dino, water, or lion — hatch your egg, feed and train it, and watch it evolve through six stages. It's a Tamagotchi with combat in the back room."}
+              {"In-progress browser game by kid_ghost. Pick a species — dino, water, or lion — hatch your egg, feed and train it, and watch it evolve through six stages. It's a Tamagotchi with combat in the back room."}
             </p>
 
             <div className="mt-6 grid gap-3 sm:grid-cols-3">
