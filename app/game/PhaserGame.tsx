@@ -1514,7 +1514,7 @@ function createHomeScene(Phaser: any) {
         { x: 150, label: 'Punching Bag', prompt: '[SPACE] TRAIN',   action: () => this.train(),     draw: this.drawBag.bind(this) },
         { x: 240, label: 'Fidget Rings', prompt: '[SPACE] PLAY',    action: () => this.fidget(),    draw: this.drawFidget.bind(this) },
         { x: 335, label: 'Bed',          prompt: '[SPACE] SLEEP',   action: () => this.sleep(),     draw: this.drawBed.bind(this) },
-        { x: 435, label: 'Doorway',      prompt: '[SPACE] EXPLORE', action: () => this.scene.start('WorldScene'), draw: this.drawDoor.bind(this) },
+        { x: 435, label: 'Doorway',      prompt: '[SPACE] EXPLORE', action: () => { G.worldX = undefined; this.scene.start('WorldScene') }, draw: this.drawDoor.bind(this) },
       ]
       for (const z of this.zones) {
         z.gfx = this.add.graphics()
@@ -1871,64 +1871,123 @@ function createHomeScene(Phaser: any) {
 // ─── WorldScene — side-scrolling exploration with items + chests ─────────────
 function createWorldScene(Phaser: any) {
   return class WorldScene extends Phaser.Scene {
-    private wWidth = 1440
+    private wWidth = 1800
     private floorY = 252
     private pX = 100
     private cGfx: any
     private cursors: any; private wasd: any; private escK: any
     private items: any[] = []
     private chests: any[] = []
+    private signs: any[] = []
     private encZones: any[] = []
     private encCd = 0
     private hpT: any; private bagT: any
     private prompt: any; private msgT: any; private msgTime = 0
+    private signT: any; private signTime = 0
     private nearTarget: any = null
+    private nearSign: any = null
     private touchLeft = false; private touchRight = false
+    private inputReadyAt = 0
+    // Mini-map
+    private mmBg: any; private mmPlayer: any
+    // Biome boundaries (x positions where each region ends)
+    private biomes: any[] = []
 
     constructor() { super('WorldScene') }
 
     create(data: any) {
-      this.pX = 100
-      this.items = []; this.chests = []
+      // Restore player position from previous WorldScene visit so battles
+      // don't reset progress. Reset touch state explicitly so a stuck
+      // pointer from BattleScene doesn't auto-walk on mobile.
+      this.pX = (typeof G.worldX === 'number' && G.worldX >= 20 && G.worldX <= this.wWidth - 20) ? G.worldX : 100
+      this.touchLeft = false
+      this.touchRight = false
+      this.items = []; this.chests = []; this.signs = []
+      // Ignore pointer events that fire during the scene-start handoff.
+      this.inputReadyAt = this.time.now + 350
+
       this.cameras.main.setBounds(0, 0, this.wWidth, H)
 
-      // Sky
-      this.add.rectangle(this.wWidth/2, H/2, this.wWidth, H, 0x081428)
-      // Stars
-      for (let i = 0; i < 70; i++) {
+      // Persist x-position on every scene exit (battle, home, etc.)
+      this.events.on('shutdown', () => { G.worldX = this.pX })
+
+      // ─── Biomes — four regions with distinct color tinting ─────────────
+      // Each entry: { name, x1, x2, sky, mountain, tree, ground, accent }
+      this.biomes = [
+        { name: 'Mossroot Forest',  x1: 0,    x2: 500,  sky: 0x081428, mountain: 0x1a1a3a, tree: 0x0a2218, ground: 0x2a3a1a, accent: 0x88ddff },
+        { name: 'Twilight Grove',   x1: 500,  x2: 1000, sky: 0x180830, mountain: 0x2a1a4a, tree: 0x1a0a3a, ground: 0x2a1a3a, accent: 0xee88ff },
+        { name: 'Ancient Ruins',    x1: 1000, x2: 1500, sky: 0x2a1808, mountain: 0x4a2a1a, tree: 0x3a2010, ground: 0x4a3a1a, accent: 0xffaa44 },
+        { name: 'Boss Crucible',    x1: 1500, x2: this.wWidth, sky: 0x300a14, mountain: 0x4a0a14, tree: 0x2a0010, ground: 0x4a0820, accent: 0xff3366 },
+      ]
+
+      // Sky strips, one per biome
+      for (const b of this.biomes) {
+        this.add.rectangle((b.x1 + b.x2)/2, H/2, b.x2 - b.x1, H, b.sky)
+      }
+      // Stars (twinkling, sprinkled across the whole map)
+      for (let i = 0; i < 90; i++) {
         const s = this.add.circle(Phaser.Math.Between(0, this.wWidth), Phaser.Math.Between(20, 180), Phaser.Math.Between(1,2), 0xffffff, Math.random() * 0.6 + 0.1)
         this.tweens.add({ targets: s, alpha: 0.2, duration: Phaser.Math.Between(800, 2400), yoyo: true, repeat: -1 })
       }
-      // Distant mountains
-      const farG = this.add.graphics()
-      farG.fillStyle(0x1a1a3a, 0.5)
-      for (let i = 0; i < 12; i++) {
-        const cx = i * 140 + 60
-        farG.fillTriangle(cx - 60, 240, cx, 130 + (i%3)*15, cx + 60, 240)
+      // Distant mountains, color per biome
+      for (const b of this.biomes) {
+        const farG = this.add.graphics()
+        farG.fillStyle(b.mountain, 0.55)
+        const span = b.x2 - b.x1
+        const count = Math.max(2, Math.floor(span / 110))
+        for (let i = 0; i < count; i++) {
+          const cx = b.x1 + (i + 0.5) * (span / count)
+          farG.fillTriangle(cx - 60, 240, cx, 130 + (i%3)*15, cx + 60, 240)
+        }
       }
-      // Mid-ground trees
-      const midG = this.add.graphics()
-      midG.fillStyle(0x0a2218, 0.85)
-      for (let i = 0; i < 32; i++) {
-        const tx = 30 + i * 48 + (i%2)*20
-        const ty = 230 - (i%3)*5
-        midG.fillTriangle(tx - 14, ty, tx, ty - 36, tx + 14, ty)
-        midG.fillRect(tx - 2, ty - 4, 4, 6)
+      // Mid-ground trees / pillars (per biome silhouette)
+      for (const b of this.biomes) {
+        const midG = this.add.graphics()
+        midG.fillStyle(b.tree, 0.85)
+        const span = b.x2 - b.x1
+        const count = Math.max(3, Math.floor(span / 50))
+        for (let i = 0; i < count; i++) {
+          const tx = b.x1 + 24 + i * (span / count) + (i%2)*16
+          const ty = 230 - (i%3)*4
+          if (b.name === 'Ancient Ruins') {
+            // Broken pillars
+            midG.fillRect(tx - 4, ty - 36, 8, 36)
+            midG.fillStyle(b.tree, 0.6); midG.fillRect(tx - 6, ty - 32, 12, 4)
+            midG.fillStyle(b.tree, 0.85)
+          } else if (b.name === 'Boss Crucible') {
+            // Jagged spires
+            midG.fillTriangle(tx - 10, ty, tx - 4, ty - 40, tx + 4, ty)
+            midG.fillTriangle(tx + 4, ty, tx + 10, ty - 32, tx + 16, ty)
+          } else {
+            // Pine / dark trees
+            midG.fillTriangle(tx - 14, ty, tx, ty - 36, tx + 14, ty)
+            midG.fillRect(tx - 2, ty - 4, 4, 6)
+          }
+        }
       }
-      // Floor
-      this.add.rectangle(this.wWidth/2, this.floorY + 30, this.wWidth, 80, 0x2a3a1a)
-      this.add.rectangle(this.wWidth/2, this.floorY, this.wWidth, 4, 0x4a6a2a)
-      // Foliage
-      const fg = this.add.graphics()
-      fg.fillStyle(0x1a4422, 0.85)
-      for (let i = 0; i < 16; i++) {
-        const bx = 60 + i * 90 + (i%2)*30
-        fg.fillCircle(bx, this.floorY - 4, 6); fg.fillCircle(bx + 6, this.floorY - 6, 4); fg.fillCircle(bx - 4, this.floorY - 6, 4)
+      // Floor strips per biome
+      for (const b of this.biomes) {
+        this.add.rectangle((b.x1 + b.x2)/2, this.floorY + 30, b.x2 - b.x1, 80, b.ground)
+        this.add.rectangle((b.x1 + b.x2)/2, this.floorY, b.x2 - b.x1, 4, Phaser.Display.Color.IntegerToColor(b.ground).brighten(20).color)
       }
-      for (let i = 0; i < 9; i++) {
-        const cx = 80 + i * 160
-        fg.fillStyle(0x88ddff, 0.45)
-        fg.fillTriangle(cx - 4, this.floorY + 18, cx, this.floorY + 6, cx + 4, this.floorY + 18)
+
+      // Foliage / ambient ground decorations per biome
+      for (const b of this.biomes) {
+        const fg = this.add.graphics()
+        const span = b.x2 - b.x1
+        if (b.name === 'Mossroot Forest' || b.name === 'Twilight Grove') {
+          fg.fillStyle(b.tree, 0.75)
+          for (let i = 0; i < Math.floor(span / 90); i++) {
+            const bx = b.x1 + 40 + i * 90 + (i%2)*20
+            fg.fillCircle(bx, this.floorY - 4, 6); fg.fillCircle(bx + 6, this.floorY - 6, 4); fg.fillCircle(bx - 4, this.floorY - 6, 4)
+          }
+        }
+        // Sparkly accent crystals
+        for (let i = 0; i < Math.floor(span / 160); i++) {
+          const cx = b.x1 + 40 + i * 160
+          fg.fillStyle(b.accent, 0.5)
+          fg.fillTriangle(cx - 4, this.floorY + 20, cx, this.floorY + 6, cx + 4, this.floorY + 20)
+        }
       }
 
       // Doorway home (left)
@@ -1938,55 +1997,89 @@ function createWorldScene(Phaser: any) {
       doorG.fillStyle(0xffdd44); doorG.fillRect(38, this.floorY - 28, 2, 4)
       this.add.text(34, this.floorY - 60, 'HOME', { fontSize: '8px', color: '#aaccee' }).setOrigin(0.5)
 
+      // ─── Signposts — flavor text + tutorialization ─────────────────────
+      const signSpots = [
+        { x: 110,  text: 'Mossroot Forest\nWalk right to explore.\nWatch the green strips —\nwild creatures lurk.' },
+        { x: 540,  text: 'Twilight Grove\nStronger foes here.\nKeep food + HP up.' },
+        { x: 1040, text: 'Ancient Ruins\nGreat rewards.\nGreater danger.' },
+        { x: 1480, text: 'BOSS CRUCIBLE\nReady your strongest form.\nNo retreat past this point.' },
+      ]
+      for (const s of signSpots) {
+        const g = this.add.graphics()
+        // Wooden post
+        g.fillStyle(0x4a2810); g.fillRect(s.x - 1, this.floorY - 24, 3, 24)
+        g.fillStyle(0x8a5a30); g.fillRoundedRect(s.x - 12, this.floorY - 42, 24, 16, 2)
+        g.fillStyle(0x6a3a18); g.fillTriangle(s.x - 12, this.floorY - 26, s.x - 12, this.floorY - 30, s.x - 8, this.floorY - 26)
+        g.fillStyle(0xeed6a8); g.fillRect(s.x - 9, this.floorY - 39, 18, 10)
+        // Faint text icon (representing "info")
+        g.fillStyle(0x4a2810); g.fillRect(s.x - 1, this.floorY - 36, 2, 4)
+        this.signs.push({ x: s.x, text: s.text, gfx: g })
+      }
+
       // Items along the path
       const itemSpots = [
         { x: 230, id: 'berry' }, { x: 400, id: 'apple' }, { x: 540, id: 'herb' },
         { x: 720, id: 'shard' }, { x: 880, id: 'berry' }, { x: 1020, id: 'apple' },
-        { x: 1200, id: 'shard' }, { x: 1280, id: 'coin' },
+        { x: 1200, id: 'shard' }, { x: 1320, id: 'coin' }, { x: 1450, id: 'shard' },
       ]
       for (const it of itemSpots) {
         const g = this.add.graphics()
         this.drawItem(g, it.x, this.floorY - 6, ITEMS[it.id].color)
+        // Bobbing animation
         this.tweens.add({ targets: g, y: -3, duration: 800, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' })
-        this.items.push({ x: it.x, id: it.id, gfx: g, taken: false })
+        // Sparkle particle (occasional)
+        const sparkle = this.add.circle(it.x + Phaser.Math.Between(-6, 6), this.floorY - 8, 1, 0xffffff, 0.85)
+        this.tweens.add({ targets: sparkle, alpha: 0, y: sparkle.y - 8, duration: 1000, repeat: -1, repeatDelay: Phaser.Math.Between(800, 2400) })
+        this.items.push({ x: it.x, id: it.id, gfx: g, sparkle, taken: false })
       }
 
-      // Chests
+      // Chests with surrounding glow that pulses when you're nearby
       const chestSpots = [
-        { x: 460, id: 'world_chest_1', seed: [{ id: 'shard', qty: 3 }, { id: 'apple', qty: 2 }] },
-        { x: 1100, id: 'world_chest_2', seed: [{ id: 'herb', qty: 2 }, { id: 'coin', qty: 5 }] },
+        { x: 470,  id: 'world_chest_1', seed: [{ id: 'shard', qty: 3 }, { id: 'apple', qty: 2 }] },
+        { x: 1140, id: 'world_chest_2', seed: [{ id: 'herb', qty: 2 }, { id: 'coin', qty: 5 }, { id: 'berry', qty: 2 }] },
       ]
       for (const cs of chestSpots) {
         if (!G.chests[cs.id]) G.chests[cs.id] = { items: cs.seed.map((x: any) => ({ ...x })) }
-        const g = this.add.graphics()
+        const glow = this.add.graphics().setDepth(1)
+        const g = this.add.graphics().setDepth(2)
         this.drawChest(g, cs.x, this.floorY - 6)
-        this.chests.push({ x: cs.x, id: cs.id, gfx: g })
+        this.chests.push({ x: cs.x, id: cs.id, gfx: g, glow, glowT: 0 })
       }
 
-      // Encounter zones (visual indicators)
+      // Encounter zones — gentler chances + clearer warning posts
       this.encZones = [
-        { x1: 280, x2: 360, ch: 22 },
-        { x1: 600, x2: 720, ch: 32 },
-        { x1: 940, x2: 1040, ch: 28 },
+        { x1: 280, x2: 360,  ch: 14, label: 'WILD' },
+        { x1: 620, x2: 740,  ch: 22, label: 'WILD' },
+        { x1: 1080, x2: 1200, ch: 26, label: 'WILD' },
       ]
       const encG = this.add.graphics()
       for (const z of this.encZones) {
-        encG.fillStyle(0x44ff66, 0.18); encG.fillRect(z.x1, this.floorY - 2, z.x2 - z.x1, 6)
-        encG.fillStyle(0x66ff88, 0.6); for (let i = 0; i < 6; i++) {
+        // Warning ground stripe
+        encG.fillStyle(0x44ff66, 0.20); encG.fillRect(z.x1, this.floorY - 2, z.x2 - z.x1, 6)
+        // Warning sign at the start of the zone
+        const sx = z.x1 - 8
+        encG.fillStyle(0xffdd44); encG.fillTriangle(sx - 8, this.floorY - 18, sx + 8, this.floorY - 18, sx, this.floorY - 32)
+        encG.fillStyle(0x000000); encG.fillRect(sx - 1, this.floorY - 28, 2, 5); encG.fillRect(sx - 1, this.floorY - 22, 2, 2)
+        // Floating sparkles in the zone
+        encG.fillStyle(0x66ff88, 0.6)
+        for (let i = 0; i < 6; i++) {
           const tx = z.x1 + Phaser.Math.Between(0, z.x2 - z.x1), ty = this.floorY - 18 - Phaser.Math.Between(0, 12)
           encG.fillCircle(tx, ty, 1)
         }
       }
 
-      // Boss zone (right end)
+      // Boss zone (far right)
       const bossG = this.add.graphics()
-      bossG.fillStyle(0xaa0033, 0.4); bossG.fillRect(1340, this.floorY - 14, 80, 18)
+      bossG.fillStyle(0xaa0033, 0.4); bossG.fillRect(1700, this.floorY - 14, 80, 18)
       bossG.lineStyle(1, 0xff3366, 0.85)
-      bossG.beginPath(); bossG.moveTo(1346, this.floorY - 5); bossG.lineTo(1356, this.floorY); bossG.lineTo(1366, this.floorY - 5); bossG.strokePath()
-      this.add.text(1380, this.floorY - 36, 'BOSS', { fontSize: '10px', color: '#ff5577', fontStyle: 'bold' }).setOrigin(0.5)
+      bossG.beginPath(); bossG.moveTo(1706, this.floorY - 5); bossG.lineTo(1716, this.floorY); bossG.lineTo(1726, this.floorY - 5); bossG.strokePath()
+      // Pulsing skull-like marker
+      const bossSkull = this.add.text(1740, this.floorY - 50, '☠', { fontSize: '20px', color: '#ff5577' }).setOrigin(0.5)
+      this.tweens.add({ targets: bossSkull, scale: 1.2, duration: 700, yoyo: true, repeat: -1 })
+      this.add.text(1740, this.floorY - 30, 'BOSS', { fontSize: '10px', color: '#ff5577', fontStyle: 'bold', stroke: '#000', strokeThickness: 2 }).setOrigin(0.5)
 
       // Player
-      this.cGfx = this.add.graphics()
+      this.cGfx = this.add.graphics().setDepth(3)
       this.drawPlayer()
 
       // HUD (fixed to camera) — taller two-row layout to match HOME
@@ -2001,7 +2094,7 @@ function createWorldScene(Phaser: any) {
       // Right-side action buttons (centered vertically in the 40-px bar)
       const homeBg = this.add.rectangle(W - 158, 20, 56, 28, 0x1a3344, 0.95).setScrollFactor(0).setInteractive({ useHandCursor: true }).setStrokeStyle(1, 0x55aaff)
       this.add.text(W - 158, 20, '← HOME', { fontSize: '9px', color: '#aaccee', fontStyle: 'bold' }).setOrigin(0.5).setScrollFactor(0)
-      homeBg.on('pointerdown', () => this.scene.start('HomeScene'))
+      homeBg.on('pointerdown', () => { if (this.time.now < this.inputReadyAt) return; G.worldX = this.pX; this.scene.start('HomeScene') })
 
       const bagBtn = this.add.rectangle(W - 92, 20, 64, 28, 0x1a2a44, 0.94).setScrollFactor(0).setInteractive({ useHandCursor: true }).setStrokeStyle(1, 0x556699)
       this.bagT = this.add.text(W - 92, 20, '', { fontSize: '9px', color: '#ddccaa', fontStyle: 'bold' }).setOrigin(0.5).setScrollFactor(0)
@@ -2014,27 +2107,51 @@ function createWorldScene(Phaser: any) {
       // Bottom strip + touch controls
       this.add.rectangle(W/2, H - 16, W, 32, 0x080814, 0.92).setScrollFactor(0).setDepth(8)
 
+      // Touch buttons: guard against pointerdown events that fire during the
+      // scene-start handoff (browser still thinks finger is over the button).
       const lBtn = this.add.rectangle(28, H - 16, 40, 26, 0x1a2a44, 0.9).setScrollFactor(0).setStrokeStyle(1, 0x556699).setInteractive({ useHandCursor: true }).setDepth(9)
       this.add.text(28, H - 16, '◀', { fontSize: '14px', color: '#aaccee', fontStyle: 'bold' }).setOrigin(0.5).setScrollFactor(0).setDepth(10)
-      const startL = () => this.touchLeft = true
+      const startL = () => { if (this.time.now < this.inputReadyAt) return; this.touchLeft = true }
       const stopL  = () => this.touchLeft = false
       lBtn.on('pointerdown', startL); lBtn.on('pointerup', stopL); lBtn.on('pointerout', stopL); lBtn.on('pointerupoutside', stopL)
 
       const rBtn = this.add.rectangle(72, H - 16, 40, 26, 0x1a2a44, 0.9).setScrollFactor(0).setStrokeStyle(1, 0x556699).setInteractive({ useHandCursor: true }).setDepth(9)
       this.add.text(72, H - 16, '▶', { fontSize: '14px', color: '#aaccee', fontStyle: 'bold' }).setOrigin(0.5).setScrollFactor(0).setDepth(10)
-      const startR = () => this.touchRight = true
+      const startR = () => { if (this.time.now < this.inputReadyAt) return; this.touchRight = true }
       const stopR  = () => this.touchRight = false
       rBtn.on('pointerdown', startR); rBtn.on('pointerup', stopR); rBtn.on('pointerout', stopR); rBtn.on('pointerupoutside', stopR)
 
       const aBtn = this.add.rectangle(W - 40, H - 16, 70, 26, 0x2a4a1a, 0.92).setScrollFactor(0).setStrokeStyle(1, 0x66aa44).setInteractive({ useHandCursor: true }).setDepth(9)
       this.add.text(W - 40, H - 16, 'ACTION', { fontSize: '9px', color: '#ccffaa', fontStyle: 'bold', letterSpacing: 1 }).setOrigin(0.5).setScrollFactor(0).setDepth(10)
-      aBtn.on('pointerdown', () => this.tryActivate())
+      aBtn.on('pointerdown', () => { if (this.time.now < this.inputReadyAt) return; this.tryActivate() })
 
-      this.add.text(W/2, H - 16, 'walk to a chest, hit ACTION', { fontSize: '7px', color: '#556677' }).setOrigin(0.5).setScrollFactor(0).setDepth(10)
+      this.add.text(W/2, H - 16, '◀ ▶ to walk · ACTION near a target', { fontSize: '7px', color: '#556677' }).setOrigin(0.5).setScrollFactor(0).setDepth(10)
 
-      // Prompt + msg
+      // ─── Mini-map progress bar ─────────────────────────────────────────
+      // Lives just below the HUD top bar; shows player + chests + boss as
+      // markers along a track that represents the whole 1800-wide world.
+      const mmX = 88, mmY = 50, mmW = W - 176, mmH = 6
+      this.add.rectangle(mmX, mmY, mmW, mmH, 0x0a1528, 0.95).setOrigin(0, 0.5).setScrollFactor(0).setStrokeStyle(1, 0x223355).setDepth(9)
+      // Encounter zone overlays on the mini-map
+      const mmG = this.add.graphics().setScrollFactor(0).setDepth(10)
+      const mapX = (worldX: number) => mmX + (worldX / this.wWidth) * mmW
+      mmG.fillStyle(0x44ff66, 0.35)
+      for (const z of this.encZones) mmG.fillRect(mapX(z.x1), mmY - 3, (z.x2 - z.x1) / this.wWidth * mmW, 6)
+      // Chest markers
+      mmG.fillStyle(0xffdd44, 0.95)
+      for (const c of this.chests) mmG.fillCircle(mapX(c.x), mmY, 2.5)
+      // Boss marker
+      mmG.fillStyle(0xff3366, 0.95); mmG.fillCircle(mapX(1740), mmY, 3)
+      // Home marker (left)
+      mmG.fillStyle(0xaaccee, 0.85); mmG.fillRect(mapX(34) - 1, mmY - 3, 2, 6)
+      // Player marker — mutable
+      this.mmPlayer = this.add.triangle(mapX(this.pX), mmY - 7, 0, -3, -3, 3, 3, 3, 0xffffff).setScrollFactor(0).setDepth(11)
+      ;(this as any)._mmX = mmX; ;(this as any)._mmW = mmW
+
+      // Prompt + msg + sign panel
       this.prompt = this.add.text(0, 0, '', { fontSize: '9px', color: '#ffdd66', fontStyle: 'bold' }).setOrigin(0.5).setAlpha(0)
-      this.msgT = this.add.text(W/2, 50, '', { fontSize: '9px', color: '#ffeeaa', backgroundColor: '#000814', padding: { x: 6, y: 3 } as any }).setOrigin(0.5).setAlpha(0).setScrollFactor(0)
+      this.msgT  = this.add.text(W/2, 70, '', { fontSize: '9px', color: '#ffeeaa', backgroundColor: '#000814', padding: { x: 6, y: 3 } as any }).setOrigin(0.5).setAlpha(0).setScrollFactor(0)
+      this.signT = this.add.text(W/2, H/2 - 60, '', { fontSize: '9px', color: '#ffeebb', backgroundColor: '#1a0e08', padding: { x: 8, y: 5 } as any, align: 'center', stroke: '#5a3a10', strokeThickness: 1 }).setOrigin(0.5).setAlpha(0).setScrollFactor(0).setDepth(12)
 
       this.cursors = this.input.keyboard.createCursorKeys()
       this.wasd = this.input.keyboard.addKeys('W,A,S,D')
@@ -2045,12 +2162,18 @@ function createWorldScene(Phaser: any) {
 
       this.updHUD()
 
+      // After a battle, give a generous safe window so the player can clear
+      // the encounter zone instead of immediately re-triggering it.
       if (data?.result) {
+        this.encCd = 5000
         const color = data.result === 'win' ? '#44ff88' : '#ff4444'
         const label = data.result === 'win' ? 'Victory!' : 'Defeated!'
         const rt = this.add.text(W/2, H/2, label, { fontSize: '15px', color, fontStyle: 'bold' }).setOrigin(0.5).setDepth(8).setScrollFactor(0)
         this.tweens.add({ targets: rt, y: rt.y - 40, alpha: 0, duration: 2000, onComplete: () => rt.destroy() })
       }
+
+      // Initial camera position so the player isn't stuck off-screen
+      this.cameras.main.scrollX = Phaser.Math.Clamp(this.pX - W/2, 0, this.wWidth - W)
     }
 
     drawItem(g: any, x: number, y: number, color: number) {
@@ -2075,6 +2198,9 @@ function createWorldScene(Phaser: any) {
     tryActivate() {
       if (!this.nearTarget) return
       const t = this.nearTarget
+      // Always save position before scene transitions so a battle/chest/home
+      // hop preserves the player's progress through the overworld.
+      G.worldX = this.pX
       if (t.kind === 'home')       this.scene.start('HomeScene')
       else if (t.kind === 'chest') { this.scene.launch('ChestScene', { chestId: t.id, from: 'WorldScene' }); this.scene.pause() }
       else if (t.kind === 'boss')  { this.cameras.main.flash(280, 255, 100, 100); this.time.delayedCall(280, () => this.scene.start('BattleScene', { isBoss: true, fromWorld: true })) }
@@ -2084,6 +2210,12 @@ function createWorldScene(Phaser: any) {
 
     msg(txt: string) { this.msgT.setText(txt).setAlpha(1); this.msgTime = 1400 }
 
+    showSign(text: string) {
+      if (this.signT.text === text && this.signTime > 0) return  // already showing same
+      this.signT.setText(text).setAlpha(1)
+      this.signTime = 2200
+    }
+
     updHUD() {
       this.hpT.setText(G.name + '   Lv.' + G.level)
       ;(this as any)._subT.setText('HP ' + G.hp + '/' + G.maxHp + '   ·   Day ' + G.day)
@@ -2091,7 +2223,7 @@ function createWorldScene(Phaser: any) {
     }
 
     update(time: number, dt: number) {
-      if (Phaser.Input.Keyboard.JustDown(this.escK)) { this.scene.start('HomeScene'); return }
+      if (Phaser.Input.Keyboard.JustDown(this.escK)) { G.worldX = this.pX; this.scene.start('HomeScene'); return }
 
       let dx = 0
       if (this.cursors.left.isDown  || this.wasd.A.isDown || this.touchLeft)  dx -= 1
@@ -2102,24 +2234,55 @@ function createWorldScene(Phaser: any) {
         this.cameras.main.scrollX = Phaser.Math.Clamp(this.pX - W/2, 0, this.wWidth - W)
       }
 
+      // Mini-map: move the player triangle to the live world position
+      if (this.mmPlayer) {
+        const mmX = (this as any)._mmX, mmW = (this as any)._mmW
+        this.mmPlayer.setX(mmX + (this.pX / this.wWidth) * mmW)
+      }
+
       // Item pickups
       for (const it of this.items) {
         if (!it.taken && Math.abs(it.x - this.pX) < 14) {
           if (invAdd(it.id, 1)) {
-            it.taken = true; it.gfx.destroy()
+            it.taken = true; it.gfx.destroy(); it.sparkle?.destroy()
             this.msg('Picked up ' + ITEMS[it.id].name)
             this.updHUD()
           } else this.msg('Bag is full!')
         }
       }
 
-      // Encounter check
+      // Chest glow when nearby
+      for (const c of this.chests) {
+        const dist = Math.abs(c.x - this.pX)
+        const want = dist < 60
+        c.glowT = (c.glowT || 0) + dt * 0.005
+        c.glow.clear()
+        if (want) {
+          const a = 0.18 + Math.sin(c.glowT) * 0.12
+          c.glow.fillStyle(0xffdd44, Math.max(0, a))
+          c.glow.fillCircle(c.x, this.floorY - 6, 22)
+          c.glow.fillStyle(0xffffff, Math.max(0, a * 0.6))
+          c.glow.fillCircle(c.x, this.floorY - 6, 12)
+        }
+      }
+
+      // Sign proximity — show flavor/tutorial text
+      const ns = this.signs.find((s: any) => Math.abs(s.x - this.pX) < 30)
+      if (ns && ns !== this.nearSign) {
+        this.nearSign = ns
+        this.showSign(ns.text)
+      } else if (!ns && this.nearSign) {
+        this.nearSign = null
+      }
+
+      // Encounter check — gentler probability + 1.5s post-trigger cooldown
       this.encCd -= dt
       if (this.encCd <= 0 && dx !== 0) {
         for (const z of this.encZones) {
           if (this.pX >= z.x1 && this.pX <= z.x2) {
-            if (Phaser.Math.Between(1, 1000) <= z.ch * 4) {
+            if (Phaser.Math.Between(1, 1000) <= z.ch * 2) {
               this.encCd = 1500
+              G.worldX = this.pX  // PRESERVE position before battle!
               this.cameras.main.flash(280, 255, 255, 255)
               this.time.delayedCall(280, () => this.scene.start('BattleScene', { isBoss: false, fromWorld: true }))
               return
@@ -2132,7 +2295,7 @@ function createWorldScene(Phaser: any) {
       let near: any = null
       if (this.pX < 56) near = { kind: 'home', x: 34, y: this.floorY - 70 }
       for (const c of this.chests) if (Math.abs(c.x - this.pX) < 22) near = { kind: 'chest', id: c.id, x: c.x, y: this.floorY - 32 }
-      if (this.pX > 1340 && this.pX < 1420) near = { kind: 'boss', x: 1380, y: this.floorY - 70 }
+      if (this.pX > 1700 && this.pX < 1780) near = { kind: 'boss', x: 1740, y: this.floorY - 70 }
 
       if (near !== this.nearTarget) {
         this.nearTarget = near
@@ -2145,6 +2308,10 @@ function createWorldScene(Phaser: any) {
       if (this.msgTime > 0) {
         this.msgTime -= dt
         if (this.msgTime <= 0) this.msgT.setAlpha(0)
+      }
+      if (this.signTime > 0) {
+        this.signTime -= dt
+        if (this.signTime <= 0) this.signT.setAlpha(0)
       }
     }
   }
