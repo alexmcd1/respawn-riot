@@ -69,11 +69,11 @@ export default function NavBar() {
               />
             </span>
             <span
-              className="font-display text-2xl tracking-[0.22em] text-white transition group-hover:text-fuchsia-300 sm:text-[26px]"
+              className="font-display text-2xl tracking-[0.3em] text-white transition group-hover:text-fuchsia-300 sm:text-[26px]"
             >
-              RESPAWN
-              <span className="mx-1.5 text-fuchsia-400">/</span>
-              RIOT
+              <span className="glitch" data-text="RESPAWN">RESPAWN</span>
+              <span className="mx-2 text-fuchsia-400">/</span>
+              <span className="glitch" data-text="RIOT">RIOT</span>
             </span>
           </Link>
 
