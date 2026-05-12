@@ -2378,7 +2378,8 @@ function createBattleScene(Phaser: any) {
       this.add.rectangle(W / 2, 18, W, 36, 0x060810, 0.95)
       this.add.text(W / 2, 10, this.isBoss ? '  BOSS BATTLE  ' : '  WILD ENCOUNTER', { fontSize: '11px', color: this.isBoss ? '#ff3377' : '#77ff88', letterSpacing: 3 }).setOrigin(0.5)
 
-      this.eX = W * 0.72; this.eY = H * 0.38
+      // Enemy sits in the upper-middle area, well clear of the right-side action panel.
+      this.eX = W * 0.55; this.eY = H * 0.38
       this.eGfx = this.add.graphics()
       SPECIES[this.enemy.species].draw(this.eGfx, this.enemy.stage, this.eX, this.eY)
       this.eGfx.setScale(-1, 1); this.eGfx.x = this.eX * 2
@@ -2439,7 +2440,8 @@ function createBattleScene(Phaser: any) {
         atk: (3 + s * 3) * (this.isBoss ? 1.6 : 1),
         def: 2 + s * 2,
         spd: 3 + s,
-        level: G.level + (this.isBoss ? 2 : Phaser.Math.Between(-1, 1)),
+        // Clamp to >=1 so a low-level player doesn't see "Lv.0" enemies.
+        level: Math.max(1, G.level + (this.isBoss ? 2 : Phaser.Math.Between(-1, 1))),
       }
     }
 
