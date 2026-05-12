@@ -224,7 +224,7 @@ export default function GamingPage() {
                 </h2>
               </div>
               <span className="rounded-md border border-amber-400/40 bg-black px-3 py-1 font-display text-xs tracking-[0.25em] text-amber-300">
-                3 DROPS
+                4 DROPS
               </span>
             </div>
             <p className="mt-4 max-w-2xl text-white/75">
@@ -259,6 +259,15 @@ export default function GamingPage() {
                   cta: "Build a rig",
                   accent: "border-cyan-400/50 hover:border-cyan-300",
                   chip: "text-cyan-300",
+                },
+                {
+                  href: "/stars-brawl",
+                  emoji: "⭐",
+                  title: "Stars Brawl",
+                  blurb: "Top-down brawler with six characters, supers, and a walled arena. 1v1 the AI.",
+                  cta: "Pick a brawler",
+                  accent: "border-yellow-400/50 hover:border-yellow-300",
+                  chip: "text-yellow-300",
                 },
               ].map((d) => (
                 <Link

@@ -25,7 +25,7 @@ const links: NavLink[] = [
 ]
 
 const tickerItems = [
-  '★ NEW DROPS — JJK FIGHT + PC BUILDER LIVE',
+  '★ NEW DROPS — STARS BRAWL · PC BUILDER · JJK FIGHT',
   '✶ SPRING 2026 ANIME RANKED',
   '☠ POP PUNK HEADLINES',
   '◢ RC — RESPAWN CREATURES DEVLOG',

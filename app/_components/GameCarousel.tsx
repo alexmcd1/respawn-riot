@@ -70,6 +70,19 @@ const slides: Slide[] = [
     glow: 'rgba(34,211,238,0.40)',
     bgGradient: 'from-cyan-500/20 via-blue-500/10 to-transparent',
   },
+  {
+    href: '/stars-brawl',
+    tag: 'CREATOR · ZOKU21 · NEW',
+    title: 'Stars Brawl',
+    blurb: 'Top-down brawler. Six characters, supers, walled arena. 1v1 the AI.',
+    cta: 'Pick a brawler',
+    emoji: '⭐',
+    accentBorder: 'border-yellow-400/60',
+    accentText: 'text-yellow-300',
+    accentBg: 'bg-yellow-400 hover:bg-yellow-300',
+    glow: 'rgba(250,204,21,0.40)',
+    bgGradient: 'from-yellow-500/20 via-orange-500/10 to-transparent',
+  },
 ]
 
 const AUTO_MS = 5500
