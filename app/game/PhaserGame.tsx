@@ -272,10 +272,10 @@ const theme = new Theme()
 
 // ─── Items + inventory ────────────────────────────────────────────────────────
 const ITEMS: any = {
-  berry: { name: 'Berry',   color: 0xff5577, desc: '+5 HP',      effect: () => { if (G.hp < G.maxHp) { G.hp = Math.min(G.maxHp, G.hp + 5); return true } return false } },
-  apple: { name: 'Apple',   color: 0xff8844, desc: '+12 Hunger', effect: () => { if (G.hunger < 100) { G.hunger = Math.min(100, G.hunger + 12); return true } return false } },
-  shard: { name: 'Crystal', color: 0x88ddff, desc: '+5 XP',      effect: () => { gainXp(5); return true } },
-  herb:  { name: 'Herb',    color: 0x88dd66, desc: '+8 Happy',   effect: () => { if (G.happy < 100) { G.happy = Math.min(100, G.happy + 8); return true } return false } },
+  berry: { name: 'Berry',   color: 0xff5577, desc: '+5 HP',    effect: () => { if (G.hp < G.maxHp) { G.hp = Math.min(G.maxHp, G.hp + 5); return true } return false } },
+  apple: { name: 'Apple',   color: 0xff8844, desc: '+12 FOOD', effect: () => { if (G.hunger < 100) { G.hunger = Math.min(100, G.hunger + 12); return true } return false } },
+  shard: { name: 'Crystal', color: 0x88ddff, desc: '+5 XP',    effect: () => { gainXp(5); return true } },
+  herb:  { name: 'Herb',    color: 0x88dd66, desc: '+8 MOOD',  effect: () => { if (G.happy < 100) { G.happy = Math.min(100, G.happy + 8); return true } return false } },
   coin:  { name: 'Coin',    color: 0xffdd44, desc: 'Currency',   effect: () => false },
 }
 
@@ -1506,12 +1506,15 @@ function createHomeScene(Phaser: any) {
       }
 
       // Define and draw zones
+      // Zone x positions are clamped between 40 and 440 so the player (whose
+      // own cX is clamped to 20..460) can always be within 30 units of any
+      // zone. Edge zones (Fruit Tree, Doorway) used to be unreachable.
       this.zones = [
-        { x: 60,  label: 'Fruit Tree',   prompt: '[SPACE] EAT',     action: () => this.pickFruit(),  draw: this.drawFruitTree.bind(this) },
-        { x: 155, label: 'Punching Bag', prompt: '[SPACE] TRAIN',   action: () => this.train(),     draw: this.drawBag.bind(this) },
+        { x: 50,  label: 'Fruit Tree',   prompt: '[SPACE] EAT',     action: () => this.pickFruit(),  draw: this.drawFruitTree.bind(this) },
+        { x: 150, label: 'Punching Bag', prompt: '[SPACE] TRAIN',   action: () => this.train(),     draw: this.drawBag.bind(this) },
         { x: 240, label: 'Fidget Rings', prompt: '[SPACE] PLAY',    action: () => this.fidget(),    draw: this.drawFidget.bind(this) },
         { x: 335, label: 'Bed',          prompt: '[SPACE] SLEEP',   action: () => this.sleep(),     draw: this.drawBed.bind(this) },
-        { x: 430, label: 'Doorway',      prompt: '[SPACE] EXPLORE', action: () => this.scene.start('WorldScene'), draw: this.drawDoor.bind(this) },
+        { x: 435, label: 'Doorway',      prompt: '[SPACE] EXPLORE', action: () => this.scene.start('WorldScene'), draw: this.drawDoor.bind(this) },
       ]
       for (const z of this.zones) {
         z.gfx = this.add.graphics()
@@ -1520,30 +1523,31 @@ function createHomeScene(Phaser: any) {
       }
 
       // Top HUD — taller two-row layout so labels and values don't collide
-      this.add.rectangle(W/2, 18, W, 36, 0x060810, 0.96)
-      this.add.rectangle(W/2, 36, W, 1, 0x224488)
+      this.add.rectangle(W/2, 20, W, 40, 0x060810, 0.96)
+      this.add.rectangle(W/2, 40, W, 1, 0x224488)
 
       // Identity column (left)
-      this.nameT = this.add.text(6, 5, '', { fontSize: '10px', color: '#eeeeff', fontStyle: 'bold', letterSpacing: 1 })
-      this.dayT  = this.add.text(6, 21, '', { fontSize: '8px', color: '#7799cc' })
+      this.nameT = this.add.text(6, 7, '', { fontSize: '10px', color: '#eeeeff', fontStyle: 'bold', letterSpacing: 1 })
+      this.dayT  = this.add.text(6, 23, '', { fontSize: '8px', color: '#7799cc' })
 
-      // Stat bars in a 2x2 grid (label above bar)
-      this.mkBar(110, 9,  'HP',   0x44ff88)
-      this.mkBar(110, 24, 'FOOD', 0xff9944)
-      this.mkBar(206, 9,  'XP',   0x44aaff)
-      this.mkBar(206, 24, 'MOOD', 0xff44bb)
+      // Stat bars in a 2x2 grid (label above bar). Bumped y values down so the
+      // labels (rendered at y - 6 inside mkBar) stay inside the HUD bar.
+      this.mkBar(110, 13, 'HP',   0x44ff88)
+      this.mkBar(110, 28, 'FOOD', 0xff9944)
+      this.mkBar(206, 13, 'XP',   0x44aaff)
+      this.mkBar(206, 28, 'MOOD', 0xff44bb)
 
-      // Right-side action buttons (each centered vertically in the 36px bar)
-      const codexBtn = this.add.rectangle(W - 158, 18, 56, 26, 0x2a1a44, 0.94).setInteractive({ useHandCursor: true }).setStrokeStyle(1, 0x886699)
-      this.add.text(W - 158, 18, 'CODEX', { fontSize: '9px', color: '#ddccff', fontStyle: 'bold', letterSpacing: 1 }).setOrigin(0.5)
+      // Right-side action buttons (each centered vertically in the 40px bar)
+      const codexBtn = this.add.rectangle(W - 158, 20, 56, 28, 0x2a1a44, 0.94).setInteractive({ useHandCursor: true }).setStrokeStyle(1, 0x886699)
+      this.add.text(W - 158, 20, 'CODEX', { fontSize: '9px', color: '#ddccff', fontStyle: 'bold', letterSpacing: 1 }).setOrigin(0.5)
       codexBtn.on('pointerdown', () => this.openCodex())
 
-      const bagBtn = this.add.rectangle(W - 92, 18, 64, 26, 0x1a2a44, 0.94).setInteractive({ useHandCursor: true }).setStrokeStyle(1, 0x556699)
-      this.bagT = this.add.text(W - 92, 18, '', { fontSize: '9px', color: '#ddccaa', fontStyle: 'bold' }).setOrigin(0.5)
+      const bagBtn = this.add.rectangle(W - 92, 20, 64, 28, 0x1a2a44, 0.94).setInteractive({ useHandCursor: true }).setStrokeStyle(1, 0x556699)
+      this.bagT = this.add.text(W - 92, 20, '', { fontSize: '9px', color: '#ddccaa', fontStyle: 'bold' }).setOrigin(0.5)
       bagBtn.on('pointerdown', () => this.openBag())
 
-      const mb = this.add.rectangle(W - 28, 18, 50, 26, 0x1a1a2a, 0.94).setInteractive({ useHandCursor: true }).setStrokeStyle(1, 0x556699)
-      this.musicT = this.add.text(W - 28, 18, theme.isMuted ? '♪ OFF' : '♪ ON', { fontSize: '9px', color: theme.isMuted ? '#778899' : '#aaccee', fontStyle: 'bold' }).setOrigin(0.5)
+      const mb = this.add.rectangle(W - 28, 20, 50, 28, 0x1a1a2a, 0.94).setInteractive({ useHandCursor: true }).setStrokeStyle(1, 0x556699)
+      this.musicT = this.add.text(W - 28, 20, theme.isMuted ? '♪ OFF' : '♪ ON', { fontSize: '9px', color: theme.isMuted ? '#778899' : '#aaccee', fontStyle: 'bold' }).setOrigin(0.5)
       mb.on('pointerdown', () => {
         theme.toggleMute()
         this.musicT.setText(theme.isMuted ? '♪ OFF' : '♪ ON').setColor(theme.isMuted ? '#778899' : '#aaccee')
@@ -1728,7 +1732,7 @@ function createHomeScene(Phaser: any) {
     }
 
     train() {
-      if (G.hunger <= 10) { this.msg('Too hungry to train! Eat at the Fruit Tree first.'); return }
+      if (G.hunger <= 10) { this.msg('Out of FOOD! Eat at the Fruit Tree first.'); return }
       G.hunger = Math.max(0, G.hunger - 10); G.happy = Math.min(100, G.happy + 5)
       const xpAmt = 6
       let maxHpGain = 0
@@ -1738,7 +1742,7 @@ function createHomeScene(Phaser: any) {
       const r = gainXp(xpAmt)
       this.showStatGain('XP', xpAmt)
       if (maxHpGain) this.showStatGain('MAX HP', maxHpGain)
-      this.msg(maxHpGain ? `+${xpAmt} XP   +1 MAX HP!` : `+${xpAmt} XP   -10 Hunger`)
+      this.msg(maxHpGain ? `+${xpAmt} XP   +1 MAX HP!` : `+${xpAmt} XP   -10 FOOD`)
       this.updHUD()
 
       // Player jab + camera shake
@@ -1850,7 +1854,7 @@ function createHomeScene(Phaser: any) {
       if (dx !== 0) this.cX = Math.max(20, Math.min(W - 20, this.cX + dx * this.SPEED))
       this.drawC()
 
-      const nz = this.zones.find((z: any) => Math.abs(z.x - this.cX) < 30) || null
+      const nz = this.zones.find((z: any) => Math.abs(z.x - this.cX) <= 36) || null
       if (nz !== this.nearZone) {
         this.nearZone = nz
         if (nz) this.promptT.setText(nz.prompt).setX(nz.x).setAlpha(1)
@@ -1986,25 +1990,25 @@ function createWorldScene(Phaser: any) {
       this.drawPlayer()
 
       // HUD (fixed to camera) — taller two-row layout to match HOME
-      this.add.rectangle(W/2, 18, W, 36, 0x060810, 0.96).setScrollFactor(0)
-      this.add.rectangle(W/2, 36, W, 1, 0x224488).setScrollFactor(0)
+      this.add.rectangle(W/2, 20, W, 40, 0x060810, 0.96).setScrollFactor(0)
+      this.add.rectangle(W/2, 40, W, 1, 0x224488).setScrollFactor(0)
 
       // Two-row identity readout on the left
-      this.hpT = this.add.text(8, 5, '', { fontSize: '9px', color: '#eeeeff', fontStyle: 'bold' }).setScrollFactor(0)
-      const subT = this.add.text(8, 21, '', { fontSize: '8px', color: '#7799cc' }).setScrollFactor(0)
+      this.hpT = this.add.text(8, 7, '', { fontSize: '9px', color: '#eeeeff', fontStyle: 'bold' }).setScrollFactor(0)
+      const subT = this.add.text(8, 23, '', { fontSize: '8px', color: '#7799cc' }).setScrollFactor(0)
       ;(this as any)._subT = subT  // updated alongside hpT in updHUD()
 
-      // Right-side action buttons (centered vertically in the 36-px bar)
-      const homeBg = this.add.rectangle(W - 158, 18, 56, 26, 0x1a3344, 0.95).setScrollFactor(0).setInteractive({ useHandCursor: true }).setStrokeStyle(1, 0x55aaff)
-      this.add.text(W - 158, 18, '← HOME', { fontSize: '9px', color: '#aaccee', fontStyle: 'bold' }).setOrigin(0.5).setScrollFactor(0)
+      // Right-side action buttons (centered vertically in the 40-px bar)
+      const homeBg = this.add.rectangle(W - 158, 20, 56, 28, 0x1a3344, 0.95).setScrollFactor(0).setInteractive({ useHandCursor: true }).setStrokeStyle(1, 0x55aaff)
+      this.add.text(W - 158, 20, '← HOME', { fontSize: '9px', color: '#aaccee', fontStyle: 'bold' }).setOrigin(0.5).setScrollFactor(0)
       homeBg.on('pointerdown', () => this.scene.start('HomeScene'))
 
-      const bagBtn = this.add.rectangle(W - 92, 18, 64, 26, 0x1a2a44, 0.94).setScrollFactor(0).setInteractive({ useHandCursor: true }).setStrokeStyle(1, 0x556699)
-      this.bagT = this.add.text(W - 92, 18, '', { fontSize: '9px', color: '#ddccaa', fontStyle: 'bold' }).setOrigin(0.5).setScrollFactor(0)
+      const bagBtn = this.add.rectangle(W - 92, 20, 64, 28, 0x1a2a44, 0.94).setScrollFactor(0).setInteractive({ useHandCursor: true }).setStrokeStyle(1, 0x556699)
+      this.bagT = this.add.text(W - 92, 20, '', { fontSize: '9px', color: '#ddccaa', fontStyle: 'bold' }).setOrigin(0.5).setScrollFactor(0)
       bagBtn.on('pointerdown', () => this.openBag())
 
-      const mb = this.add.rectangle(W - 28, 18, 50, 26, 0x1a1a2a, 0.94).setScrollFactor(0).setInteractive({ useHandCursor: true }).setStrokeStyle(1, 0x556699)
-      const mt = this.add.text(W - 28, 18, theme.isMuted ? '♪ OFF' : '♪ ON', { fontSize: '9px', color: theme.isMuted ? '#778899' : '#aaccee', fontStyle: 'bold' }).setOrigin(0.5).setScrollFactor(0)
+      const mb = this.add.rectangle(W - 28, 20, 50, 28, 0x1a1a2a, 0.94).setScrollFactor(0).setInteractive({ useHandCursor: true }).setStrokeStyle(1, 0x556699)
+      const mt = this.add.text(W - 28, 20, theme.isMuted ? '♪ OFF' : '♪ ON', { fontSize: '9px', color: theme.isMuted ? '#778899' : '#aaccee', fontStyle: 'bold' }).setOrigin(0.5).setScrollFactor(0)
       mb.on('pointerdown', () => { theme.toggleMute(); mt.setText(theme.isMuted ? '♪ OFF' : '♪ ON').setColor(theme.isMuted ? '#778899' : '#aaccee') })
 
       // Bottom strip + touch controls
@@ -2300,8 +2304,13 @@ function createCodexScene(Phaser: any) {
         const isCur = i === G.stage
         const slotBg = this.add.rectangle(cx, stageY, cellW - 8, 70, isCur ? 0x33224a : 0x14182a, 0.9).setStrokeStyle(1, isCur ? 0xffdd44 : 0x33446a)
 
+        // Draw sprite at origin, then scale + translate so larger stage 4/5
+        // forms fit cleanly inside the codex cell instead of spilling over.
         const g = this.add.graphics()
-        sp().draw(g, i, cx, stageY - 4)
+        sp().draw(g, i, 0, 0)
+        g.setScale(0.55)
+        g.setX(cx)
+        g.setY(stageY - 8)
 
         this.add.text(cx, stageY + 22, stages[i], { fontSize: '8px', color: isCur ? '#ffdd44' : '#aaccee', fontStyle: isCur ? 'bold' : 'normal' }).setOrigin(0.5)
         const req = i === 0 ? 'Hatch' : (i === stages.length - 1 ? 'Final' : 'Lv ' + EVO_LEVEL[i])
