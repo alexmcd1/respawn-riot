@@ -1330,8 +1330,9 @@ function createPickScene(Phaser: any) {
         this.add.text(cx, cardY + 32, s.label, { fontSize: '11px', color: '#eeeeff', fontStyle: 'bold', letterSpacing: 1 }).setOrigin(0.5)
         this.add.text(cx, cardY + 48, s.desc, { fontSize: '8px', color: '#99aacc' }).setOrigin(0.5)
 
-        // Final-form preview text
-        this.add.text(cx, cardY + 68, '→ ' + s.stageNames[4], { fontSize: '8px', color: '#ffdd66', fontStyle: 'italic' }).setOrigin(0.5)
+        // Final-form preview text (use the actual last stage so this stays
+        // correct as evolution chains grow).
+        this.add.text(cx, cardY + 68, '→ ' + s.stageNames[s.stageNames.length - 1], { fontSize: '8px', color: '#ffdd66', fontStyle: 'italic' }).setOrigin(0.5)
 
         // Tap-to-pick label
         const pickT = this.add.text(cx, cardY + 86, '[ TAP TO CHOOSE ]', { fontSize: '8px', color: '#66aaff' }).setOrigin(0.5)
