@@ -100,6 +100,46 @@ body {
   98% { transform: translate(-2px, -2px); clip-path: inset(0 0 80% 0); }
 }
 
+/* Quieter glitch variant — pseudo elements invisible at rest, only
+   flash briefly during glitch peaks. Use on small text (e.g. nav logo)
+   where the always-on RGB split blurs letters together. */
+.glitch-flash {
+  position: relative;
+  display: inline-block;
+  color: inherit;
+}
+.glitch-flash::before,
+.glitch-flash::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+}
+.glitch-flash::before {
+  color: #ff2d8a;
+  mix-blend-mode: screen;
+  animation: glitch-flash-a 3.6s steps(1) infinite;
+}
+.glitch-flash::after {
+  color: #00f0ff;
+  mix-blend-mode: screen;
+  animation: glitch-flash-b 4.2s steps(1) infinite;
+}
+
+@keyframes glitch-flash-a {
+  0%, 92%, 100% { opacity: 0; transform: translate(0, 0); }
+  93% { opacity: 1; transform: translate(3px, -1px); clip-path: inset(0 0 70% 0); }
+  95% { opacity: 1; transform: translate(-2px, 1px); clip-path: inset(40% 0 30% 0); }
+  97% { opacity: 1; transform: translate(2px, 2px); clip-path: inset(70% 0 0 0); }
+}
+@keyframes glitch-flash-b {
+  0%, 90%, 100% { opacity: 0; transform: translate(0, 0); }
+  91% { opacity: 1; transform: translate(-3px, 1px); clip-path: inset(60% 0 10% 0); }
+  94% { opacity: 1; transform: translate(2px, -1px); clip-path: inset(10% 0 60% 0); }
+  98% { opacity: 1; transform: translate(-2px, -1px); clip-path: inset(0 0 80% 0); }
+}
+
 /* Marquee — left-scrolling ticker. Track contains TWO copies of content;
    moving -50% loops seamlessly because the second copy slides into the first's spot. */
 .marquee {
