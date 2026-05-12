@@ -224,7 +224,7 @@ export default function GamingPage() {
                 </h2>
               </div>
               <span className="rounded-md border border-amber-400/40 bg-black px-3 py-1 font-display text-xs tracking-[0.25em] text-amber-300">
-                4 DROPS
+                3 DROPS
               </span>
             </div>
             <p className="mt-4 max-w-2xl text-white/75">
@@ -260,15 +260,6 @@ export default function GamingPage() {
                   accent: "border-cyan-400/50 hover:border-cyan-300",
                   chip: "text-cyan-300",
                 },
-                {
-                  href: "/quest-list",
-                  emoji: "⚔",
-                  title: "QuestList",
-                  blurb: "Gamified task tracker. XP, levels, coins. Local-only — your data stays on your machine.",
-                  cta: "Start questing",
-                  accent: "border-lime-400/50 hover:border-lime-300",
-                  chip: "text-lime-300",
-                },
               ].map((d) => (
                 <Link
                   key={d.href}
@@ -292,6 +283,34 @@ export default function GamingPage() {
                   </p>
                 </Link>
               ))}
+            </div>
+          </div>
+
+          {/* ───────── KID_GHOST IN-HOUSE: QUESTLIST ───────── */}
+          <div className="rounded-3xl border border-violet-400/30 bg-gradient-to-br from-violet-500/15 via-fuchsia-500/10 to-transparent p-6 sm:p-10">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <p className="font-display text-xs tracking-[0.3em] text-violet-400">
+                  ▌ BUILT IN-HOUSE · KID_GHOST
+                </p>
+                <h2 className="mt-2 font-display text-3xl tracking-[0.04em] sm:text-4xl">
+                  QUESTLIST // GAMIFIED TASKS
+                </h2>
+              </div>
+              <span className="rounded-md border border-violet-400/40 bg-black px-3 py-1 font-display text-xs tracking-[0.25em] text-violet-300">
+                APP · LOCAL-ONLY
+              </span>
+            </div>
+            <p className="mt-4 max-w-2xl text-white/75">
+              {"Not a game exactly — a task tracker that gives XP for finishing things. Levels, coins, daily quests. Everything stays in your browser's localStorage. Built by kid_ghost."}
+            </p>
+            <div className="mt-6">
+              <Link
+                href="/quest-list"
+                className="inline-block rounded-xl bg-violet-400 px-6 py-3 font-display text-sm tracking-[0.25em] text-black transition hover:scale-[1.04] hover:bg-violet-300"
+              >
+                ⚔ START QUESTING
+              </Link>
             </div>
           </div>
         </div>

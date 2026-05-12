@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import GameCarousel from "./_components/GameCarousel";
 import JoinTheRiotForm from "./_components/JoinTheRiotForm";
 
 const sections = [
@@ -174,6 +175,9 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* ───────── FEATURED GAMES CAROUSEL ───────── */}
+      <GameCarousel />
 
       <section
         id="sections"

@@ -21,14 +21,16 @@ const links: NavLink[] = [
   { href: '/game',          label: 'RC',       text: 'text-lime-300',      glow: 'hover:border-lime-400 hover:text-lime-300 shadow-lime-500/40',       num: '04' },
   { href: '/trading-cards', label: 'TDC',      text: 'text-amber-300',     glow: 'hover:border-amber-400 hover:text-amber-300 shadow-amber-500/40',    num: '05' },
   { href: '/orlando',       label: 'Orlando',  text: 'text-orange-300',    glow: 'hover:border-orange-400 hover:text-orange-300 shadow-orange-500/40', num: '06' },
+  { href: '/quest-list',    label: 'Quests',   text: 'text-violet-300',    glow: 'hover:border-violet-400 hover:text-violet-300 shadow-violet-500/40', num: '07' },
 ]
 
 const tickerItems = [
-  '★ NEW DROP — TDC TRADING CARDS LIVE',
+  '★ NEW DROPS — JJK FIGHT + PC BUILDER LIVE',
   '✶ SPRING 2026 ANIME RANKED',
   '☠ POP PUNK HEADLINES',
   '◢ RC — RESPAWN CREATURES DEVLOG',
   '☼ ORLANDO LIVE WEATHER + PARK NEWS',
+  '⚔ QUESTLIST BY KID_GHOST',
   '⚡ JOIN THE RIOT',
 ]
 
