@@ -33,7 +33,7 @@ const sections = [
   {
     href: "/trading-cards",
     tag: "TDC",
-    title: "Trading Digital Cards by A Zoku21",
+    title: "Trading Digital Cards by Zoku21",
     body: "Open anime-themed packs, trade with NPCs, build a collection. Hosted creator game.",
     accent: "from-amber-500/20 to-transparent",
     border: "hover:border-amber-400/60",

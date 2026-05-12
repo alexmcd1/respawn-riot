@@ -1,0 +1,2672 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>QuestList — Gamified Task Tracker</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
+  <link rel="shortcut icon" type="image/svg+xml" href="favicon.svg"/>
+  <link rel="apple-touch-icon" href="favicon.svg"/>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter','ui-sans-serif','system-ui','-apple-system','Segoe UI','Roboto','sans-serif'] },
+          keyframes: {
+            pop:       { '0%':{transform:'scale(1)'},'40%':{transform:'scale(1.12)'},'100%':{transform:'scale(1)'} },
+            floatUp:   { '0%':{opacity:0,transform:'translateY(12px)'},'100%':{opacity:1,transform:'translateY(0)'} },
+            slideIn:   { '0%':{opacity:0,transform:'translateX(-8px)'},'100%':{opacity:1,transform:'translateX(0)'} },
+            shimmer:   { '0%':{backgroundPosition:'-200% 0'},'100%':{backgroundPosition:'200% 0'} },
+            xpBurst:   { '0%':{opacity:0,transform:'translate(-50%,0) scale(0.8)'},'30%':{opacity:1},'100%':{opacity:0,transform:'translate(-50%,-60px) scale(1.2)'} },
+            levelUp:   { '0%':{opacity:0,transform:'scale(0.8)'},'30%':{opacity:1,transform:'scale(1.05)'},'80%':{opacity:1,transform:'scale(1)'},'100%':{opacity:0,transform:'scale(1.2)'} },
+            pulseRing: { '0%':{transform:'scale(0.8)',opacity:0.8},'100%':{transform:'scale(2.4)',opacity:0} },
+          },
+          animation: {
+            pop:      'pop 280ms ease-out',
+            floatUp:  'floatUp 260ms ease-out',
+            slideIn:  'slideIn 220ms ease-out',
+            shimmer:  'shimmer 2.5s linear infinite',
+            xpBurst:  'xpBurst 900ms ease-out forwards',
+            levelUp:  'levelUp 1600ms ease-out forwards',
+            pulseRing:'pulseRing 900ms ease-out forwards',
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- Google Identity Services (OAuth for Gmail) -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <style>
+    html,body,#root{height:100%}
+    body{
+      background:
+        radial-gradient(1000px 600px at 90% -10%, rgba(99,102,241,0.18), transparent 60%),
+        radial-gradient(800px 600px at -10% 110%, rgba(236,72,153,0.14), transparent 60%),
+        linear-gradient(180deg,#0b1020 0%,#0a0f1c 100%);
+      color:#e5e7eb;
+      font-family: Inter, system-ui, sans-serif;
+    }
+    .glass{ background:rgba(17,24,39,0.55); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); border:1px solid rgba(255,255,255,0.06);}
+    .glass-lite{ background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.06);}
+    /* Solid modal pane — used for full-screen dialogs where backdrop-filter
+       chains can fail and the dialog needs to fully occlude what's behind. */
+    .modal-pane{ background:#0d111c; border:1px solid rgba(255,255,255,0.08); box-shadow:0 25px 80px rgba(0,0,0,0.5);}
+
+    /* Toast-specific slide-up that preserves horizontal centering.
+       (Plain animate-floatUp overrides translateX(-50%) and makes the toast
+        drift right during the animation.) */
+    @keyframes toastSlideIn {
+      from { opacity: 0; transform: translate(-50%, 14px); }
+      to   { opacity: 1; transform: translate(-50%, 0); }
+    }
+    .toast-anim {
+      transform: translate(-50%, 0);
+      animation: toastSlideIn 260ms cubic-bezier(.2,.7,.3,1);
+    }
+    .gradient-bar{
+      background: linear-gradient(90deg,#6366f1 0%,#8b5cf6 40%,#ec4899 80%,#f59e0b 100%);
+      background-size:200% 100%;
+    }
+    .scroll-thin::-webkit-scrollbar{width:8px;height:8px}
+    .scroll-thin::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.08); border-radius:8px}
+    .ring-focus:focus{outline:none; box-shadow:0 0 0 2px rgba(139,92,246,0.55)}
+    .chip{ display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:9999px; font-size:11px; font-weight:600; border:1px solid rgba(255,255,255,0.08)}
+    details>summary{list-style:none}
+    details>summary::-webkit-details-marker{display:none}
+    .no-tap-highlight{ -webkit-tap-highlight-color: transparent }
+    input[type="checkbox"]{ accent-color:#8b5cf6 }
+
+    /* --- Pencil strike animation --- */
+    @keyframes revealBar   { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0% 0 0); } }
+    @keyframes movePencil  { 0% { left: -4%; opacity: 1; } 92% { opacity: 1; } 100% { left: 100%; opacity: 0; } }
+    @keyframes wiggleWrite { 0%,100% { transform: translateY(-58%) rotate(-22deg); }
+                             50%     { transform: translateY(calc(-58% + 1.2px)) rotate(-27deg); } }
+    .strike-bar {
+      position: absolute;
+      left: 0; right: 0;
+      top: 50%;
+      height: 2px;
+      transform: translateY(-50%);
+      border-radius: 2px;
+      pointer-events: none;
+      background: linear-gradient(
+        to right,
+        rgba(214,217,224,0.60),
+        rgba(220,224,231,0.95) 20%,
+        rgba(206,210,218,0.70) 45%,
+        rgba(224,228,234,0.95) 70%,
+        rgba(208,212,220,0.75)
+      );
+      filter: drop-shadow(0 0.5px 0 rgba(0,0,0,0.25));
+    }
+    .strike-bar-animate { clip-path: inset(0 100% 0 0); animation: revealBar 620ms cubic-bezier(.55,.05,.3,1) forwards; }
+    .strike-bar-static  { clip-path: inset(0 0 0 0); }
+    .pencil-tip-move {
+      position: absolute; top: 50%; left: 0%;
+      animation: movePencil 620ms cubic-bezier(.55,.05,.3,1) forwards,
+                 wiggleWrite 95ms ease-in-out infinite;
+      pointer-events: none;
+      z-index: 2;
+      filter: drop-shadow(0 1px 1px rgba(0,0,0,0.3));
+    }
+
+    @media (max-width: 768px){
+      .sidebar{ display:none }
+      .sidebar.open{ display:block; position:fixed; inset:0; z-index:40 }
+    }
+  </style>
+</head>
+<body class="no-tap-highlight">
+  <div id="root"></div>
+  <script type="text/babel" data-presets="env,react">
+/* =========================================================================
+   QuestList — single-file React prototype
+   Features: CRUD, priorities, due dates, tags, projects, filters/search/sort,
+             XP/levels/streaks/coins, confetti, sound FX (Web Audio),
+             localStorage autosave + JSON import/export.
+   ========================================================================= */
+const { useState, useEffect, useMemo, useRef, useCallback } = React;
+
+/* -------------------------- utilities & constants ------------------------- */
+const uid = () => Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4);
+const todayISO = () => new Date().toISOString().slice(0,10);
+const isoToday = todayISO();
+const daysBetween = (a,b) => Math.floor((new Date(a)-new Date(b))/86400000);
+const PRIORITIES = {
+  low:    { label:'Low',    xp:5,  color:'text-sky-300',    ring:'ring-sky-400/40',    bg:'bg-sky-500/15',    dot:'bg-sky-400'},
+  medium: { label:'Medium', xp:12, color:'text-violet-300', ring:'ring-violet-400/40', bg:'bg-violet-500/15', dot:'bg-violet-400'},
+  high:   { label:'High',   xp:25, color:'text-rose-300',   ring:'ring-rose-400/40',   bg:'bg-rose-500/15',   dot:'bg-rose-400'},
+};
+const LEVEL_XP = (lvl) => 80 + lvl*40; // XP required for level `lvl` -> lvl+1
+const xpForLevel = (level) => { let total=0; for(let i=1;i<level;i++) total+=LEVEL_XP(i); return total; };
+const levelForXP = (xp) => { let lvl=1, rem=xp; while(rem>=LEVEL_XP(lvl)){ rem-=LEVEL_XP(lvl); lvl++; } return { level:lvl, inLevel:rem, need:LEVEL_XP(lvl) }; };
+
+const DEFAULT_STATE = {
+  tasks: [
+    { id: uid(), title:'Welcome to QuestList!', notes:'Click the circle on the left to complete a task and earn XP.', priority:'medium', due: isoToday, tags:['getting-started'], project:'Inbox', done:false, created: Date.now()},
+    { id: uid(), title:'Add your first custom task', notes:'', priority:'low', due:'', tags:[], project:'Inbox', done:false, created: Date.now()},
+    { id: uid(), title:'Try checking this off ✅', notes:'Feel that little dopamine hit? Good.', priority:'high', due: isoToday, tags:['demo'], project:'Inbox', done:false, created: Date.now()},
+  ],
+  projects:['Inbox','Work','Personal','Learning'],
+  player: { xp:0, coins:0, streak:0, bestStreak:0, lastCompleteDay:null, achievements:{} },
+  profile: { name:'', avatarDataUrl:'', friends:[] },
+  settings: { soundOn:true, confettiOn:true },
+  gmail: {
+    accounts: [],          // array of per-inbox configs (see migrateGmailState comment)
+    importedIds: {},       // { [accountId]: { [messageId|synKey]: taskId } } — namespaced per account
+    clientId: '',          // shared OAuth client id (used by all OAuth-mode accounts)
+    defaults: {            // applied as defaults when adding a new account
+      sourceMode: 'browser',                    // 'browser' (Claude in Chrome) | 'oauth'
+      query: 'in:inbox -category:promotions newer_than:7d',
+      defaultProject: 'Inbox',
+      defaultPriority: 'auto',
+      autoTag: 'email',
+    },
+    schedule: { enabled: true, taskId: null, intervalMinutes: 15 }, // automated recurring sync
+  },
+};
+
+// Each account in gmail.accounts:
+// { id, label, email, gmailUserIndex, sourceMode, defaultProject, defaultPriority,
+//   autoTag, query, enabled, lastSync }
+function migrateGmailState(gmail){
+  if(!gmail) return JSON.parse(JSON.stringify(DEFAULT_STATE.gmail));
+  if(Array.isArray(gmail.accounts) && gmail.defaults){
+    return { ...DEFAULT_STATE.gmail, ...gmail,
+             defaults: { ...DEFAULT_STATE.gmail.defaults, ...(gmail.defaults||{}) },
+             schedule: { ...DEFAULT_STATE.gmail.schedule, ...(gmail.schedule||{}) } };
+  }
+  // Old single-account shape → migrate to one default account.
+  const account = {
+    id: 'acc-' + uid(),
+    label: 'Default',
+    email: '',
+    gmailUserIndex: 0,
+    sourceMode: 'browser',
+    defaultProject: gmail.defaultProject || 'Inbox',
+    defaultPriority: gmail.defaultPriority || 'auto',
+    autoTag: gmail.autoTag || 'email',
+    query: gmail.query || 'in:inbox -category:promotions newer_than:7d',
+    enabled: true,
+    lastSync: gmail.lastSync || null,
+  };
+  const oldImported = gmail.importedIds && Object.keys(gmail.importedIds).length > 0
+    ? gmail.importedIds : null;
+  return {
+    accounts: [account],
+    importedIds: oldImported ? { [account.id]: oldImported } : {},
+    clientId: gmail.clientId || '',
+    defaults: {
+      sourceMode: 'browser',
+      query: account.query,
+      defaultProject: account.defaultProject,
+      defaultPriority: account.defaultPriority,
+      autoTag: account.autoTag,
+    },
+    schedule: { enabled: false, taskId: null, intervalMinutes: 360 },
+  };
+}
+
+const ACHIEVEMENTS = [
+  { id:'first_task',  icon:'⚔️',  label:'First Quest',    desc:'Complete your first task',           check:(p,s)=> s.completedTotal>=1 },
+  { id:'ten_tasks',   icon:'🗡️',  label:'Getting Going',  desc:'Complete 10 tasks',                  check:(p,s)=> s.completedTotal>=10 },
+  { id:'fifty_tasks', icon:'🏆',  label:'Task Slayer',    desc:'Complete 50 tasks',                  check:(p,s)=> s.completedTotal>=50 },
+  { id:'streak_3',    icon:'🔥',  label:'On a Roll',      desc:'3-day streak',                       check:(p)=> p.streak>=3 },
+  { id:'streak_7',    icon:'⚡',  label:'Week Warrior',   desc:'7-day streak',                       check:(p)=> p.streak>=7 },
+  { id:'streak_30',   icon:'🌙',  label:'Unstoppable',    desc:'30-day streak',                      check:(p)=> p.streak>=30 },
+  { id:'level_5',     icon:'🌟',  label:'Apprentice',     desc:'Reach level 5',                      check:(p)=> levelForXP(p.xp).level>=5 },
+  { id:'level_10',    icon:'💎',  label:'Adept',          desc:'Reach level 10',                     check:(p)=> levelForXP(p.xp).level>=10 },
+  { id:'high_prio_5', icon:'🎯',  label:'Heavy Lifter',   desc:'Complete 5 high-priority tasks',     check:(p,s)=> s.highDone>=5 },
+  { id:'coins_100',   icon:'🪙',  label:'Coin Hoarder',   desc:'Accumulate 100 coins',               check:(p)=> p.coins>=100 },
+];
+
+/* =============================== Gmail integration =============================== */
+const GMAIL_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly';
+
+// Simulated inbox for users without a Google Cloud project yet. Lets you test
+// the whole end-to-end UX today without any setup.
+const DEMO_EMAILS = () => {
+  const now = Date.now();
+  const hr = 3600000, day = 24*hr;
+  return [
+    { id:'d1', from:'Sarah Chen <sarah@company.com>',       subject:'Quick review of the Q2 roadmap?',
+      snippet:'Hi — can you take a look at the attached roadmap before Friday? Need your sign-off on the launch dates.',
+      date:new Date(now-2*hr).toString(),   labelIds:['INBOX','IMPORTANT','UNREAD'], internalDate:now-2*hr },
+    { id:'d2', from:'GitHub <noreply@github.com>',           subject:'[PR #447] Review requested: feat: add gamification',
+      snippet:'mike.mcdermott requested your review on pull request #447 in acme/task-tracker.',
+      date:new Date(now-4*hr).toString(),   labelIds:['INBOX','UNREAD'], internalDate:now-4*hr },
+    { id:'d3', from:'Legal @ Acme <legal@acme.com>',         subject:'Action required: NDA signature by EOW',
+      snippet:'Please review and sign the attached NDA by end of week so we can proceed with the partnership.',
+      date:new Date(now-1*day).toString(),  labelIds:['INBOX','IMPORTANT'], internalDate:now-1*day },
+    { id:'d4', from:'Maya Patel <maya@startup.io>',          subject:'Coffee next week?',
+      snippet:'Would love to catch up — are you free Tuesday or Wednesday afternoon? Happy to come to your side of town.',
+      date:new Date(now-2*day).toString(),  labelIds:['INBOX','UNREAD'], internalDate:now-2*day },
+    { id:'d5', from:'Notion <team@makenotion.com>',          subject:'Your weekly productivity summary',
+      snippet:'You completed 23 tasks this week — 8 more than last week. Here is how it breaks down by project.',
+      date:new Date(now-3*day).toString(),  labelIds:['INBOX'], internalDate:now-3*day },
+    { id:'d6', from:'AWS Billing <no-reply@aws.com>',        subject:'Your monthly invoice is ready',
+      snippet:'Your monthly AWS invoice of $247.83 is available for download in your console.',
+      date:new Date(now-4*day).toString(),  labelIds:['INBOX'], internalDate:now-4*day },
+    { id:'d7', from:'Alex Ruiz <alex@designco.com>',         subject:'Draft mocks attached — need feedback',
+      snippet:'I pushed the v3 home screen mocks to Figma. Can you take a look before our 1:1?',
+      date:new Date(now-5*day).toString(),  labelIds:['INBOX','UNREAD'], internalDate:now-5*day },
+    { id:'d8', from:'Calendly <noreply@calendly.com>',       subject:'New event booked: 30-min intro with Priya Shah',
+      snippet:'Priya Shah has booked a 30-min intro on Friday at 2:00 PM. Calendar invite is on its way.',
+      date:new Date(now-6*day).toString(),  labelIds:['INBOX'], internalDate:now-6*day },
+  ];
+};
+
+function parseGmailFrom(s){
+  if(!s) return { name:'', email:'' };
+  const m = s.match(/^(.*?)<(.+?)>\s*$/);
+  if(m) return { name: m[1].trim().replace(/^"|"$/g,''), email: m[2].trim() };
+  return { name:'', email:s.trim() };
+}
+
+function inferPriorityFromEmail(email){
+  const labels = email.labelIds || [];
+  if(labels.includes('IMPORTANT') || labels.includes('STARRED')) return 'high';
+  const blob = ((email.subject||'') + ' ' + (email.snippet||'')).toLowerCase();
+  if(/\b(urgent|asap|action required|deadline|final reminder|eod|eow|blocker)\b/.test(blob)) return 'high';
+  if(/\b(review|please|sign|approve|needs?|can you|follow up|respond|reply|feedback)\b/.test(blob)) return 'medium';
+  return 'low';
+}
+
+function emailToTaskPatch(email, defaults){
+  const from = parseGmailFrom(email.from);
+  const priority = defaults.defaultPriority === 'auto'
+    ? inferPriorityFromEmail(email)
+    : defaults.defaultPriority;
+  return {
+    id: uid(),
+    title: (email.subject || '(no subject)').slice(0, 200),
+    notes: `From: ${from.name || from.email}\nReceived: ${email.date || ''}\n\n${email.snippet || ''}`,
+    priority,
+    due: '',
+    tags: defaults.autoTag ? [defaults.autoTag] : [],
+    project: defaults.defaultProject || 'Inbox',
+    done: false,
+    created: Date.now(),
+    source: { type:'gmail', id: email.id, threadId: email.threadId, from: from.email },
+  };
+}
+
+// OAuth via Google Identity Services token flow (client-side, no backend).
+// options.silent=true uses prompt:'none' for background refresh — fails if user
+// signed out of Google or hasn't granted consent before. options.hint pre-selects
+// the Google account to refresh.
+function requestGmailToken(clientId, options = {}){
+  return new Promise((resolve, reject)=>{
+    const gs = window.google?.accounts?.oauth2;
+    if(!gs) return reject(new Error('Google Identity Services not loaded yet. Wait a moment and try again.'));
+    const client = gs.initTokenClient({
+      client_id: clientId,
+      scope: GMAIL_SCOPE,
+      hint: options.hint || undefined,
+      callback: (resp) => {
+        if(resp.error) reject(new Error(resp.error_description || resp.error));
+        else resolve(resp);   // { access_token, expires_in, scope, ... }
+      },
+      error_callback: (err) => reject(new Error(err?.message || 'OAuth failed')),
+    });
+    client.requestAccessToken({ prompt: options.silent ? 'none' : '' });
+  });
+}
+
+function revokeGmailToken(token){
+  if(!token) return;
+  try { window.google?.accounts?.oauth2?.revoke(token, ()=>{}); } catch(e){}
+}
+
+async function fetchGmailProfile(token){
+  const r = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/profile',
+    { headers: { Authorization: `Bearer ${token}` } });
+  if(!r.ok) throw new Error(`Profile fetch failed (${r.status})`);
+  return r.json();   // { emailAddress, messagesTotal, ... }
+}
+
+async function fetchGmailMessages(token, query, max=25){
+  const listUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=${max}&q=${encodeURIComponent(query)}`;
+  const lr = await fetch(listUrl, { headers: { Authorization: `Bearer ${token}` } });
+  if(!lr.ok) throw new Error(`List failed (${lr.status})`);
+  const list = await lr.json();
+  const ids = (list.messages || []).map(m => m.id);
+  if(ids.length===0) return [];
+
+  const details = await Promise.all(ids.map(async id => {
+    const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}`
+              + `?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`;
+    const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    if(!r.ok) return null;
+    const m = await r.json();
+    const headers = Object.fromEntries((m.payload?.headers || [])
+      .map(h => [h.name.toLowerCase(), h.value]));
+    return {
+      id: m.id, threadId: m.threadId,
+      snippet: m.snippet,
+      from: headers.from || '',
+      subject: headers.subject || '(no subject)',
+      date: headers.date || '',
+      labelIds: m.labelIds || [],
+      internalDate: Number(m.internalDate) || 0,
+    };
+  }));
+  return details.filter(Boolean).sort((a,b)=> b.internalDate - a.internalDate);
+}
+
+/* ------------------------------ Sound engine ------------------------------ */
+function useSound(enabled){
+  const ctxRef = useRef(null);
+  const getCtx = () => {
+    if(!ctxRef.current){
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if(AC) ctxRef.current = new AC();
+    }
+    return ctxRef.current;
+  };
+  const tone = useCallback((freq, dur=0.14, type='sine', gain=0.08, when=0)=>{
+    if(!enabled) return;
+    const ctx = getCtx(); if(!ctx) return;
+    const t = ctx.currentTime + when;
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(gain, t+0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+    o.connect(g).connect(ctx.destination);
+    o.start(t); o.stop(t+dur+0.02);
+  },[enabled]);
+  const play = useCallback((name)=>{
+    if(!enabled) return;
+    const ctx = getCtx(); if(!ctx) return;
+    if(ctx.state === 'suspended') ctx.resume();
+    switch(name){
+      case 'complete':
+        tone(880,0.10,'sine',0.10,0);
+        tone(1175,0.14,'sine',0.09,0.06);
+        tone(1568,0.18,'triangle',0.07,0.14);
+        break;
+      case 'add':
+        tone(660,0.08,'triangle',0.06,0);
+        tone(880,0.08,'triangle',0.05,0.05);
+        break;
+      case 'delete':
+        tone(320,0.10,'sawtooth',0.05,0);
+        tone(220,0.14,'sawtooth',0.05,0.08);
+        break;
+      case 'levelup':
+        tone(523,0.12,'triangle',0.09,0);
+        tone(659,0.12,'triangle',0.09,0.10);
+        tone(784,0.14,'triangle',0.09,0.22);
+        tone(1046,0.22,'triangle',0.10,0.36);
+        break;
+      case 'achievement':
+        tone(700,0.10,'sine',0.08,0);
+        tone(900,0.10,'sine',0.08,0.08);
+        tone(1200,0.16,'sine',0.09,0.18);
+        break;
+      case 'click':
+        tone(500,0.04,'square',0.03,0);
+        break;
+      case 'pencil': {
+        // Realistic pencil-on-paper: grain-based friction + wood resonance + filter sweep.
+        // Each "grain" simulates graphite catching on a paper fiber — short bursts
+        // with random amplitude + a sine-shaped envelope to avoid clicks.
+        const bufferDur = 0.62;
+        const sr  = ctx.sampleRate;
+        const len = Math.floor(sr * bufferDur);
+        const buf = ctx.createBuffer(1, len, sr);
+        const d   = buf.getChannelData(0);
+
+        let grainPos = 0, grainLen = 0, grainAmp = 0;
+        for(let i=0;i<len;i++){
+          if(grainPos >= grainLen){ // new micro-scratch
+            grainPos = 0;
+            grainLen = 3 + Math.floor(Math.random() * 28);  // 0.06-0.65 ms at 48k
+            grainAmp = 0.25 + Math.random()*0.75;
+          }
+          const grainEnv = Math.sin(Math.PI * grainPos / grainLen); // smooth attack/decay
+          grainPos++;
+
+          const t = i/len; // 0..1 across the buffer
+          const attack  = Math.min(1, t * 20);       // ~30ms attack
+          const release = Math.min(1, (1-t) * 12);   // ~50ms release
+          const env     = Math.min(attack, release);
+
+          // Slow pressure undulation so it sounds like a hand drawing, not static hiss.
+          const press = 0.55 + 0.45 * Math.sin(t*Math.PI*5.3 + Math.sin(t*Math.PI*11.7));
+
+          const white = Math.random()*2 - 1;
+          d[i] = white * grainAmp * grainEnv * env * press * 0.55;
+        }
+
+        const src = ctx.createBufferSource(); src.buffer = buf;
+
+        // Friction peak — lead scraping paper fibers. Slight sweep = "pencil in motion".
+        const bpFric = ctx.createBiquadFilter();
+        bpFric.type = 'bandpass'; bpFric.Q.value = 1.3;
+
+        // Woody body resonance of the pencil barrel.
+        const bpWood = ctx.createBiquadFilter();
+        bpWood.type = 'bandpass'; bpWood.Q.value = 3.2; bpWood.frequency.value = 1100;
+
+        // Gentle high-shelf roll-off so it's not harsh.
+        const hs = ctx.createBiquadFilter();
+        hs.type = 'highshelf'; hs.frequency.value = 6500; hs.gain.value = -6;
+
+        const gFric = ctx.createGain(); gFric.gain.value = 0.85;
+        const gWood = ctx.createGain(); gWood.gain.value = 0.22;
+        const master = ctx.createGain();
+
+        const tS = ctx.currentTime;
+        bpFric.frequency.setValueAtTime(2600, tS);
+        bpFric.frequency.linearRampToValueAtTime(4100, tS+0.28);
+        bpFric.frequency.linearRampToValueAtTime(3000, tS+bufferDur);
+
+        master.gain.setValueAtTime(0.0001, tS);
+        master.gain.exponentialRampToValueAtTime(0.13, tS+0.04);
+        master.gain.setValueAtTime(0.13, tS+bufferDur-0.10);
+        master.gain.exponentialRampToValueAtTime(0.0001, tS+bufferDur);
+
+        src.connect(bpFric).connect(gFric).connect(hs).connect(master);
+        src.connect(bpWood).connect(gWood).connect(master);
+        master.connect(ctx.destination);
+        src.start(tS);
+        break;
+      }
+    }
+  },[enabled,tone]);
+  return play;
+}
+
+/* -------------------------------- Confetti -------------------------------- */
+function Confetti({ burstKey }){
+  const canvasRef = useRef(null);
+  const rafRef = useRef(null);
+  useEffect(()=>{
+    if(!burstKey) return;
+    const canvas = canvasRef.current; if(!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const resize = ()=>{ canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
+    resize(); window.addEventListener('resize',resize);
+    const colors = ['#8b5cf6','#ec4899','#f59e0b','#10b981','#06b6d4','#f472b6'];
+    const parts = Array.from({length:90}, ()=>({
+      x: window.innerWidth/2 + (Math.random()-0.5)*80,
+      y: window.innerHeight/2 - 50 + (Math.random()-0.5)*40,
+      vx: (Math.random()-0.5)*9,
+      vy: Math.random()*-8 - 4,
+      g: 0.22 + Math.random()*0.1,
+      size: 4 + Math.random()*6,
+      rot: Math.random()*Math.PI,
+      vr: (Math.random()-0.5)*0.4,
+      color: colors[Math.floor(Math.random()*colors.length)],
+      life: 1,
+    }));
+    let start = performance.now();
+    const loop = (now)=>{
+      const t = (now-start)/1000;
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      parts.forEach(p=>{
+        p.vy += p.g; p.x += p.vx; p.y += p.vy; p.rot += p.vr;
+        p.life = Math.max(0, 1 - t/2.2);
+        ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rot); ctx.globalAlpha = p.life;
+        ctx.fillStyle = p.color; ctx.fillRect(-p.size/2,-p.size/2,p.size,p.size*0.5);
+        ctx.restore();
+      });
+      if(t<2.4) rafRef.current = requestAnimationFrame(loop);
+      else ctx.clearRect(0,0,canvas.width,canvas.height);
+    };
+    rafRef.current = requestAnimationFrame(loop);
+    return ()=>{ cancelAnimationFrame(rafRef.current); window.removeEventListener('resize',resize); };
+  },[burstKey]);
+  return <canvas ref={canvasRef} className="pointer-events-none fixed inset-0 z-50" />;
+}
+
+/* ------------------------------- Root App --------------------------------- */
+function App(){
+  const [state, setState] = useState(()=>{
+    try{
+      const raw = localStorage.getItem('questlist.v1');
+      if(raw){
+        const parsed = JSON.parse(raw);
+        return {...DEFAULT_STATE, ...parsed, gmail: migrateGmailState(parsed.gmail)};
+      }
+    }catch(e){}
+    return DEFAULT_STATE;
+  });
+  useEffect(()=>{ try{ localStorage.setItem('questlist.v1', JSON.stringify(state)); }catch(e){} },[state]);
+
+  const playSound = useSound(state.settings.soundOn);
+
+  const [filter, setFilter] = useState({ status:'active', project:'All', tag:'', q:'', sort:'smart' });
+  const [confettiKey, setConfettiKey] = useState(0);
+  const [xpFloaters, setXpFloaters] = useState([]);
+  const [toast, setToast] = useState(null); // {title, body, type}
+  const [showLevelUp, setShowLevelUp] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [editing, setEditing] = useState(null); // task
+  const [strikingIds, setStrikingIds] = useState(()=> new Set());
+  const STRIKE_MS = 650;
+
+  // Gmail runtime sessions (not persisted — tokens expire). Keyed by accountId.
+  const [gmailSessions, setGmailSessions] = useState({}); // { [accountId]: {token,expiresAt,profile} }
+  const [gmailOpen, setGmailOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [gmailEmailsByAccount, setGmailEmailsByAccount] = useState({}); // { [accountId]: emails[] }
+  const [gmailLoadingByAccount, setGmailLoadingByAccount] = useState({}); // { [accountId]: bool }
+  const [gmailDemoMode, setGmailDemoMode] = useState(false);
+  const [activeAccountId, setActiveAccountId] = useState(null);
+
+  // Auto-select first account when accounts change and none is selected
+  useEffect(()=>{
+    if(!activeAccountId && state.gmail.accounts?.[0]){
+      setActiveAccountId(state.gmail.accounts[0].id);
+    }
+  },[state.gmail.accounts, activeAccountId]);
+
+  const stats = useMemo(()=>{
+    const completedTotal = state.tasks.filter(t=>t.done).length;
+    const activeTotal = state.tasks.filter(t=>!t.done).length;
+    const highDone = state.tasks.filter(t=>t.done && t.priority==='high').length;
+    const todayDone = state.tasks.filter(t=>t.done && t.completedOn===isoToday).length;
+    return { completedTotal, activeTotal, highDone, todayDone };
+  },[state.tasks]);
+
+  const levelInfo = useMemo(()=> levelForXP(state.player.xp), [state.player.xp]);
+
+  // Detect level-up via effect so it fires reliably regardless of stale closures
+  const prevLevelRef = useRef(null);
+  useEffect(()=>{
+    if(prevLevelRef.current !== null && levelInfo.level > prevLevelRef.current){
+      setTimeout(()=>{
+        playSound('levelup');
+        setShowLevelUp(levelInfo.level);
+        setTimeout(()=> setShowLevelUp(null), 1600);
+      }, 250);
+    }
+    prevLevelRef.current = levelInfo.level;
+  }, [levelInfo.level]);
+
+  const showToast = (t)=>{ setToast(t); setTimeout(()=>setToast(null), 2400); };
+
+  /* ----------------------------- Task actions ---------------------------- */
+  const addTask = (data) => {
+    const t = { id:uid(), title:data.title.trim(), notes:data.notes||'', priority:data.priority||'medium',
+                due:data.due||'', tags:data.tags||[], project:data.project||'Inbox',
+                done:false, created: Date.now() };
+    setState(s=>({ ...s, tasks:[t, ...s.tasks] }));
+    playSound('add');
+  };
+
+  const updateTask = (id, patch) => {
+    setState(s=>({ ...s, tasks: s.tasks.map(t=> t.id===id ? {...t, ...patch} : t) }));
+  };
+
+  const deleteTask = (id) => {
+    setState(s=>({ ...s, tasks: s.tasks.filter(t=>t.id!==id) }));
+    playSound('delete');
+  };
+
+  const completeTask = (task, rowEl) => {
+    if(task.done) { // uncomplete: revert XP
+      const refund = PRIORITIES[task.priority].xp;
+      setState(s=>({ ...s,
+        tasks: s.tasks.map(t=> t.id===task.id ? {...t, done:false, completedOn:null} : t),
+        player:{ ...s.player, xp: Math.max(0, s.player.xp - refund) }
+      }));
+      return;
+    }
+    if(strikingIds.has(task.id)) return;
+    // Kick off pencil scribble + scratch sound, then fire real completion.
+    setStrikingIds(s => { const n = new Set(s); n.add(task.id); return n; });
+    playSound('pencil');
+    setTimeout(() => {
+      setStrikingIds(s => { const n = new Set(s); n.delete(task.id); return n; });
+      finalizeCompletion(task, rowEl);
+    }, STRIKE_MS);
+  };
+
+  const finalizeCompletion = (task, rowEl) => {
+    const gained = PRIORITIES[task.priority].xp;
+    const coinsEarned = Math.max(1, Math.round(gained/5));
+
+    // XP floater position
+    const rect = rowEl?.getBoundingClientRect?.();
+    const floaterId = uid();
+    if(rect){
+      setXpFloaters(f=>[...f, { id: floaterId, x: rect.left+28, y: rect.top+10, amount: gained }]);
+      setTimeout(()=> setXpFloaters(f=>f.filter(x=>x.id!==floaterId)), 900);
+    }
+
+    setState(s=>{
+      const { lastCompleteDay, streak, bestStreak, xp } = s.player;
+      let newStreak = 1;
+      if(lastCompleteDay){
+        const d = daysBetween(isoToday, lastCompleteDay);
+        if(d===0) newStreak = streak;
+        else if(d===1) newStreak = streak + 1;
+        else newStreak = 1;
+      }
+      const newXP = xp + gained;
+      const next = { ...s,
+        tasks: s.tasks.map(t=> t.id===task.id ? {...t, done:true, completedOn: isoToday} : t),
+        player: { ...s.player,
+          xp: newXP,
+          coins: s.player.coins + coinsEarned,
+          streak: newStreak,
+          bestStreak: Math.max(bestStreak, newStreak),
+          lastCompleteDay: isoToday,
+          achievements: { ...s.player.achievements },
+        }
+      };
+      const computedStats = {
+        completedTotal: next.tasks.filter(t=>t.done).length,
+        highDone: next.tasks.filter(t=>t.done && t.priority==='high').length,
+      };
+      ACHIEVEMENTS.forEach(a=>{
+        if(!next.player.achievements[a.id] && a.check(next.player, computedStats)){
+          next.player.achievements[a.id] = Date.now();
+          setTimeout(()=>{ playSound('achievement'); showToast({ type:'achievement', title:'Achievement unlocked', body:a.label });}, 200);
+        }
+      });
+      return next;
+    });
+
+    playSound('complete');
+    if(state.settings.confettiOn) setConfettiKey(k=>k+1);
+    // level-up is detected by the prevLevelRef useEffect above
+  };
+
+  /* ----------------------------- Projects -------------------------------- */
+  const addProject = (name) => {
+    const n = name.trim(); if(!n) return;
+    if(state.projects.includes(n)) return;
+    setState(s=>({...s, projects:[...s.projects, n]}));
+  };
+  const deleteProject = (name) => {
+    if(name==='Inbox') return;
+    setState(s=>({
+      ...s,
+      projects: s.projects.filter(p=>p!==name),
+      tasks: s.tasks.map(t=> t.project===name ? {...t, project:'Inbox'} : t),
+    }));
+  };
+
+  /* ----------------------------- Import/Export --------------------------- */
+  const exportJSON = () => {
+    const blob = new Blob([JSON.stringify(state,null,2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `questlist-${isoToday}.json`; a.click();
+    URL.revokeObjectURL(url);
+  };
+  const importJSON = (file) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try{
+        const parsed = JSON.parse(reader.result);
+        if(!parsed.tasks) throw new Error('Invalid file');
+        // Merge mode: partial files (no player/settings) are appended to existing
+        // state — your XP, streak, projects, and existing tasks are preserved.
+        const isMergeMode = !parsed.player && !parsed.settings;
+        if(isMergeMode){
+          setState(s => {
+            const existing = new Set(s.projects);
+            const newProjects = (parsed.projects || []).filter(p => !existing.has(p));
+            return {
+              ...s,
+              tasks: [...parsed.tasks, ...s.tasks],
+              projects: [...s.projects, ...newProjects],
+              gmail: {
+                ...s.gmail,
+                importedIds: { ...s.gmail.importedIds, ...(parsed.gmail?.importedIds || {}) },
+              },
+            };
+          });
+          showToast({type:'info', title:'Synced', body:`Added ${parsed.tasks.length} task${parsed.tasks.length===1?'':'s'}`});
+        } else {
+          setState({ ...DEFAULT_STATE, ...parsed });
+          showToast({type:'info', title:'Import complete', body:`Loaded ${parsed.tasks.length} tasks`});
+        }
+      }catch(e){ showToast({type:'error', title:'Import failed', body:String(e.message||e)}); }
+    };
+    reader.readAsText(file);
+  };
+  const resetAll = () => {
+    if(confirm('Reset all data? This cannot be undone.')) setState(DEFAULT_STATE);
+  };
+
+  /* ----------------------------- Gmail actions (multi-account) --------- */
+  const gmailGetAccount = (accountId) => state.gmail.accounts.find(a => a.id === accountId);
+
+  const gmailAddAccount = (partial) => {
+    const d = state.gmail.defaults;
+    const acc = {
+      id: 'acc-' + uid(),
+      label: partial.label || 'New Inbox',
+      email: partial.email || '',
+      gmailUserIndex: partial.gmailUserIndex ?? 0,
+      sourceMode: partial.sourceMode || d.sourceMode,
+      defaultProject: partial.defaultProject || d.defaultProject,
+      defaultPriority: partial.defaultPriority || d.defaultPriority,
+      autoTag: partial.autoTag ?? d.autoTag,
+      query: partial.query || d.query,
+      enabled: partial.enabled !== false,
+      lastSync: null,
+    };
+    setState(s => ({ ...s, gmail: { ...s.gmail, accounts: [...s.gmail.accounts, acc] } }));
+    setActiveAccountId(acc.id);
+    showToast({ type:'info', title:'Account added', body: acc.label });
+    return acc;
+  };
+
+  const gmailUpdateAccount = (accountId, patch) => {
+    setState(s => ({ ...s, gmail: { ...s.gmail,
+      accounts: s.gmail.accounts.map(a => a.id===accountId ? {...a, ...patch} : a) } }));
+  };
+
+  const gmailRemoveAccount = (accountId) => {
+    if(!confirm('Remove this inbox? Tasks already created stay; just stops future syncs.')) return;
+    if(gmailSessions[accountId]?.token) revokeGmailToken(gmailSessions[accountId].token);
+    setGmailSessions(s => { const n={...s}; delete n[accountId]; return n; });
+    setGmailEmailsByAccount(s => { const n={...s}; delete n[accountId]; return n; });
+    setState(s => {
+      const importedIds = { ...s.gmail.importedIds }; delete importedIds[accountId];
+      return { ...s, gmail: { ...s.gmail,
+        accounts: s.gmail.accounts.filter(a => a.id !== accountId),
+        importedIds } };
+    });
+    if(activeAccountId === accountId) setActiveAccountId(null);
+  };
+
+  const gmailConnect = async (accountId) => {
+    const clientId = (state.gmail.clientId || '').trim();
+    if(!clientId){ showToast({ type:'error', title:'Client ID required', body:'Add an OAuth Client ID in Defaults.'}); return; }
+    try{
+      const resp = await requestGmailToken(clientId);
+      const expiresAt = Date.now() + (resp.expires_in || 3600) * 1000;
+      const profile = await fetchGmailProfile(resp.access_token);
+      setGmailSessions(s => ({ ...s, [accountId]: { token: resp.access_token, expiresAt, profile } }));
+      setGmailDemoMode(false);
+      // Auto-fill email on the account if empty
+      const acc = gmailGetAccount(accountId);
+      if(acc && !acc.email && profile.emailAddress){
+        gmailUpdateAccount(accountId, { email: profile.emailAddress });
+      }
+      showToast({ type:'info', title:'Connected', body: profile.emailAddress });
+      gmailRefresh(accountId, resp.access_token);
+    }catch(e){
+      showToast({ type:'error', title:'Connect failed', body: String(e.message||e) });
+    }
+  };
+
+  const gmailDisconnect = (accountId) => {
+    const sess = gmailSessions[accountId];
+    if(sess?.token) revokeGmailToken(sess.token);
+    setGmailSessions(s => { const n={...s}; delete n[accountId]; return n; });
+    setGmailEmailsByAccount(s => { const n={...s}; delete n[accountId]; return n; });
+    showToast({ type:'info', title:'Disconnected' });
+  };
+
+  const setLoading = (accountId, val) =>
+    setGmailLoadingByAccount(s => ({ ...s, [accountId]: val }));
+
+  const gmailRefresh = async (accountId, tokenOverride) => {
+    if(gmailDemoMode){
+      setLoading(accountId, true);
+      setTimeout(()=>{
+        setGmailEmailsByAccount(s => ({ ...s, [accountId]: DEMO_EMAILS() }));
+        setLoading(accountId, false);
+      }, 400);
+      return;
+    }
+    const acc = gmailGetAccount(accountId);
+    if(!acc) return;
+    if(acc.sourceMode === 'browser'){
+      // Browser mode: actual sync happens via Claude in Chrome (external).
+      // Here we just indicate "ready"; tasks are pushed via JSON merge import.
+      showToast({ type:'info', title:'Browser-mode sync',
+        body:'Ask Claude to sync this inbox in chat.' });
+      return;
+    }
+    const token = tokenOverride || gmailSessions[accountId]?.token;
+    if(!token){ showToast({ type:'error', title:'Not connected', body:'Connect this account first.' }); return; }
+    setLoading(accountId, true);
+    try{
+      const msgs = await fetchGmailMessages(token, acc.query, 25);
+      setGmailEmailsByAccount(s => ({ ...s, [accountId]: msgs }));
+      gmailUpdateAccount(accountId, { lastSync: Date.now() });
+    }catch(e){
+      showToast({ type:'error', title:'Fetch failed', body:String(e.message||e) });
+    }finally{
+      setLoading(accountId, false);
+    }
+  };
+
+  const gmailRefreshAll = async () => {
+    const enabled = state.gmail.accounts.filter(a => a.enabled);
+    if(enabled.length === 0){ showToast({ type:'error', title:'No accounts', body:'Add an inbox first.' }); return; }
+    if(gmailDemoMode){
+      enabled.forEach(a => gmailRefresh(a.id));
+      return;
+    }
+    let oauthCount = 0, browserCount = 0;
+    for(const a of enabled){
+      if(a.sourceMode === 'oauth' && gmailSessions[a.id]?.token){
+        await gmailRefresh(a.id);
+        oauthCount++;
+      } else if(a.sourceMode === 'browser'){
+        browserCount++;
+      }
+    }
+    if(browserCount > 0){
+      showToast({ type:'info', title:'Sync All',
+        body:`${oauthCount} via OAuth, ${browserCount} await Claude.` });
+    }
+  };
+
+  // Silent OAuth token refresh: re-up access tokens ~5 min before expiry so the
+  // user doesn't have to keep clicking Connect. Falls back silently if the user
+  // signed out of Google — they'll just have to reconnect manually next time.
+  const silentRefreshDataRef = useRef({ accounts: [], sessions: {}, clientId: '' });
+  useEffect(()=>{
+    silentRefreshDataRef.current = {
+      accounts: state.gmail.accounts || [],
+      sessions: gmailSessions,
+      clientId: state.gmail.clientId || '',
+    };
+  }, [state.gmail.accounts, gmailSessions, state.gmail.clientId]);
+
+  useEffect(()=>{
+    const REFRESH_WINDOW_MS = 5 * 60 * 1000; // refresh if within 5 min of expiry
+    const tick = async () => {
+      const { accounts, sessions, clientId } = silentRefreshDataRef.current;
+      const cid = clientId.trim();
+      if(!cid) return;
+      const now = Date.now();
+      for(const acc of accounts){
+        if(acc.sourceMode !== 'oauth' || !acc.enabled) continue;
+        const sess = sessions[acc.id];
+        if(!sess?.token || !sess.expiresAt) continue;
+        if(sess.expiresAt - now > REFRESH_WINDOW_MS) continue;
+        try{
+          const resp = await requestGmailToken(cid, { silent: true, hint: acc.email });
+          const expiresAt = Date.now() + (resp.expires_in || 3600) * 1000;
+          setGmailSessions(s => s[acc.id]
+            ? { ...s, [acc.id]: { ...s[acc.id], token: resp.access_token, expiresAt } }
+            : s);
+        }catch(e){
+          // Silent — don't toast. If the user signed out of Google we let the
+          // token lapse and surface "Connect" UI on the next manual interaction.
+        }
+      }
+    };
+    const id = setInterval(tick, 60 * 1000);
+    tick(); // run once on mount in case a stored token is already near expiry
+    return ()=> clearInterval(id);
+  }, []);
+
+  // Built-in auto-sync: refresh OAuth accounts on a rolling interval without Cowork
+  const autoSyncDataRef = useRef({ accounts: [], sessions: {} });
+  useEffect(()=>{
+    autoSyncDataRef.current = { accounts: state.gmail.accounts, sessions: gmailSessions };
+  }, [state.gmail.accounts, gmailSessions]);
+  const gmailRefreshRef = useRef(null);
+  useEffect(()=>{ gmailRefreshRef.current = gmailRefresh; });
+  useEffect(()=>{
+    const ms = Math.max(5, state.gmail.schedule?.intervalMinutes || 15) * 60 * 1000;
+    const id = setInterval(()=>{
+      const { accounts, sessions } = autoSyncDataRef.current;
+      accounts
+        .filter(a => a.enabled && a.sourceMode === 'oauth')
+        .forEach(a => {
+          const sess = sessions[a.id];
+          if(sess?.token && (!sess.expiresAt || sess.expiresAt > Date.now() + 60_000)){
+            gmailRefreshRef.current?.(a.id);
+          }
+        });
+    }, ms);
+    return ()=> clearInterval(id);
+  }, [state.gmail.schedule?.intervalMinutes]);
+
+  const gmailEnterDemo = () => {
+    setGmailDemoMode(true);
+    if(state.gmail.accounts.length === 0){
+      // Auto-create two demo accounts
+      gmailAddAccount({ label:'Work (demo)', email:'mike@work.demo', gmailUserIndex:0,
+        defaultProject:'BlueConic', autoTag:'email-bc' });
+      gmailAddAccount({ label:'Personal (demo)', email:'mike@personal.demo', gmailUserIndex:1,
+        defaultProject:'Personal', autoTag:'email-personal' });
+    }
+    state.gmail.accounts.forEach(a => {
+      setLoading(a.id, true);
+      setTimeout(()=>{
+        setGmailEmailsByAccount(s => ({ ...s, [a.id]: DEMO_EMAILS() }));
+        setLoading(a.id, false);
+      }, 350);
+    });
+  };
+
+  const gmailImportSelected = (accountId, selectedIds) => {
+    if(!selectedIds.length){ showToast({ type:'error', title:'Nothing selected', body:'Pick at least one email.' }); return; }
+    const acc = gmailGetAccount(accountId); if(!acc) return;
+    const accImported = state.gmail.importedIds[accountId] || {};
+    const emails = gmailEmailsByAccount[accountId] || [];
+    const picked = emails.filter(e => selectedIds.includes(e.id));
+    const newTasks = picked
+      .filter(e => !accImported[e.id])
+      .map(e => emailToTaskPatch(e, acc));
+    if(newTasks.length === 0){
+      showToast({ type:'info', title:'Already imported', body:'These emails are already tasks.' });
+      return;
+    }
+    setState(s => {
+      const accIds = { ...(s.gmail.importedIds[accountId] || {}) };
+      newTasks.forEach(t => { accIds[t.source.id] = t.id; });
+      return {
+        ...s,
+        tasks:[...newTasks, ...s.tasks],
+        gmail:{ ...s.gmail, importedIds: { ...s.gmail.importedIds, [accountId]: accIds } },
+      };
+    });
+    playSound('add');
+    showToast({ type:'info', title:'Imported', body:`${newTasks.length} task${newTasks.length===1?'':'s'} from ${acc.label}` });
+  };
+
+  const gmailUpdateDefaults = (patch) =>
+    setState(s => ({ ...s, gmail: { ...s.gmail, defaults: { ...s.gmail.defaults, ...patch } } }));
+
+  const gmailUpdateClientId = (clientId) => {
+    // Sanitize: strip whitespace, accidental http(s):// prefix, trailing slashes,
+    // and anything after the .apps.googleusercontent.com suffix.
+    let cleaned = (clientId || '').trim().replace(/^https?:\/\//i, '').replace(/\/+$/,'');
+    const m = cleaned.match(/^([0-9A-Za-z._-]+\.apps\.googleusercontent\.com)/);
+    if(m) cleaned = m[1];
+    setState(s => ({ ...s, gmail: { ...s.gmail, clientId: cleaned } }));
+  };
+
+  /* ----------------------------- Derived list ---------------------------- */
+  const allTags = useMemo(()=> {
+    const s = new Set();
+    state.tasks.forEach(t=> (t.tags||[]).forEach(x=>s.add(x)));
+    return [...s].sort();
+  },[state.tasks]);
+
+  const visibleTasks = useMemo(()=>{
+    let list = [...state.tasks];
+    if(filter.status==='active') list = list.filter(t=>!t.done);
+    else if(filter.status==='done') list = list.filter(t=>t.done);
+    else if(filter.status==='today') list = list.filter(t=>!t.done && t.due===isoToday);
+    else if(filter.status==='overdue') list = list.filter(t=>!t.done && t.due && t.due<isoToday);
+    if(filter.project!=='All') list = list.filter(t=> (t.project||'Inbox')===filter.project);
+    if(filter.tag) list = list.filter(t=> (t.tags||[]).includes(filter.tag));
+    if(filter.q){
+      const q = filter.q.toLowerCase();
+      list = list.filter(t=> t.title.toLowerCase().includes(q) || (t.notes||'').toLowerCase().includes(q));
+    }
+    const prioVal = {high:3, medium:2, low:1};
+    const sortFns = {
+      smart: (a,b)=>{
+        if(a.done!==b.done) return a.done?1:-1;
+        const ao = a.due && a.due<isoToday && !a.done ? 1 : 0;
+        const bo = b.due && b.due<isoToday && !b.done ? 1 : 0;
+        if(ao!==bo) return bo-ao;
+        if(prioVal[b.priority]!==prioVal[a.priority]) return prioVal[b.priority]-prioVal[a.priority];
+        if(a.due && b.due) return a.due.localeCompare(b.due);
+        if(a.due) return -1; if(b.due) return 1;
+        return b.created-a.created;
+      },
+      dueAsc:   (a,b)=> (a.due||'9999').localeCompare(b.due||'9999'),
+      prio:     (a,b)=> prioVal[b.priority]-prioVal[a.priority],
+      newest:   (a,b)=> b.created - a.created,
+      oldest:   (a,b)=> a.created - b.created,
+    };
+    list.sort(sortFns[filter.sort] || sortFns.smart);
+    return list;
+  },[state.tasks, filter]);
+
+  return (
+    <div className="min-h-full flex flex-col">
+      {/* Top bar */}
+      <header className="sticky top-0 z-30 px-4 md:px-8 py-3 glass border-b border-white/5">
+        <div className="flex items-center gap-3">
+          <button className="md:hidden p-2 rounded-lg glass-lite" onClick={()=>setSidebarOpen(v=>!v)} aria-label="Toggle sidebar">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+          </button>
+          <div className="flex items-center gap-2">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 grid place-items-center shadow-lg shadow-violet-500/30">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7"/></svg>
+            </div>
+            <div className="leading-tight">
+              <div className="text-[11px] uppercase tracking-[0.2em] text-white/50">QuestList</div>
+              <div className="font-semibold">Gamified Tasks</div>
+            </div>
+          </div>
+          <div className="flex-1"/>
+          <PlayerHUD player={state.player} levelInfo={levelInfo} stats={stats}/>
+        </div>
+      </header>
+
+      <div className="flex-1 flex">
+        {/* Sidebar */}
+        <aside className={`sidebar ${sidebarOpen?'open':''} md:block w-[260px] md:w-[280px] shrink-0 p-4 md:p-5 border-r border-white/5 glass md:sticky md:top-[64px] md:self-start md:h-[calc(100vh-64px)] overflow-auto scroll-thin`}>
+          <Sidebar
+            state={state} filter={filter} setFilter={setFilter}
+            allTags={allTags} addProject={addProject} deleteProject={deleteProject}
+            onExport={exportJSON} onImport={importJSON} onReset={resetAll}
+            toggleSound={()=>setState(s=>({...s, settings:{...s.settings, soundOn:!s.settings.soundOn}}))}
+            toggleConfetti={()=>setState(s=>({...s, settings:{...s.settings, confettiOn:!s.settings.confettiOn}}))}
+            onCloseMobile={()=>setSidebarOpen(false)}
+            gmailSessions={gmailSessions}
+            gmailDemoMode={gmailDemoMode}
+            openGmail={()=>setGmailOpen(true)}
+            openProfile={()=>setProfileOpen(true)}
+          />
+        </aside>
+
+        {/* Main */}
+        <main className="flex-1 min-w-0 p-4 md:p-8">
+          <QuickAdd projects={state.projects} allTags={allTags} onAdd={addTask} playSound={playSound}/>
+          <div className="mt-5 flex flex-wrap items-center gap-2">
+            <StatusTabs filter={filter} setFilter={setFilter} tasks={state.tasks}/>
+            <div className="flex-1"/>
+            <div className="flex items-center gap-2">
+              <input
+                placeholder="Search…"
+                className="px-3 py-2 rounded-lg glass-lite text-sm ring-focus w-36 md:w-56"
+                value={filter.q} onChange={e=>setFilter(f=>({...f,q:e.target.value}))}/>
+              <select className="px-2 py-2 rounded-lg glass-lite text-sm ring-focus"
+                value={filter.sort} onChange={e=>setFilter(f=>({...f,sort:e.target.value}))}>
+                <option value="smart">Smart</option>
+                <option value="dueAsc">Due date</option>
+                <option value="prio">Priority</option>
+                <option value="newest">Newest</option>
+                <option value="oldest">Oldest</option>
+              </select>
+            </div>
+          </div>
+
+          <TaskList
+            tasks={visibleTasks}
+            strikingIds={strikingIds}
+            onComplete={completeTask}
+            onEdit={(t)=>setEditing(t)}
+            onDelete={deleteTask}
+          />
+
+          <Achievements player={state.player}/>
+          <footer className="mt-10 text-center text-xs text-white/40">
+            Autosaved to your browser. Export to JSON anytime from the sidebar.
+          </footer>
+        </main>
+      </div>
+
+      {/* overlays */}
+      <Confetti burstKey={confettiKey}/>
+      {xpFloaters.map(f=>(
+        <div key={f.id}
+          className="fixed z-50 pointer-events-none text-emerald-300 font-bold text-lg animate-xpBurst"
+          style={{left:f.x, top:f.y, transform:'translate(-50%,0)'}}>
+          +{f.amount} XP
+        </div>
+      ))}
+      {showLevelUp && (
+        <div className="fixed inset-0 z-50 grid place-items-center pointer-events-none">
+          <div className="absolute w-40 h-40 rounded-full bg-violet-500/30 animate-pulseRing"/>
+          <div className="relative glass px-6 py-4 rounded-2xl text-center shadow-2xl animate-levelUp">
+            <div className="text-xs uppercase tracking-[0.25em] text-white/60">Level Up</div>
+            <div className="text-3xl font-extrabold bg-gradient-to-r from-violet-300 to-pink-300 bg-clip-text text-transparent">Lv {showLevelUp}</div>
+          </div>
+        </div>
+      )}
+      {toast && <Toast toast={toast}/>}
+      {editing && (
+        <EditModal
+          task={editing}
+          projects={state.projects}
+          allTags={allTags}
+          onClose={()=>setEditing(null)}
+          onSave={(patch)=>{ updateTask(editing.id, patch); setEditing(null); }}
+        />
+      )}
+      {profileOpen && (
+        <ProfileModal
+          profile={state.profile || {}}
+          player={state.player}
+          levelInfo={levelInfo}
+          onClose={()=>setProfileOpen(false)}
+          onSave={(patch)=>setState(s=>({...s, profile:{...s.profile, ...patch}}))}
+        />
+      )}
+      {gmailOpen && (
+        <GmailModal
+          state={state} setState={setState}
+          sessions={gmailSessions}
+          demoMode={gmailDemoMode}
+          emailsByAccount={gmailEmailsByAccount}
+          loadingByAccount={gmailLoadingByAccount}
+          activeAccountId={activeAccountId}
+          setActiveAccountId={setActiveAccountId}
+          onClose={()=>setGmailOpen(false)}
+          onAddAccount={gmailAddAccount}
+          onUpdateAccount={gmailUpdateAccount}
+          onRemoveAccount={gmailRemoveAccount}
+          onConnect={gmailConnect}
+          onDisconnect={gmailDisconnect}
+          onDemo={gmailEnterDemo}
+          onRefresh={gmailRefresh}
+          onRefreshAll={gmailRefreshAll}
+          onImport={gmailImportSelected}
+          onUpdateDefaults={gmailUpdateDefaults}
+          onUpdateClientId={gmailUpdateClientId}
+        />
+      )}
+    </div>
+  );
+}
+
+/* -------------------------------- HUD ------------------------------------- */
+function PlayerHUD({ player, levelInfo, stats }){
+  const pct = Math.min(100, Math.round((levelInfo.inLevel/levelInfo.need)*100));
+  return (
+    <div className="flex items-center gap-3">
+      <div className="hidden sm:flex items-center gap-2 glass-lite rounded-xl px-3 py-1.5">
+        <span className="text-amber-300">🔥</span>
+        <span className="text-sm"><b>{player.streak}</b><span className="text-white/50"> streak</span></span>
+      </div>
+      <div className="hidden sm:flex items-center gap-2 glass-lite rounded-xl px-3 py-1.5">
+        <span className="text-yellow-300">🪙</span>
+        <span className="text-sm"><b>{player.coins}</b></span>
+      </div>
+      <div className="flex items-center gap-3 glass-lite rounded-xl px-3 py-1.5 min-w-[170px]">
+        <div className="w-8 h-8 rounded-lg grid place-items-center bg-gradient-to-br from-violet-500 to-fuchsia-500 shadow-md shadow-fuchsia-500/30 text-[11px] font-bold">
+          Lv{levelInfo.level}
+        </div>
+        <div className="flex-1">
+          <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+            <div className="h-full gradient-bar animate-shimmer" style={{width:`${pct}%`}}/>
+          </div>
+          <div className="text-[10px] text-white/50 mt-0.5">{levelInfo.inLevel}/{levelInfo.need} XP</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------- Sidebar ---------------------------------- */
+function Sidebar({ state, filter, setFilter, allTags, addProject, deleteProject,
+                   onExport, onImport, onReset, toggleSound, toggleConfetti, onCloseMobile,
+                   gmailSessions, gmailDemoMode, openGmail, openProfile }){
+  const [newProj, setNewProj] = useState('');
+  const fileRef = useRef(null);
+  const accounts = state.gmail?.accounts || [];
+  const connectedCount = accounts.filter(a => a.sourceMode==='browser' || gmailSessions?.[a.id]?.token).length;
+  const gmailDemoActive = gmailDemoMode;
+  const gmailStatus = gmailDemoActive ? 'Demo mode'
+    : accounts.length === 0 ? 'No inboxes'
+    : `${accounts.length} inbox${accounts.length===1?'':'es'} · ${connectedCount} ready`;
+  const gmailConnected = accounts.length > 0 || gmailDemoActive;
+  const importedCount = Object.values(state.gmail?.importedIds || {})
+    .reduce((acc, m) => acc + Object.keys(m||{}).length, 0);
+  const scheduleOn = state.gmail?.schedule?.enabled;
+  const profile = state.profile || {};
+  const levelInfo = useMemo(()=> levelForXP(state.player.xp), [state.player.xp]);
+
+  return (
+    <div className="space-y-5">
+      <div className="flex md:hidden justify-between items-center">
+        <div className="text-sm font-semibold">Menu</div>
+        <button className="text-white/60" onClick={onCloseMobile}>✕</button>
+      </div>
+
+      {/* Profile card */}
+      <button onClick={openProfile}
+        className="w-full rounded-xl glass-lite border border-white/5 p-3 flex items-center gap-3 hover:bg-white/[0.07] transition text-left">
+        <div className="w-10 h-10 rounded-full shrink-0 overflow-hidden bg-gradient-to-br from-violet-500 to-fuchsia-500 grid place-items-center shadow">
+          {profile.avatarDataUrl
+            ? <img src={profile.avatarDataUrl} alt="avatar" className="w-full h-full object-cover"/>
+            : <span className="text-lg">{profile.name ? profile.name[0].toUpperCase() : '?'}</span>}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="font-semibold text-sm truncate">{profile.name || 'Set up profile'}</div>
+          <div className="text-[11px] text-white/50">Level {levelInfo.level} · {state.player.coins} coins</div>
+        </div>
+        <span className="text-white/30 text-xs">Edit →</span>
+      </button>
+
+      <section>
+        <SectionTitle>Projects</SectionTitle>
+        <div className="mt-2 space-y-1">
+          <NavItem active={filter.project==='All'} onClick={()=>setFilter(f=>({...f, project:'All'}))} icon="📚">All Projects</NavItem>
+          {state.projects.map(p=>(
+            <NavItem key={p}
+              active={filter.project===p}
+              onClick={()=>setFilter(f=>({...f, project:p}))}
+              icon={p==='Inbox'?'📥':'📂'}
+              trailing={ p!=='Inbox' && (
+                <button className="opacity-0 group-hover:opacity-100 text-white/40 hover:text-rose-400 text-xs"
+                  onClick={(e)=>{ e.stopPropagation(); if(confirm(`Delete project "${p}"? Tasks move to Inbox.`)) deleteProject(p); }}
+                  title="Delete project">✕</button>)}>
+              {p}
+            </NavItem>
+          ))}
+        </div>
+        <form className="mt-2 flex gap-2" onSubmit={e=>{e.preventDefault(); addProject(newProj); setNewProj('');}}>
+          <input value={newProj} onChange={e=>setNewProj(e.target.value)} placeholder="New project…"
+            className="flex-1 px-2 py-1.5 rounded-md glass-lite text-sm ring-focus"/>
+          <button className="px-2 py-1.5 rounded-md bg-violet-500/80 hover:bg-violet-500 text-sm font-semibold">+</button>
+        </form>
+      </section>
+
+      <section>
+        <SectionTitle>Tags</SectionTitle>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          <button
+            className={`chip ${filter.tag===''?'bg-white/15 text-white':'bg-white/5 text-white/60 hover:text-white'}`}
+            onClick={()=>setFilter(f=>({...f, tag:''}))}>All</button>
+          {allTags.map(t=>(
+            <button key={t}
+              className={`chip ${filter.tag===t?'bg-violet-500/30 text-violet-200':'bg-white/5 text-white/60 hover:text-white'}`}
+              onClick={()=>setFilter(f=>({...f, tag: filter.tag===t?'':t}))}>#{t}</button>
+          ))}
+          {allTags.length===0 && <span className="text-xs text-white/40">No tags yet.</span>}
+        </div>
+      </section>
+
+      <section>
+        <SectionTitle>Integrations</SectionTitle>
+        <button onClick={openGmail}
+          className={`mt-2 w-full rounded-xl p-3 text-left transition border
+            ${gmailConnected
+              ? 'bg-gradient-to-br from-emerald-500/15 to-teal-500/10 border-emerald-400/25 hover:from-emerald-500/20'
+              : 'glass-lite hover:bg-white/[0.07] border-white/5'}`}>
+          <div className="flex items-center gap-2">
+            <span className="w-8 h-8 rounded-lg bg-white grid place-items-center shadow-md shrink-0">
+              <svg width="18" height="14" viewBox="0 0 24 18" aria-hidden="true">
+                <path fill="#4285F4" d="M22 4v10a2 2 0 0 1-2 2h-2V7.6l-6 4-6-4V16H4a2 2 0 0 1-2-2V4z"/>
+                <path fill="#34A853" d="M4 16h2V7.6l6 4 6-4V16h2a2 2 0 0 0 2-2V4L12 11 2 4v10a2 2 0 0 0 2 2z" opacity=".0"/>
+                <path fill="#EA4335" d="M2 4v1.5l10 7 10-7V4l-10 7z"/>
+                <path fill="#FBBC04" d="M22 4a2 2 0 0 0-2-2h-1l-7 5 -7-5H4a2 2 0 0 0-2 2v1.5l10 7 10-7z"/>
+              </svg>
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-semibold flex items-center gap-1.5">
+                Email
+                {gmailConnected && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"/>}
+              </div>
+              <div className="text-[11px] text-white/55 truncate">{gmailStatus}</div>
+            </div>
+          </div>
+          <div className="mt-2 flex items-center justify-between gap-3 text-[11px] text-white/50">
+            <span className="truncate">{importedCount} task{importedCount===1?'':'s'} imported{scheduleOn ? ' · auto-sync on' : ''}</span>
+            <span className="text-violet-300 whitespace-nowrap shrink-0">{accounts.length>0 ? 'Sync →' : 'Set up →'}</span>
+          </div>
+        </button>
+      </section>
+
+      <section>
+        <SectionTitle>Settings</SectionTitle>
+        <div className="mt-2 space-y-1">
+          <Toggle label={`Sound ${state.settings.soundOn?'on':'off'}`} on={state.settings.soundOn} onToggle={toggleSound} icon="🔊"/>
+          <Toggle label={`Confetti ${state.settings.confettiOn?'on':'off'}`} on={state.settings.confettiOn} onToggle={toggleConfetti} icon="🎉"/>
+        </div>
+      </section>
+
+      <section>
+        <SectionTitle>Data</SectionTitle>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <button onClick={onExport} className="px-3 py-2 rounded-lg glass-lite text-sm hover:bg-white/10">⬇️ Export JSON</button>
+          <button onClick={()=>fileRef.current?.click()} className="px-3 py-2 rounded-lg glass-lite text-sm hover:bg-white/10">⬆️ Import JSON</button>
+          <input ref={fileRef} type="file" accept="application/json" className="hidden"
+            onChange={e=>{ const f=e.target.files?.[0]; if(f) onImport(f); e.target.value=''; }}/>
+          <button onClick={onReset} className="col-span-2 px-3 py-2 rounded-lg text-sm text-rose-300 hover:bg-rose-500/10 border border-rose-500/20">Reset all data</button>
+        </div>
+      </section>
+    </div>
+  );
+}
+const SectionTitle = ({children}) => <div className="text-[11px] uppercase tracking-[0.22em] text-white/40 font-semibold">{children}</div>;
+const NavItem = ({active, onClick, icon, children, trailing}) => (
+  <button onClick={onClick} className={`group w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-sm transition
+    ${active? 'bg-white/10 text-white':'text-white/70 hover:bg-white/5 hover:text-white'}`}>
+    <span>{icon}</span>
+    <span className="flex-1 text-left truncate">{children}</span>
+    {trailing}
+  </button>
+);
+const Toggle = ({label, on, onToggle, icon}) => (
+  <button onClick={onToggle} className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-sm text-white/80 hover:bg-white/5">
+    <span>{icon}</span>
+    <span className="flex-1 text-left">{label}</span>
+    <span className={`w-9 h-5 rounded-full relative transition ${on?'bg-violet-500':'bg-white/10'}`}>
+      <span className={`absolute top-0.5 ${on?'left-4.5 left-[18px]':'left-0.5'} w-4 h-4 rounded-full bg-white transition-all`}/>
+    </span>
+  </button>
+);
+
+/* ----------------------------- Voice → Task parser ----------------------- */
+// Parses natural-language voice transcripts into task fields.
+// Examples:
+//   "In BlueConic folder, add a task for creating a listener"
+//     → { title: "Creating a listener", project: "BlueConic" }
+//   "Remind me to call Sarah tomorrow, high priority"
+//     → { title: "Call Sarah", due: <tomorrow's ISO>, priority: "high" }
+//   "Add a task to follow up with Ryan in BlueConic, due Friday #email"
+//     → { title: "Follow up with Ryan", project: "BlueConic", due: <Friday>, tags: ["email"] }
+function parseVoiceCommand(transcript, projects){
+  let text = transcript.trim();
+  let project = null, priority = null, due = '', tags = [];
+
+  // Project: "in/to/under [name] folder|project|category|list"
+  const projMatch = text.match(/\b(?:in|to|under)\s+(?:the\s+)?([\w\s'-]+?)\s+(?:folder|project|category|list)\b/i);
+  if(projMatch){
+    const candidate = projMatch[1].trim();
+    const matched = projects.find(p => p.toLowerCase() === candidate.toLowerCase());
+    if(matched){
+      project = matched;
+      text = (text.slice(0, projMatch.index) + text.slice(projMatch.index + projMatch[0].length)).trim();
+    }
+  }
+  if(!project){
+    // Bare project name: "in BlueConic", "to Personal"
+    for(const p of projects){
+      const re = new RegExp(`\\b(?:in|to)\\s+${p.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}\\b`, 'i');
+      const m = text.match(re);
+      if(m){ project = p; text = (text.slice(0,m.index) + text.slice(m.index+m[0].length)).trim(); break; }
+    }
+  }
+
+  // Priority
+  for(const [re, p] of [
+    [/\b(?:urgent|asap|critical|high\s+priority|important)\b/i, 'high'],
+    [/\b(?:low\s+priority|whenever|sometime|when\s+i\s+have\s+time)\b/i, 'low'],
+    [/\b(?:medium\s+priority|normal\s+priority)\b/i, 'medium'],
+  ]){
+    if(re.test(text)){ priority = p; text = text.replace(re, '').trim(); break; }
+  }
+
+  // Due date
+  const today = new Date(); today.setHours(0,0,0,0);
+  const dayMatch = text.match(/\b(?:due|by|on)\s+(today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|next\s+week|end\s+of\s+(?:day|week|month))\b/i);
+  if(dayMatch){
+    const word = dayMatch[1].toLowerCase().replace(/\s+/g,' ');
+    let target = null;
+    if(word === 'today' || word === 'end of day') target = today;
+    else if(word === 'tomorrow') target = new Date(today.getTime() + 86400000);
+    else if(word === 'next week' || word === 'end of week'){ target = new Date(today.getTime() + 7*86400000); }
+    else if(word === 'end of month'){ target = new Date(today.getFullYear(), today.getMonth()+1, 0); }
+    else {
+      const dayMap = {sunday:0, monday:1, tuesday:2, wednesday:3, thursday:4, friday:5, saturday:6};
+      const idx = dayMap[word];
+      if(idx !== undefined){
+        const cur = today.getDay();
+        let diff = (idx - cur + 7) % 7;
+        if(diff === 0) diff = 7;
+        target = new Date(today.getTime() + diff*86400000);
+      }
+    }
+    if(target){ due = target.toISOString().slice(0,10); text = text.replace(dayMatch[0],'').trim(); }
+  }
+
+  // Hashtags → tags
+  const found = [...text.matchAll(/#(\w+)/g)].map(m => m[1]);
+  if(found.length){ tags = found; text = text.replace(/#\w+/g,'').trim(); }
+
+  // Strip leading command boilerplate
+  text = text.replace(/^(?:please\s+)?(?:add|create|make|new|set\s+up|set)\s+(?:a\s+|an\s+)?task\s+(?:for|to|about|saying|that\s+says|titled|called)?\s*/i,'').trim();
+  text = text.replace(/^(?:remind\s+me\s+to|i\s+need\s+to|todo|task|note)\s*/i,'').trim();
+  text = text.replace(/^(?:and\s+|then\s+|also\s+)/i,'').trim();
+
+  // Cleanup punctuation, trailing commas, capitalize
+  text = text.replace(/\s*,\s*/g,' ').replace(/\s+/g,' ').replace(/[.,;:!?]+$/,'').trim();
+  if(text.length > 0) text = text[0].toUpperCase() + text.slice(1);
+
+  return { title: text, project, priority, due, tags };
+}
+
+/* -------------------------------- QuickAdd -------------------------------- */
+function QuickAdd({ projects, allTags, onAdd, playSound }){
+  const [title, setTitle] = useState('');
+  const [priority, setPriority] = useState('medium');
+  const [due, setDue] = useState('');
+  const [project, setProject] = useState(projects[0]||'Inbox');
+  const [tagInput, setTagInput] = useState('');
+  const inputRef = useRef(null);
+
+  // Voice state
+  const [listening, setListening] = useState(false);
+  const [voiceText, setVoiceText] = useState('');
+  const [voicePreview, setVoicePreview] = useState(null);
+  const recRef = useRef(null);
+  const finalRef = useRef('');
+  const SR = (typeof window !== 'undefined') && (window.SpeechRecognition || window.webkitSpeechRecognition);
+
+  useEffect(()=>{
+    const onKey = (e)=>{
+      if((e.metaKey||e.ctrlKey) && e.key.toLowerCase()==='k'){ e.preventDefault(); inputRef.current?.focus(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return ()=> window.removeEventListener('keydown', onKey);
+  },[]);
+
+  const submit = (e) => {
+    e.preventDefault();
+    if(!title.trim()) return;
+    const tags = tagInput.split(',').map(t=>t.trim().replace(/^#/,'')).filter(Boolean);
+    onAdd({ title, priority, due, tags, project });
+    setTitle(''); setTagInput(''); setDue('');
+  };
+
+  const startVoice = () => {
+    if(!SR){
+      alert('Voice input requires Chrome or Edge. Other browsers don\'t support the Web Speech API.');
+      return;
+    }
+    if(listening){ recRef.current?.stop(); return; }
+
+    const rec = new SR();
+    rec.continuous = false;
+    rec.interimResults = true;
+    rec.lang = 'en-US';
+    finalRef.current = '';
+    setVoiceText('');
+    setVoicePreview(null);
+
+    rec.onresult = (e) => {
+      let interim = '';
+      for(let i = e.resultIndex; i < e.results.length; i++){
+        const r = e.results[i];
+        if(r.isFinal) finalRef.current += r[0].transcript + ' ';
+        else interim += r[0].transcript;
+      }
+      const live = (finalRef.current + interim).trim();
+      setVoiceText(live);
+      // Live preview
+      if(live){
+        try { setVoicePreview(parseVoiceCommand(live, projects)); } catch(e){}
+      }
+    };
+    rec.onerror = (e) => {
+      console.warn('Speech error:', e.error);
+      setListening(false);
+    };
+    rec.onend = () => {
+      setListening(false);
+      const transcript = (finalRef.current || voiceText).trim();
+      if(transcript){
+        const parsed = parseVoiceCommand(transcript, projects);
+        if(parsed.title){
+          onAdd({
+            title: parsed.title,
+            priority: parsed.priority || priority,
+            due: parsed.due || due,
+            tags: parsed.tags.length ? parsed.tags : tagInput.split(',').map(t=>t.trim().replace(/^#/,'')).filter(Boolean),
+            project: parsed.project || project,
+          });
+          if(playSound) playSound('add');
+        }
+      }
+      setVoiceText('');
+      setVoicePreview(null);
+    };
+    recRef.current = rec;
+    rec.start();
+    setListening(true);
+  };
+
+  const showLive = listening && voiceText;
+
+  return (
+    <form onSubmit={submit} className="glass rounded-2xl p-3 md:p-4 flex flex-wrap items-center gap-2 shadow-xl shadow-black/20 relative">
+      <div className="flex-1 min-w-[220px] flex items-center gap-2">
+        <div className="w-8 h-8 rounded-lg bg-amber-400/15 border border-amber-300/25 grid place-items-center text-amber-300 shrink-0">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 20h9"/>
+            <path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/>
+          </svg>
+        </div>
+        <input
+          ref={inputRef}
+          value={showLive ? voiceText : title}
+          onChange={e=>setTitle(e.target.value)}
+          disabled={listening}
+          placeholder={listening ? 'Listening… speak now' : 'Write a new quest…   (⌘/Ctrl+K)   or click 🎤'}
+          className={`flex-1 bg-transparent outline-none placeholder:text-white/40 py-2 text-[15px] ${listening?'text-rose-200':''}`}
+        />
+        <button
+          type="button"
+          onClick={startVoice}
+          aria-label={listening ? 'Stop listening' : 'Add task by voice'}
+          title={SR ? (listening ? 'Listening… click to stop' : 'Add task by voice') : 'Voice not supported (use Chrome/Edge)'}
+          className={`w-9 h-9 rounded-lg grid place-items-center transition shrink-0 relative
+            ${!SR ? 'bg-white/5 text-white/30 cursor-not-allowed'
+              : listening ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/40'
+              : 'bg-white/5 text-white/65 hover:text-white hover:bg-white/10'}`}>
+          {listening && <span className="absolute inset-0 rounded-lg ring-2 ring-rose-400/60 animate-pulseRing"/>}
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+            <line x1="12" y1="19" x2="12" y2="23"/>
+            <line x1="8" y1="23" x2="16" y2="23"/>
+          </svg>
+        </button>
+      </div>
+      <select value={priority} onChange={e=>setPriority(e.target.value)} className="px-2 py-1.5 rounded-lg glass-lite text-sm ring-focus" disabled={listening}>
+        {Object.entries(PRIORITIES).map(([k,v])=>(
+          <option key={k} value={k}>{v.label} · +{v.xp} XP</option>
+        ))}
+      </select>
+      <input type="date" value={due} onChange={e=>setDue(e.target.value)}
+        disabled={listening}
+        className="px-2 py-1.5 rounded-lg glass-lite text-sm ring-focus"/>
+      <select value={project} onChange={e=>setProject(e.target.value)} disabled={listening} className="px-2 py-1.5 rounded-lg glass-lite text-sm ring-focus">
+        {projects.map(p=> <option key={p} value={p}>{p}</option>)}
+      </select>
+      <input value={tagInput} onChange={e=>setTagInput(e.target.value)} disabled={listening} placeholder="tags, comma, separated"
+        className="px-2 py-1.5 rounded-lg glass-lite text-sm ring-focus w-44"/>
+      <button className="px-4 py-2 rounded-lg font-semibold text-sm bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:brightness-110 shadow-lg shadow-fuchsia-500/20" disabled={listening}>
+        Add
+      </button>
+
+      {/* Live voice preview popover */}
+      {listening && voicePreview && voicePreview.title && (
+        <div className="absolute left-3 right-3 -bottom-[72px] modal-pane rounded-xl px-4 py-2.5 text-sm flex items-center gap-3 z-20 animate-floatUp">
+          <span className="text-rose-300 animate-pulse">●</span>
+          <div className="flex-1 min-w-0">
+            <div className="text-xs text-white/55">Will create:</div>
+            <div className="truncate"><b>{voicePreview.title}</b>
+              {voicePreview.project && <span className="text-violet-300"> → {voicePreview.project}</span>}
+              {voicePreview.priority && <span className={`ml-2 ${PRIORITIES[voicePreview.priority]?.color || ''}`}>· {voicePreview.priority}</span>}
+              {voicePreview.due && <span className="ml-2 text-amber-300">· due {voicePreview.due}</span>}
+              {voicePreview.tags?.length > 0 && <span className="ml-2 text-white/55">· {voicePreview.tags.map(t=>'#'+t).join(' ')}</span>}
+            </div>
+          </div>
+        </div>
+      )}
+    </form>
+  );
+}
+
+/* ------------------------------ StatusTabs -------------------------------- */
+function StatusTabs({ filter, setFilter, tasks }){
+  const tabs = [
+    { k:'all',     label:'All',     count: tasks.length },
+    { k:'active',  label:'Active',  count: tasks.filter(t=>!t.done).length },
+    { k:'today',   label:'Today',   count: tasks.filter(t=>!t.done && t.due===isoToday).length },
+    { k:'overdue', label:'Overdue', count: tasks.filter(t=>!t.done && t.due && t.due<isoToday).length },
+    { k:'done',    label:'Done',    count: tasks.filter(t=>t.done).length },
+  ];
+  return (
+    <div className="flex flex-wrap gap-1 glass-lite rounded-xl p-1">
+      {tabs.map(t=>(
+        <button key={t.k}
+          onClick={()=>setFilter(f=>({...f, status:t.k}))}
+          className={`px-3 py-1.5 rounded-lg text-sm transition flex items-center gap-2
+            ${filter.status===t.k? 'bg-white/10 text-white':'text-white/60 hover:text-white'}`}>
+          <span>{t.label}</span>
+          <span className="text-[11px] text-white/50">{t.count}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/* -------------------------------- TaskList -------------------------------- */
+function TaskList({ tasks, strikingIds, onComplete, onEdit, onDelete }){
+  if(tasks.length===0){
+    return (
+      <div className="mt-10 text-center text-white/50 animate-floatUp">
+        <div className="text-5xl mb-3">✨</div>
+        <div>Nothing here. Add a quest to earn XP.</div>
+      </div>
+    );
+  }
+  return (
+    <ul className="mt-4 space-y-2">
+      {tasks.map(t => <TaskRow key={t.id} task={t} striking={strikingIds?.has(t.id)} onComplete={onComplete} onEdit={onEdit} onDelete={onDelete}/>)}
+    </ul>
+  );
+}
+
+/* ------------------------ Pencil strike primitives ------------------------ */
+function StrikeLine({ animate }){
+  return (
+    <span
+      aria-hidden="true"
+      className={`strike-bar ${animate ? 'strike-bar-animate' : 'strike-bar-static'}`}
+    />
+  );
+}
+function PencilTip(){
+  return (
+    <span className="pencil-tip-move" aria-hidden="true">
+      <svg width="22" height="22" viewBox="0 0 24 24" className="block">
+        {/* wooden barrel */}
+        <rect x="8"  y="3"  width="8" height="12" fill="#f6c246" stroke="#8a6a1a" strokeWidth="0.4"/>
+        <rect x="8"  y="3"  width="8" height="2"  fill="#d89a22"/>
+        {/* ferrule */}
+        <rect x="8"  y="15" width="8" height="1.4" fill="#c9c9cf"/>
+        {/* eraser */}
+        <rect x="8"  y="16" width="8" height="2"  fill="#d9493a"/>
+        {/* wood tip */}
+        <polygon points="8,3 12,-1 16,3" fill="#f2dcaf" stroke="#8a6a1a" strokeWidth="0.4"/>
+        {/* graphite point */}
+        <polygon points="10.8,0.4 12,-1 13.2,0.4" fill="#2b2b2b"/>
+        {/* highlight */}
+        <rect x="9.2" y="5" width="1.2" height="10" fill="#fff" opacity="0.35"/>
+      </svg>
+    </span>
+  );
+}
+
+function TaskRow({ task, striking, onComplete, onEdit, onDelete }){
+  const p = PRIORITIES[task.priority] || PRIORITIES.medium;
+  const overdue = !task.done && task.due && task.due < isoToday;
+  const dueToday = !task.done && task.due === isoToday;
+  const ref = useRef(null);
+  return (
+    <li ref={ref}
+      className={`glass rounded-xl p-3 flex items-start gap-3 animate-slideIn
+        ${task.done ? 'opacity-60':''}`}>
+      <button
+        onClick={()=>onComplete(task, ref.current)}
+        className={`relative shrink-0 w-7 h-7 rounded-full border-2 grid place-items-center transition
+          ${task.done ? 'bg-gradient-to-br from-emerald-400 to-teal-500 border-emerald-300 animate-pop' : `border-white/25 hover:border-white/60 ${p.ring}`}`}
+        aria-label={task.done?'Mark as not done':'Complete task'}>
+        {task.done && (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7"/></svg>
+        )}
+        {striking && !task.done && (
+          <span className="absolute inset-[-2px] rounded-full ring-2 ring-amber-300/60 animate-pulseRing pointer-events-none"/>
+        )}
+      </button>
+
+      <div className="flex-1 min-w-0">
+        <div className="flex items-start gap-2">
+          <div className={`flex-1 text-[15px] ${task.done ? 'text-white/60' : ''}`}>
+            <span className="relative inline-block max-w-full align-baseline">
+              <span>{task.title}</span>
+              {(striking || task.done) && <StrikeLine animate={striking}/>}
+              {striking && <PencilTip/>}
+            </span>
+          </div>
+          <span className={`chip ${p.bg} ${p.color}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${p.dot}`}/>
+            {p.label} · +{p.xp}
+          </span>
+        </div>
+        {task.notes && <div className="text-sm text-white/60 mt-1 whitespace-pre-wrap">{task.notes}</div>}
+        <div className="flex flex-wrap items-center gap-1.5 mt-2">
+          {task.project && task.project!=='Inbox' && <span className="chip bg-white/5 text-white/70">📂 {task.project}</span>}
+          {task.due && (
+            <span className={`chip ${overdue?'bg-rose-500/15 text-rose-300': dueToday?'bg-amber-500/15 text-amber-300':'bg-white/5 text-white/60'}`}>
+              📅 {task.due}{overdue && ' · overdue'}{dueToday && ' · today'}
+            </span>
+          )}
+          {(task.tags||[]).map(t=> <span key={t} className="chip bg-white/5 text-white/60">#{t}</span>)}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-1 shrink-0">
+        <IconBtn title="Edit" onClick={()=>onEdit(task)}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>
+        </IconBtn>
+        <IconBtn title="Delete" onClick={()=>{ if(confirm('Delete this task?')) onDelete(task.id); }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
+        </IconBtn>
+      </div>
+    </li>
+  );
+}
+const IconBtn = ({children, title, onClick}) => (
+  <button title={title} onClick={onClick} className="w-8 h-8 rounded-lg text-white/60 hover:text-white hover:bg-white/10 grid place-items-center transition">{children}</button>
+);
+
+/* -------------------------------- EditModal ------------------------------- */
+function EditModal({ task, projects, allTags, onClose, onSave }){
+  const [form, setForm] = useState({
+    title: task.title, notes: task.notes||'', priority: task.priority,
+    due: task.due||'', project: task.project||'Inbox',
+    tags: (task.tags||[]).join(', ')
+  });
+  const save = () => {
+    onSave({
+      title: form.title.trim() || task.title,
+      notes: form.notes,
+      priority: form.priority,
+      due: form.due,
+      project: form.project,
+      tags: form.tags.split(',').map(t=>t.trim().replace(/^#/,'')).filter(Boolean),
+    });
+  };
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center p-4 bg-black/50 backdrop-blur-sm animate-floatUp" onClick={onClose}>
+      <div className="modal-pane rounded-2xl p-5 w-full max-w-lg" onClick={e=>e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-lg">Edit quest</h3>
+          <button onClick={onClose} className="text-white/60 hover:text-white">✕</button>
+        </div>
+        <div className="mt-4 space-y-3">
+          <Field label="Title">
+            <input value={form.title} onChange={e=>setForm({...form,title:e.target.value})}
+              className="w-full px-3 py-2 rounded-lg glass-lite ring-focus"/>
+          </Field>
+          <Field label="Notes">
+            <textarea rows="3" value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})}
+              className="w-full px-3 py-2 rounded-lg glass-lite ring-focus"/>
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Priority">
+              <select value={form.priority} onChange={e=>setForm({...form,priority:e.target.value})}
+                className="w-full px-2 py-2 rounded-lg glass-lite ring-focus">
+                {Object.entries(PRIORITIES).map(([k,v])=>(<option key={k} value={k}>{v.label}</option>))}
+              </select>
+            </Field>
+            <Field label="Due date">
+              <input type="date" value={form.due} onChange={e=>setForm({...form,due:e.target.value})}
+                className="w-full px-2 py-2 rounded-lg glass-lite ring-focus"/>
+            </Field>
+            <Field label="Project">
+              <select value={form.project} onChange={e=>setForm({...form,project:e.target.value})}
+                className="w-full px-2 py-2 rounded-lg glass-lite ring-focus">
+                {projects.map(p=><option key={p} value={p}>{p}</option>)}
+              </select>
+            </Field>
+            <Field label="Tags (comma separated)">
+              <input value={form.tags} onChange={e=>setForm({...form,tags:e.target.value})}
+                className="w-full px-2 py-2 rounded-lg glass-lite ring-focus"/>
+            </Field>
+          </div>
+        </div>
+        <div className="mt-5 flex justify-end gap-2">
+          <button onClick={onClose} className="px-3 py-2 rounded-lg glass-lite hover:bg-white/10 text-sm">Cancel</button>
+          <button onClick={save} className="px-4 py-2 rounded-lg font-semibold text-sm bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:brightness-110">Save</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+const Field = ({label, children}) => (
+  <label className="block">
+    <div className="text-[11px] uppercase tracking-[0.2em] text-white/50 mb-1">{label}</div>
+    {children}
+  </label>
+);
+
+/* -------------------------------- ProfileModal ----------------------------- */
+function ProfileModal({ profile, player, levelInfo, onClose, onSave }){
+  const [name, setName] = useState(profile.name || '');
+  const [avatarDataUrl, setAvatarDataUrl] = useState(profile.avatarDataUrl || '');
+  const [friends, setFriends] = useState(profile.friends || []);
+  const [friendInput, setFriendInput] = useState('');
+  const [saved, setSaved] = useState(false);
+  const avatarRef = useRef(null);
+
+  const handleAvatar = (e) => {
+    const file = e.target.files?.[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => setAvatarDataUrl(ev.target.result);
+    reader.readAsDataURL(file);
+  };
+
+  const addFriend = () => {
+    const email = friendInput.trim().toLowerCase();
+    if(!email || friends.includes(email)) return;
+    setFriends(f => [...f, email]);
+    setFriendInput('');
+  };
+
+  const save = () => {
+    onSave({ name: name.trim(), avatarDataUrl, friends });
+    setSaved(true);
+    setTimeout(() => { setSaved(false); onClose(); }, 800);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center p-4 bg-black/55 backdrop-blur-sm animate-floatUp">
+      <div className="modal-pane rounded-2xl w-full max-w-md flex flex-col overflow-hidden" onClick={e=>e.stopPropagation()}>
+        <div className="flex items-center gap-3 p-4 border-b border-white/5">
+          <div className="font-semibold flex-1">Your Profile</div>
+          <button onClick={onClose} className="text-white/60 hover:text-white px-2">✕</button>
+        </div>
+
+        <div className="p-5 space-y-5 overflow-auto">
+          {/* Avatar */}
+          <div className="flex items-center gap-4">
+            <button onClick={()=>avatarRef.current?.click()}
+              className="w-20 h-20 rounded-full overflow-hidden bg-gradient-to-br from-violet-500 to-fuchsia-500 grid place-items-center shadow-lg hover:brightness-110 transition shrink-0 relative group">
+              {avatarDataUrl
+                ? <img src={avatarDataUrl} alt="avatar" className="w-full h-full object-cover"/>
+                : <span className="text-3xl">{name ? name[0].toUpperCase() : '👤'}</span>}
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition grid place-items-center text-xs font-semibold">Upload</div>
+            </button>
+            <input ref={avatarRef} type="file" accept="image/*" className="hidden" onChange={handleAvatar}/>
+            <div className="flex-1 space-y-2">
+              <Field label="Display name">
+                <input value={name} onChange={e=>setName(e.target.value)}
+                  placeholder="Your name"
+                  className="w-full px-3 py-2 rounded-lg glass-lite ring-focus"/>
+              </Field>
+              <div className="text-xs text-white/40">Level {levelInfo.level} · {player.xp} XP · {player.coins} coins · {player.streak}-day streak</div>
+            </div>
+          </div>
+
+          {/* Friends */}
+          <div>
+            <div className="text-[11px] uppercase tracking-[0.2em] text-white/40 font-semibold mb-2">Friends</div>
+            <div className="flex gap-2 mb-2">
+              <input value={friendInput} onChange={e=>setFriendInput(e.target.value)}
+                onKeyDown={e=>e.key==='Enter' && addFriend()}
+                placeholder="friend@email.com"
+                className="flex-1 px-3 py-2 rounded-lg glass-lite ring-focus text-sm"/>
+              <button onClick={addFriend}
+                className="px-3 py-2 rounded-lg bg-violet-500/80 hover:bg-violet-500 text-sm font-semibold">Add</button>
+            </div>
+            {friends.length === 0
+              ? <div className="text-xs text-white/35 italic">No friends added yet. Add their emails to compare progress.</div>
+              : <div className="space-y-1">
+                  {friends.map(f=>(
+                    <div key={f} className="flex items-center gap-2 text-sm glass-lite rounded-lg px-3 py-1.5">
+                      <span className="flex-1 text-white/70 truncate">{f}</span>
+                      <span className="text-[10px] text-white/30 italic">Local only — sharing coming soon</span>
+                      <button onClick={()=>setFriends(fs=>fs.filter(x=>x!==f))} className="text-white/30 hover:text-rose-400 text-xs ml-1">✕</button>
+                    </div>
+                  ))}
+                </div>}
+          </div>
+        </div>
+
+        <div className="p-4 border-t border-white/5 flex justify-end gap-2">
+          <button onClick={onClose} className="px-3 py-2 rounded-lg glass-lite hover:bg-white/10 text-sm">Cancel</button>
+          <button onClick={save}
+            className={`px-5 py-2 rounded-lg font-semibold text-sm transition ${saved ? 'bg-emerald-500/30 text-emerald-200' : 'bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:brightness-110'}`}>
+            {saved ? '✓ Saved!' : 'Save profile'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* -------------------------------- GmailModal (multi-account) -------------- */
+function GmailModal({
+  state, setState, sessions, demoMode, emailsByAccount, loadingByAccount,
+  activeAccountId, setActiveAccountId,
+  onClose, onAddAccount, onUpdateAccount, onRemoveAccount,
+  onConnect, onDisconnect, onDemo, onRefresh, onRefreshAll, onImport,
+  onUpdateDefaults, onUpdateClientId,
+}){
+  const accounts = state.gmail.accounts || [];
+  const hasAccounts = accounts.length > 0;
+  const [tab, setTab] = useState(hasAccounts ? 'inbox' : 'accounts');
+  const [selectedByAccount, setSelectedByAccount] = useState({}); // { [accountId]: Set }
+
+  useEffect(()=>{ // reset selection when emails change
+    setSelectedByAccount({});
+  }, [emailsByAccount]);
+
+  const setSelected = (accountId, fn) => {
+    setSelectedByAccount(s => {
+      const cur = s[accountId] || new Set();
+      const next = fn(cur);
+      return { ...s, [accountId]: next };
+    });
+  };
+  const toggleSel = (accountId, id) => setSelected(accountId, cur => {
+    const n = new Set(cur); n.has(id) ? n.delete(id) : n.add(id); return n;
+  });
+
+  const activeAccount = accounts.find(a => a.id === activeAccountId);
+  const activeEmails = (emailsByAccount[activeAccountId] || []);
+  const activeLoading = !!loadingByAccount[activeAccountId];
+  const activeSelected = selectedByAccount[activeAccountId] || new Set();
+  const activeImported = state.gmail.importedIds[activeAccountId] || {};
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center p-4 bg-black/55 backdrop-blur-sm animate-floatUp">
+      <div className="modal-pane rounded-2xl w-full max-w-3xl max-h-[88vh] flex flex-col overflow-hidden" onClick={e=>e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-center gap-3 p-4 border-b border-white/5">
+          <div className="w-9 h-9 rounded-xl bg-white grid place-items-center shadow">
+            <svg width="22" height="16" viewBox="0 0 24 18" aria-hidden="true">
+              <path fill="#4285F4" d="M22 4v10a2 2 0 0 1-2 2h-2V7.6l-6 4-6-4V16H4a2 2 0 0 1-2-2V4z"/>
+              <path fill="#EA4335" d="M2 4v1.5l10 7 10-7V4l-10 7z"/>
+              <path fill="#FBBC04" d="M22 4a2 2 0 0 0-2-2h-1l-7 5 -7-5H4a2 2 0 0 0-2 2v1.5l10 7 10-7z"/>
+            </svg>
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="font-semibold">Email → Tasks</div>
+            <div className="text-xs text-white/55">
+              {demoMode ? 'Demo mode (fake inbox)' :
+                accounts.length === 0 ? 'No inboxes connected'
+                : `${accounts.length} inbox${accounts.length===1?'':'es'} (Gmail + Outlook supported)`}
+            </div>
+          </div>
+          <button onClick={onClose} className="text-white/60 hover:text-white px-2">✕</button>
+        </div>
+
+        {/* Tabs */}
+        <div className="px-4 pt-3 flex gap-1 border-b border-white/5">
+          <TabBtn active={tab==='inbox'}    onClick={()=>setTab('inbox')}>Inbox</TabBtn>
+          <TabBtn active={tab==='accounts'} onClick={()=>setTab('accounts')}>Accounts ({accounts.length})</TabBtn>
+          <TabBtn active={tab==='auto'}     onClick={()=>setTab('auto')}>Automation</TabBtn>
+          <TabBtn active={tab==='defaults'} onClick={()=>setTab('defaults')}>Defaults</TabBtn>
+          <div className="flex-1"/>
+          {tab==='inbox' && hasAccounts && (
+            <button onClick={onRefreshAll} disabled={Object.values(loadingByAccount).some(v=>v)}
+              className="text-sm px-3 py-1.5 rounded-lg bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:brightness-110 font-semibold disabled:opacity-40">
+              Sync All
+            </button>
+          )}
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 min-h-0 overflow-auto scroll-thin p-4">
+          {tab==='accounts' && (
+            <AccountsPanel
+              state={state} sessions={sessions} demoMode={demoMode}
+              loadingByAccount={loadingByAccount}
+              onAdd={onAddAccount} onUpdate={onUpdateAccount} onRemove={onRemoveAccount}
+              onConnect={onConnect} onDisconnect={onDisconnect}
+              onRefresh={onRefresh} onDemo={onDemo}
+              onSelectActive={(id)=>{ setActiveAccountId(id); setTab('inbox'); }}
+            />
+          )}
+          {tab==='auto' && (
+            <AutomationPanel state={state} setState={setState}/>
+          )}
+          {tab==='defaults' && (
+            <DefaultsPanel state={state}
+              onUpdateDefaults={onUpdateDefaults}
+              onUpdateClientId={onUpdateClientId}/>
+          )}
+          {tab==='inbox' && (
+            <div>
+              {!hasAccounts && (
+                <div className="text-center py-12">
+                  <div className="text-5xl mb-3">📬</div>
+                  <div className="text-white/70">No inboxes yet — add one or try demo mode.</div>
+                  <div className="mt-4 flex justify-center gap-2">
+                    <button onClick={()=>setTab('accounts')}
+                      className="px-4 py-2 rounded-lg bg-gradient-to-r from-violet-500 to-fuchsia-500 text-sm font-semibold">Add an inbox</button>
+                    <button onClick={onDemo}
+                      className="px-4 py-2 rounded-lg glass-lite hover:bg-white/10 text-sm">Try demo mode</button>
+                  </div>
+                </div>
+              )}
+              {hasAccounts && (
+                <>
+                  {/* Account picker chips */}
+                  <div className="flex gap-1.5 overflow-x-auto pb-2 -mx-1 px-1 scroll-thin">
+                    {accounts.map(a => {
+                      const sess = sessions[a.id];
+                      const isActive = a.id === activeAccountId;
+                      const isReady = a.sourceMode === 'browser' || demoMode || !!sess?.token;
+                      const count = (emailsByAccount[a.id] || []).length;
+                      return (
+                        <button key={a.id}
+                          onClick={()=>setActiveAccountId(a.id)}
+                          className={`shrink-0 px-3 py-1.5 rounded-lg border text-sm whitespace-nowrap transition flex items-center gap-2
+                            ${isActive ? 'bg-white/10 border-white/20 text-white' : 'glass-lite border-white/5 text-white/65 hover:text-white'}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${isReady ? 'bg-emerald-400' : 'bg-white/30'}`}/>
+                          <span className="font-medium">{a.label}</span>
+                          {count > 0 && <span className="text-[11px] text-white/50">{count}</span>}
+                          <span className="text-[10px] uppercase tracking-wider text-white/40">{a.sourceMode}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {activeAccount && (
+                    <div className="mt-3">
+                      {/* Active account toolbar */}
+                      <div className="flex items-center justify-between mb-2 text-xs">
+                        <div className="text-white/55">
+                          {activeAccount.email || activeAccount.label}
+                          {activeAccount.lastSync && <span> · last sync {new Date(activeAccount.lastSync).toLocaleString()}</span>}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button onClick={()=>onRefresh(activeAccount.id)}
+                            disabled={activeLoading}
+                            className="text-violet-300 hover:text-violet-200 disabled:opacity-50">
+                            {activeLoading ? 'Syncing…' : 'Sync this'}
+                          </button>
+                          {activeAccount.sourceMode === 'oauth' && !sessions[activeAccount.id]?.token && !demoMode && (
+                            <button onClick={()=>onConnect(activeAccount.id)}
+                              className="text-emerald-300 hover:text-emerald-200">Connect</button>
+                          )}
+                          {activeAccount.sourceMode === 'oauth' && sessions[activeAccount.id]?.token && (
+                            <button onClick={()=>onDisconnect(activeAccount.id)}
+                              className="text-rose-300 hover:text-rose-200">Disconnect</button>
+                          )}
+                        </div>
+                      </div>
+
+                      {activeAccount.sourceMode === 'browser' && activeEmails.length === 0 && !activeLoading && (
+                        <div className="text-center py-10 text-white/55 text-sm">
+                          <div className="text-3xl mb-2">🤖</div>
+                          <div>This is a browser-mode inbox.</div>
+                          <div className="text-xs mt-1">In chat, ask Claude to "sync {activeAccount.label}" — Claude will read your inbox via Chrome and push tasks here.</div>
+                        </div>
+                      )}
+
+                      {activeLoading && activeEmails.length === 0 && (
+                        <div className="text-center py-10 text-white/50">Loading emails…</div>
+                      )}
+
+                      {activeEmails.length > 0 && (
+                        <>
+                          <div className="flex items-center justify-between mb-2 text-xs">
+                            <div className="text-white/50">
+                              {activeEmails.length} email{activeEmails.length===1?'':'s'} · {activeSelected.size} selected
+                            </div>
+                            <div className="flex gap-3">
+                              <button
+                                onClick={()=>{
+                                  const ids = activeEmails.filter(e => !activeImported[e.id]).map(e => e.id);
+                                  setSelected(activeAccount.id, ()=> new Set(ids));
+                                }}
+                                className="text-violet-300 hover:text-violet-200">Select all new</button>
+                              <button
+                                onClick={()=> setSelected(activeAccount.id, ()=> new Set())}
+                                className="text-white/50 hover:text-white">Clear</button>
+                            </div>
+                          </div>
+                          <ul className="space-y-2">
+                            {activeEmails.map(e => {
+                              const already = !!activeImported[e.id];
+                              const isSel = activeSelected.has(e.id);
+                              const from = parseGmailFrom(e.from);
+                              const prio = activeAccount.defaultPriority === 'auto'
+                                ? inferPriorityFromEmail(e) : activeAccount.defaultPriority;
+                              const p = PRIORITIES[prio];
+                              return (
+                                <li key={e.id}
+                                  className={`rounded-xl p-3 border transition cursor-pointer
+                                    ${already ? 'bg-white/[0.02] border-white/5 opacity-60'
+                                      : isSel ? 'bg-violet-500/15 border-violet-400/40'
+                                      : 'glass-lite hover:bg-white/[0.07] border-white/5'}`}
+                                  onClick={()=> !already && toggleSel(activeAccount.id, e.id)}>
+                                  <div className="flex items-start gap-3">
+                                    <input type="checkbox" disabled={already} checked={isSel} readOnly
+                                      className="mt-1 w-4 h-4 accent-violet-500"/>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2">
+                                        <div className="font-medium text-[14px] truncate flex-1">{e.subject}</div>
+                                        <span className={`chip ${p.bg} ${p.color}`}>
+                                          <span className={`w-1.5 h-1.5 rounded-full ${p.dot}`}/>
+                                          {p.label}
+                                        </span>
+                                      </div>
+                                      <div className="text-xs text-white/60 truncate mt-0.5">{from.name || from.email}</div>
+                                      <div className="text-xs text-white/50 line-clamp-2 mt-1">{e.snippet}</div>
+                                      <div className="flex flex-wrap gap-1 mt-2">
+                                        {e.labelIds?.includes('IMPORTANT') && <span className="chip bg-rose-500/15 text-rose-300">Important</span>}
+                                        {e.labelIds?.includes('STARRED')   && <span className="chip bg-amber-500/15 text-amber-300">Starred</span>}
+                                        {e.labelIds?.includes('UNREAD')    && <span className="chip bg-sky-500/15 text-sky-300">Unread</span>}
+                                        {already && <span className="chip bg-emerald-500/15 text-emerald-300">Imported</span>}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        {tab==='inbox' && hasAccounts && activeAccount && (
+          <div className="p-3 border-t border-white/5 flex items-center justify-between gap-3">
+            <div className="text-xs text-white/50">{activeAccount.label}</div>
+            <div className="flex gap-2">
+              <button onClick={onClose}
+                className="px-3 py-2 rounded-lg glass-lite hover:bg-white/10 text-sm">Close</button>
+              <button
+                disabled={activeSelected.size===0}
+                onClick={()=>onImport(activeAccount.id, [...activeSelected])}
+                className="px-4 py-2 rounded-lg text-sm font-semibold bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed">
+                Import {activeSelected.size > 0 ? `${activeSelected.size} → ` : ''}Task{activeSelected.size===1?'':'s'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+const TabBtn = ({active, onClick, children}) => (
+  <button onClick={onClick}
+    className={`px-3 py-2 text-sm rounded-t-lg transition
+      ${active ? 'bg-white/10 text-white border-b-2 border-violet-400 -mb-px' : 'text-white/55 hover:text-white'}`}>
+    {children}
+  </button>
+);
+
+/* --------- Accounts panel: add/edit/remove inboxes --------- */
+function AccountsPanel({ state, sessions, demoMode, loadingByAccount,
+                         onAdd, onUpdate, onRemove, onConnect, onDisconnect,
+                         onRefresh, onDemo, onSelectActive }){
+  const [adding, setAdding] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const accounts = state.gmail.accounts || [];
+
+  return (
+    <div className="space-y-4">
+      {accounts.length === 0 && (
+        <div className="text-center py-6 rounded-xl border border-white/5 bg-white/[0.02]">
+          <div className="text-3xl mb-2">📭</div>
+          <div className="text-white/70 text-sm">No inboxes yet.</div>
+          <div className="mt-3 flex justify-center gap-2">
+            <button onClick={()=>setAdding(true)}
+              className="px-4 py-2 rounded-lg bg-gradient-to-r from-violet-500 to-fuchsia-500 text-sm font-semibold">
+              + Add inbox
+            </button>
+            <button onClick={onDemo}
+              className="px-4 py-2 rounded-lg glass-lite hover:bg-white/10 text-sm">Demo mode</button>
+          </div>
+        </div>
+      )}
+
+      {accounts.map(a => {
+        const sess = sessions[a.id];
+        const ready = a.sourceMode === 'browser' || demoMode || !!sess?.token;
+        const isEditing = editingId === a.id;
+        return (
+          <div key={a.id} className="rounded-xl border border-white/5 bg-white/[0.02]">
+            <div className="p-3 flex items-center gap-3">
+              <span className={`w-2 h-2 rounded-full shrink-0 ${ready ? 'bg-emerald-400' : 'bg-white/25'}`}/>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="font-semibold text-sm">{a.label}</div>
+                  <span className={`chip ${(a.provider||'gmail')==='outlook' ? 'bg-sky-500/15 text-sky-300' : 'bg-rose-500/15 text-rose-300'}`}>
+                    {(a.provider||'gmail')==='outlook' ? 'Outlook' : 'Gmail'}
+                  </span>
+                  <span className="chip bg-white/5 text-white/60">{a.sourceMode}</span>
+                  <span className="chip bg-white/5 text-white/60">→ {a.defaultProject}</span>
+                  {a.autoTag && <span className="chip bg-white/5 text-white/60">#{a.autoTag}</span>}
+                  {!a.enabled && <span className="chip bg-rose-500/15 text-rose-300">Disabled</span>}
+                </div>
+                <div className="text-xs text-white/50 truncate">
+                  {a.email || '(no email yet)'}
+                  {(a.provider||'gmail')==='gmail' ? ` · u/${a.gmailUserIndex ?? 0}` : ` · ${a.outlookHost || 'office'}`}
+                  {a.lastSync && <span> · synced {new Date(a.lastSync).toLocaleString()}</span>}
+                </div>
+              </div>
+              <div className="flex items-center gap-1 text-xs">
+                <button onClick={()=>onSelectActive(a.id)}
+                  className="px-2 py-1 rounded text-violet-300 hover:bg-violet-500/10">Open</button>
+                <button onClick={()=>setEditingId(isEditing ? null : a.id)}
+                  className="px-2 py-1 rounded text-white/65 hover:bg-white/10">{isEditing?'Done':'Edit'}</button>
+                <button onClick={()=>onRemove(a.id)}
+                  className="px-2 py-1 rounded text-rose-300 hover:bg-rose-500/10">Remove</button>
+              </div>
+            </div>
+
+            {isEditing && (
+              <AccountEditor account={a} projects={state.projects}
+                onUpdate={(p)=>onUpdate(a.id, p)}
+                onConnect={a.sourceMode==='oauth' && !sess?.token ? ()=>onConnect(a.id) : null}
+                onDisconnect={a.sourceMode==='oauth' && sess?.token ? ()=>onDisconnect(a.id) : null}
+              />
+            )}
+          </div>
+        );
+      })}
+
+      {adding ? (
+        <NewAccountForm
+          defaults={state.gmail.defaults}
+          existingIndices={accounts.map(a=>a.gmailUserIndex)}
+          projects={state.projects}
+          onCancel={()=>setAdding(false)}
+          onCreate={(data)=>{ onAdd(data); setAdding(false); }}
+        />
+      ) : (
+        accounts.length > 0 && (
+          <button onClick={()=>setAdding(true)}
+            className="w-full px-3 py-3 rounded-xl border border-dashed border-white/15 text-white/60 hover:bg-white/5 text-sm">
+            + Add another inbox
+          </button>
+        )
+      )}
+    </div>
+  );
+}
+
+function NewAccountForm({ defaults, existingIndices, projects, onCancel, onCreate }){
+  const nextU = (() => { for(let i=0;i<10;i++) if(!existingIndices.includes(i)) return i; return 0; })();
+  const [form, setForm] = useState({
+    label: '',
+    email: '',
+    provider: 'gmail',                  // 'gmail' | 'outlook'
+    gmailUserIndex: nextU,              // /mail/u/N for Gmail
+    outlookHost: 'office',              // 'office' (work) | 'live' (personal)
+    sourceMode: defaults.sourceMode,
+    defaultProject: defaults.defaultProject,
+    defaultPriority: defaults.defaultPriority,
+    autoTag: defaults.autoTag,
+    query: defaults.query,
+  });
+  const valid = form.label.trim().length > 0;
+  const isGmail = form.provider === 'gmail';
+  return (
+    <div className="rounded-xl border border-violet-400/30 bg-violet-500/5 p-4">
+      <div className="font-semibold mb-3">Add inbox</div>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Label">
+          <input value={form.label} onChange={e=>setForm({...form, label:e.target.value})}
+            placeholder="e.g. Personal, Side project, Client X"
+            className="w-full px-3 py-2 rounded-lg glass-lite ring-focus"/>
+        </Field>
+        <Field label="Provider">
+          <select value={form.provider} onChange={e=>setForm({...form, provider: e.target.value, autoTag: e.target.value==='outlook' && form.autoTag==='email' ? 'email-outlook' : form.autoTag })}
+            className="w-full px-2 py-2 rounded-lg glass-lite ring-focus">
+            <option value="gmail">Gmail / Google Workspace</option>
+            <option value="outlook">Outlook / Microsoft 365</option>
+          </select>
+        </Field>
+        {isGmail ? (
+          <Field label="Gmail account index (u/N)">
+            <input type="number" min="0" max="9" value={form.gmailUserIndex}
+              onChange={e=>setForm({...form, gmailUserIndex: Math.max(0, Number(e.target.value)||0)})}
+              className="w-full px-3 py-2 rounded-lg glass-lite ring-focus"/>
+          </Field>
+        ) : (
+          <Field label="Outlook host">
+            <select value={form.outlookHost} onChange={e=>setForm({...form, outlookHost: e.target.value})}
+              className="w-full px-2 py-2 rounded-lg glass-lite ring-focus">
+              <option value="office">outlook.office.com (Microsoft 365 / work)</option>
+              <option value="live">outlook.live.com (personal Hotmail/Outlook.com)</option>
+            </select>
+          </Field>
+        )}
+        <Field label="Source mode">
+          <select value={form.sourceMode} onChange={e=>setForm({...form, sourceMode:e.target.value})}
+            className="w-full px-2 py-2 rounded-lg glass-lite ring-focus">
+            <option value="browser">Browser (Claude in Chrome)</option>
+            <option value="oauth">OAuth ({isGmail ? 'Gmail API' : 'Microsoft Graph'})</option>
+          </select>
+        </Field>
+        <Field label="Default project">
+          <select value={form.defaultProject} onChange={e=>setForm({...form, defaultProject:e.target.value})}
+            className="w-full px-2 py-2 rounded-lg glass-lite ring-focus">
+            {projects.map(p=> <option key={p} value={p}>{p}</option>)}
+          </select>
+        </Field>
+        <Field label="Default priority">
+          <select value={form.defaultPriority} onChange={e=>setForm({...form, defaultPriority:e.target.value})}
+            className="w-full px-2 py-2 rounded-lg glass-lite ring-focus">
+            <option value="auto">Auto (infer)</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+        </Field>
+        <Field label="Auto tag">
+          <input value={form.autoTag} onChange={e=>setForm({...form, autoTag:e.target.value.replace(/^#/,'')})}
+            className="w-full px-3 py-2 rounded-lg glass-lite ring-focus"/>
+        </Field>
+        <div className="col-span-2">
+          <Field label="Search query (Gmail syntax)">
+            <input value={form.query} onChange={e=>setForm({...form, query:e.target.value})}
+              className="w-full px-3 py-2 rounded-lg glass-lite ring-focus font-mono text-xs"/>
+          </Field>
+        </div>
+      </div>
+      <div className="mt-3 flex justify-end gap-2">
+        <button onClick={onCancel} className="px-3 py-2 rounded-lg glass-lite hover:bg-white/10 text-sm">Cancel</button>
+        <button onClick={()=>onCreate(form)} disabled={!valid}
+          className="px-4 py-2 rounded-lg bg-gradient-to-r from-violet-500 to-fuchsia-500 text-sm font-semibold disabled:opacity-40">
+          Create
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function AccountEditor({ account, projects, onUpdate, onConnect, onDisconnect }){
+  const provider = account.provider || 'gmail';
+  const isGmail = provider === 'gmail';
+  return (
+    <div className="px-3 pb-3 border-t border-white/5">
+      <div className="grid grid-cols-2 gap-3 mt-3">
+        <Field label="Label">
+          <input value={account.label} onChange={e=>onUpdate({label:e.target.value})}
+            className="w-full px-3 py-2 rounded-lg glass-lite ring-focus"/>
+        </Field>
+        <Field label="Provider">
+          <select value={provider} onChange={e=>onUpdate({provider: e.target.value})}
+            className="w-full px-2 py-2 rounded-lg glass-lite ring-focus">
+            <option value="gmail">Gmail / Google Workspace</option>
+            <option value="outlook">Outlook / Microsoft 365</option>
+          </select>
+        </Field>
+        <Field label="Email">
+          <input value={account.email} onChange={e=>onUpdate({email:e.target.value})}
+            placeholder="auto-fills on OAuth connect"
+            className="w-full px-3 py-2 rounded-lg glass-lite ring-focus"/>
+        </Field>
+        {isGmail ? (
+          <Field label="Gmail u/index">
+            <input type="number" min="0" max="9" value={account.gmailUserIndex ?? 0}
+              onChange={e=>onUpdate({gmailUserIndex: Math.max(0, Number(e.target.value)||0)})}
+              className="w-full px-3 py-2 rounded-lg glass-lite ring-focus"/>
+          </Field>
+        ) : (
+          <Field label="Outlook host">
+            <select value={account.outlookHost || 'office'} onChange={e=>onUpdate({outlookHost: e.target.value})}
+              className="w-full px-2 py-2 rounded-lg glass-lite ring-focus">
+              <option value="office">outlook.office.com (work)</option>
+              <option value="live">outlook.live.com (personal)</option>
+            </select>
+          </Field>
+        )}
+        <Field label="Source mode">
+          <select value={account.sourceMode} onChange={e=>onUpdate({sourceMode:e.target.value})}
+            className="w-full px-2 py-2 rounded-lg glass-lite ring-focus">
+            <option value="browser">Browser (Claude in Chrome)</option>
+            <option value="oauth">OAuth ({isGmail ? 'Gmail API' : 'Microsoft Graph'})</option>
+          </select>
+        </Field>
+        <Field label="Default project">
+          <select value={account.defaultProject} onChange={e=>onUpdate({defaultProject:e.target.value})}
+            className="w-full px-2 py-2 rounded-lg glass-lite ring-focus">
+            {projects.map(p=> <option key={p} value={p}>{p}</option>)}
+          </select>
+        </Field>
+        <Field label="Default priority">
+          <select value={account.defaultPriority} onChange={e=>onUpdate({defaultPriority:e.target.value})}
+            className="w-full px-2 py-2 rounded-lg glass-lite ring-focus">
+            <option value="auto">Auto</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+        </Field>
+        <Field label="Auto tag">
+          <input value={account.autoTag} onChange={e=>onUpdate({autoTag:e.target.value.replace(/^#/,'')})}
+            className="w-full px-3 py-2 rounded-lg glass-lite ring-focus"/>
+        </Field>
+        <Field label="Enabled">
+          <label className="flex items-center gap-2 px-3 py-2 rounded-lg glass-lite text-sm">
+            <input type="checkbox" checked={account.enabled} onChange={e=>onUpdate({enabled: e.target.checked})}
+              className="w-4 h-4 accent-violet-500"/>
+            Sync this inbox
+          </label>
+        </Field>
+        <div className="col-span-2">
+          <Field label="Search query">
+            <input value={account.query} onChange={e=>onUpdate({query:e.target.value})}
+              className="w-full px-3 py-2 rounded-lg glass-lite ring-focus font-mono text-xs"/>
+          </Field>
+        </div>
+      </div>
+      {(onConnect || onDisconnect) && (
+        <div className="mt-3 flex gap-2">
+          {onConnect && (
+            <button onClick={onConnect} className="px-3 py-2 rounded-lg bg-emerald-500/20 text-emerald-200 border border-emerald-400/30 text-sm">
+              Connect via OAuth
+            </button>
+          )}
+          {onDisconnect && (
+            <button onClick={onDisconnect} className="px-3 py-2 rounded-lg bg-rose-500/20 text-rose-200 border border-rose-400/30 text-sm">
+              Disconnect
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* --------- Defaults panel: global defaults + OAuth client id --------- */
+function DefaultsPanel({ state, onUpdateDefaults, onUpdateClientId }){
+  const d = state.gmail.defaults;
+  const [clientId, setClientId] = useState(state.gmail.clientId || '');
+  const [draft, setDraft] = useState({ ...d });
+  const [saved, setSaved] = useState(false);
+  const dirty = clientId !== (state.gmail.clientId || '') ||
+    JSON.stringify(draft) !== JSON.stringify(d);
+
+  const save = () => {
+    onUpdateClientId(clientId);
+    onUpdateDefaults(draft);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1800);
+  };
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <Field label="Google OAuth Client ID (shared across all OAuth-mode inboxes)">
+          <input value={clientId} onChange={e=>setClientId(e.target.value)}
+            placeholder="xxxxxxxxx.apps.googleusercontent.com (only needed for OAuth mode)"
+            className="w-full px-3 py-2 rounded-lg glass-lite ring-focus font-mono text-xs"/>
+        </Field>
+        <div className="text-[11px] text-white/50 mt-1">Skip this if all your inboxes use Browser (Claude in Chrome) mode.</div>
+      </div>
+
+      <div>
+        <SectionTitle>Defaults for new inboxes</SectionTitle>
+        <div className="grid grid-cols-2 gap-3 mt-2">
+          <Field label="Source mode">
+            <select value={draft.sourceMode} onChange={e=>setDraft(d=>({...d, sourceMode:e.target.value}))}
+              className="w-full px-2 py-2 rounded-lg glass-lite ring-focus">
+              <option value="browser">Browser (Claude in Chrome)</option>
+              <option value="oauth">OAuth (Gmail API)</option>
+            </select>
+          </Field>
+          <Field label="Default project">
+            <select value={draft.defaultProject} onChange={e=>setDraft(d=>({...d, defaultProject:e.target.value}))}
+              className="w-full px-2 py-2 rounded-lg glass-lite ring-focus">
+              {state.projects.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </Field>
+          <Field label="Default priority">
+            <select value={draft.defaultPriority} onChange={e=>setDraft(d=>({...d, defaultPriority:e.target.value}))}
+              className="w-full px-2 py-2 rounded-lg glass-lite ring-focus">
+              <option value="auto">Auto (infer)</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+          </Field>
+          <Field label="Auto tag">
+            <input value={draft.autoTag} onChange={e=>setDraft(d=>({...d, autoTag: e.target.value.replace(/^#/,'')}))}
+              className="w-full px-3 py-2 rounded-lg glass-lite ring-focus"/>
+          </Field>
+          <div className="col-span-2">
+            <Field label="Search query">
+              <input value={draft.query} onChange={e=>setDraft(d=>({...d, query: e.target.value}))}
+                className="w-full px-3 py-2 rounded-lg glass-lite ring-focus font-mono text-xs"/>
+            </Field>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex justify-end">
+        <button onClick={save}
+          className={`px-5 py-2 rounded-lg font-semibold text-sm transition
+            ${saved ? 'bg-emerald-500/30 text-emerald-200' : dirty ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:brightness-110' : 'glass-lite text-white/40 cursor-not-allowed'}`}
+          disabled={!dirty && !saved}>
+          {saved ? '✓ Saved' : 'Save changes'}
+        </button>
+      </div>
+
+      <div className="rounded-xl bg-white/[0.03] border border-white/5 p-3 text-xs text-white/60">
+        <b className="text-white/80">Auto priority:</b> Important/Starred or words like
+        <i> urgent, asap, deadline, action required</i> → <span className="text-rose-300">High</span>.
+        Words like <i>review, please, approve, follow up</i> → <span className="text-violet-300">Medium</span>.
+        Else → <span className="text-sky-300">Low</span>.
+      </div>
+    </div>
+  );
+}
+
+/* --------- Automation panel: scheduled recurring sync --------- */
+function AutomationPanel({ state, setState }){
+  const sch = state.gmail.schedule || {};
+  const [draft, setDraft] = useState({ enabled: !!sch.enabled, intervalMinutes: sch.intervalMinutes || 15 });
+  const [saved, setSaved] = useState(false);
+  const dirty = draft.enabled !== !!sch.enabled || draft.intervalMinutes !== (sch.intervalMinutes || 15);
+
+  const save = () => {
+    setState(s => ({ ...s, gmail: { ...s.gmail, schedule: { ...s.gmail.schedule, ...draft } } }));
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1800);
+  };
+
+  const oauthAccounts = (state.gmail.accounts || []).filter(a => a.sourceMode === 'oauth' && a.enabled);
+  const browserAccounts = (state.gmail.accounts || []).filter(a => a.sourceMode === 'browser' && a.enabled);
+
+  return (
+    <div className="space-y-5">
+      <div className="rounded-xl bg-white/[0.03] border border-white/5 p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <div className="font-semibold">Built-in auto-sync</div>
+            <div className="text-xs text-white/55 mt-1">
+              Automatically re-fetches your <b className="text-white/80">OAuth-mode</b> inboxes in the background while this tab is open.
+              No external tools needed — runs directly in the browser on the interval below.
+            </div>
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer shrink-0">
+            <input type="checkbox" checked={draft.enabled}
+              onChange={e=>setDraft(d=>({...d, enabled:e.target.checked}))}
+              className="w-5 h-5 accent-violet-500"/>
+            <span className="text-sm">{draft.enabled ? 'On' : 'Off'}</span>
+          </label>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Sync interval (minutes)">
+          <input type="number" min="5" step="5" value={draft.intervalMinutes}
+            onChange={e=>setDraft(d=>({...d, intervalMinutes: Math.max(5, Number(e.target.value)||15)}))}
+            className="w-full px-3 py-2 rounded-lg glass-lite ring-focus"/>
+        </Field>
+        <div className="flex items-end">
+          <button onClick={save}
+            className={`w-full px-4 py-2 rounded-lg font-semibold text-sm transition
+              ${saved ? 'bg-emerald-500/30 text-emerald-200' : dirty ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:brightness-110' : 'glass-lite text-white/40 cursor-not-allowed'}`}
+            disabled={!dirty && !saved}>
+            {saved ? '✓ Saved' : 'Save'}
+          </button>
+        </div>
+      </div>
+
+      <div className="rounded-xl bg-white/[0.02] border border-white/5 p-4 text-sm space-y-2">
+        <div className="font-semibold text-white/80">Account status</div>
+        {oauthAccounts.length === 0 && browserAccounts.length === 0 && (
+          <div className="text-white/50">No enabled inboxes yet.</div>
+        )}
+        {oauthAccounts.map(a => (
+          <div key={a.id} className="flex items-center gap-2 text-xs">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"/>
+            <span className="text-white/80">{a.label}</span>
+            <span className="text-white/40">· OAuth · auto-syncs every {draft.intervalMinutes}m</span>
+            {a.lastSync && <span className="text-white/35">· last {new Date(a.lastSync).toLocaleTimeString()}</span>}
+          </div>
+        ))}
+        {browserAccounts.map(a => (
+          <div key={a.id} className="flex items-center gap-2 text-xs">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400"/>
+            <span className="text-white/80">{a.label}</span>
+            <span className="text-amber-300/70">· Browser mode · manual sync only (switch to OAuth for auto-sync)</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="text-xs text-white/45">
+        Auto-sync only runs while this tab is open and requires an active OAuth connection. Tokens expire after ~1 hour — reconnect in Accounts if sync stops.
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------ Achievements ------------------------------ */
+function Achievements({ player }){
+  const earned = Object.keys(player.achievements||{}).length;
+  const total = ACHIEVEMENTS.length;
+  return (
+    <details className="mt-8 glass rounded-2xl p-4" open>
+      <summary className="cursor-pointer flex items-center gap-2 select-none">
+        <span className="text-lg">🏅</span>
+        <span className="font-semibold">Badges</span>
+        <span className="text-xs text-white/50 ml-1">{earned}/{total} earned</span>
+        <div className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden ml-2">
+          <div className="h-full bg-gradient-to-r from-violet-500 to-fuchsia-500 transition-all" style={{width:`${Math.round(earned/total*100)}%`}}/>
+        </div>
+      </summary>
+      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+        {ACHIEVEMENTS.map(a=>{
+          const got = !!player.achievements?.[a.id];
+          const earnedAt = player.achievements?.[a.id];
+          return (
+            <div key={a.id}
+              className={`rounded-xl p-3 border flex items-start gap-3 transition
+                ${got
+                  ? 'border-violet-400/35 bg-violet-500/10 shadow shadow-violet-500/10'
+                  : 'border-white/5 bg-white/[0.02]'}`}>
+              <span className={`text-2xl leading-none shrink-0 ${got?'':'opacity-40 grayscale'}`}>{a.icon}</span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <div className={`text-sm font-semibold leading-tight ${got?'text-white':'text-white/65'}`}>{a.label}</div>
+                  {got
+                    ? <span className="text-[10px] text-violet-300/80 bg-violet-500/15 px-1.5 py-0.5 rounded-full">Earned</span>
+                    : <span className="text-[10px] text-white/35 bg-white/5 px-1.5 py-0.5 rounded-full">Locked</span>}
+                </div>
+                <div className={`text-xs mt-0.5 leading-snug ${got?'text-white/65':'text-white/45'}`}>{a.desc}</div>
+                {got && <div className="text-[10px] text-white/35 mt-1">Earned {new Date(earnedAt).toLocaleDateString()}</div>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {earned === 0 && (
+        <div className="mt-3 text-center text-xs text-white/35 italic">Complete tasks to earn your first badge.</div>
+      )}
+    </details>
+  );
+}
+
+/* --------------------------------- Toast ---------------------------------- */
+function Toast({ toast }){
+  const color = toast.type==='achievement' ? 'from-amber-400 to-fuchsia-500'
+              : toast.type==='error'       ? 'from-rose-500 to-red-500'
+              : 'from-violet-500 to-fuchsia-500';
+  return (
+    <div className="fixed bottom-6 left-1/2 z-[60] toast-anim">
+      <div className={`modal-pane rounded-xl px-4 py-3 flex items-center gap-3 shadow-2xl`}>
+        <div className={`w-2 h-8 rounded-full bg-gradient-to-b ${color}`}/>
+        <div>
+          <div className="text-sm font-semibold">{toast.title}</div>
+          <div className="text-xs text-white/60">{toast.body}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* --------------------------------- Mount ---------------------------------- */
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+  </script>
+</body>
+</html>

@@ -1,0 +1,467 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Jujutsu Shenanigans — Zoku21</title>
+<style>
+  :root {
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --color-text-primary: #ededed;
+    --color-text-secondary: #a0a0c8;
+    --color-text-tertiary: #6b6b8c;
+    --color-text-info: #67e8f9;
+    --color-text-success: #86efac;
+    --color-text-warning: #fcd34d;
+    --color-text-danger: #fca5a5;
+    --color-background-primary: #0a0a14;
+    --color-background-secondary: #14141f;
+    --color-background-tertiary: #1c1c2a;
+    --color-background-info: rgba(34,211,238,0.12);
+    --color-background-success: rgba(34,197,94,0.15);
+    --color-background-warning: rgba(245,158,11,0.15);
+    --color-background-danger: rgba(239,68,68,0.15);
+    --color-border-primary: rgba(255,255,255,0.30);
+    --color-border-secondary: rgba(255,255,255,0.18);
+    --color-border-tertiary: rgba(255,255,255,0.10);
+    --color-border-info: rgba(34,211,238,0.5);
+    --color-border-success: rgba(34,197,94,0.5);
+    --color-border-warning: rgba(245,158,11,0.5);
+    --color-border-danger: rgba(239,68,68,0.5);
+    --border-radius-md: 8px;
+    --border-radius-lg: 12px;
+  }
+  html, body { background: var(--color-background-primary); color: var(--color-text-primary); }
+  body { padding: 16px; max-width: 720px; margin: 0 auto; }
+  button {
+    background: var(--color-background-secondary);
+    color: var(--color-text-primary);
+    border: 0.5px solid var(--color-border-secondary);
+    border-radius: var(--border-radius-md);
+    padding: 8px 14px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+  }
+  button:hover:not(:disabled) { background: var(--color-background-tertiary); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+</style>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:var(--font-sans);color:var(--color-text-primary);background:transparent;}
+#game{padding:0;min-height:600px;}
+canvas{display:block;}
+#ui-overlay{padding:8px;}
+.hud{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;margin-bottom:8px;}
+.fighter-hud{background:var(--color-background-secondary);border-radius:var(--border-radius-lg);border:0.5px solid var(--color-border-tertiary);padding:10px 12px;}
+.fighter-hud.right{text-align:right;}
+.fighter-name{font-size:13px;font-weight:500;margin-bottom:4px;}
+.bar-wrap{background:var(--color-border-tertiary);border-radius:4px;height:8px;overflow:hidden;margin-bottom:3px;}
+.bar-fill{height:100%;border-radius:4px;transition:width 0.2s;}
+.hp-fill{background:#e74c3c;}
+.ce-fill{background:#8e44ad;}
+.bar-label{font-size:11px;color:var(--color-text-secondary);}
+.vs-badge{font-size:18px;font-weight:500;color:var(--color-text-secondary);text-align:center;}
+.arena-wrap{border-radius:var(--border-radius-lg);overflow:hidden;border:0.5px solid var(--color-border-secondary);background:#1a1a2e;position:relative;}
+#arena{display:block;width:100%;}
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;}
+.control-side{background:var(--color-background-secondary);border-radius:var(--border-radius-lg);border:0.5px solid var(--color-border-tertiary);padding:10px;}
+.control-side h4{font-size:11px;font-weight:500;color:var(--color-text-secondary);margin-bottom:8px;letter-spacing:0.5px;}
+.move-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;}
+.move-btn{padding:7px 6px;font-size:12px;font-weight:500;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-secondary);background:var(--color-background-primary);color:var(--color-text-primary);cursor:pointer;text-align:center;transition:background 0.15s;line-height:1.3;}
+.move-btn:hover:not(:disabled){background:var(--color-background-tertiary);}
+.move-btn:disabled{opacity:0.35;cursor:not-allowed;}
+.move-btn.special{border-color:#8e44ad;color:#a78bfa;}
+.move-btn.special:hover:not(:disabled){background:rgba(142,68,173,0.15);}
+.move-btn.domain{border-color:#c0392b;color:#fca5a5;grid-column:1/-1;}
+.move-btn.domain:hover:not(:disabled){background:rgba(192,57,43,0.15);}
+.log-strip{background:var(--color-background-secondary);border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-tertiary);padding:6px 10px;margin-top:8px;font-size:12px;color:var(--color-text-secondary);min-height:32px;line-height:1.5;}
+.char-picker{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;padding:12px 0;}
+.char-card{background:var(--color-background-secondary);border-radius:var(--border-radius-lg);border:0.5px solid var(--color-border-tertiary);padding:14px 10px;text-align:center;cursor:pointer;transition:border-color 0.15s;}
+.char-card:hover{border-color:var(--color-border-primary);}
+.char-card.selected{border:2px solid #8e44ad;}
+.char-avatar{font-size:36px;margin-bottom:6px;}
+.char-cname{font-size:14px;font-weight:500;margin-bottom:3px;}
+.char-style{font-size:11px;color:var(--color-text-secondary);margin-bottom:8px;}
+.char-stat{font-size:11px;color:var(--color-text-tertiary);}
+.pick-title{font-size:16px;font-weight:500;margin-bottom:4px;}
+.pick-sub{font-size:13px;color:var(--color-text-secondary);margin-bottom:12px;}
+.start-fight-btn{display:block;width:100%;padding:11px;font-size:15px;font-weight:500;background:var(--color-text-primary);color:var(--color-background-primary);border:none;border-radius:var(--border-radius-md);cursor:pointer;margin-top:12px;}
+.start-fight-btn:hover{opacity:0.85;}
+.start-fight-btn:disabled{opacity:0.35;cursor:not-allowed;}
+.result-overlay{position:absolute;inset:0;background:rgba(10,10,30,0.88);display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:var(--border-radius-lg);}
+.result-title{font-size:28px;font-weight:500;color:#fff;margin-bottom:8px;}
+.result-sub{font-size:14px;color:rgba(255,255,255,0.6);margin-bottom:20px;}
+.result-btn{padding:10px 28px;font-size:14px;font-weight:500;background:#8e44ad;color:#fff;border:none;border-radius:var(--border-radius-md);cursor:pointer;margin:4px;}
+.result-btn:hover{opacity:0.85;}
+.domain-flash{position:absolute;inset:0;background:rgba(142,68,173,0.18);pointer-events:none;border-radius:var(--border-radius-lg);animation:dFlash 0.5s ease;}
+@keyframes dFlash{0%{opacity:0}40%{opacity:1}100%{opacity:0}}
+.screen{display:none;}
+.screen.active{display:block;}
+.ai-tag{font-size:10px;background:var(--color-background-warning);color:var(--color-text-warning);border-radius:4px;padding:1px 5px;margin-left:4px;font-weight:500;}
+</style>
+</head>
+<body>
+
+<h2 class="sr-only">Jujutsu Shenanigans — a 1v1 cursed energy fighting game</h2>
+
+<div id="game">
+  <div id="pick-screen" class="screen active">
+    <div class="pick-title">Jujutsu Shenanigans</div>
+    <div class="pick-sub">Choose your fighter. The AI will pick its own.</div>
+    <div class="char-picker" id="char-picker"></div>
+    <button class="start-fight-btn" id="start-btn" onclick="startFight()" disabled>Select a fighter to start</button>
+  </div>
+
+  <div id="fight-screen" class="screen">
+    <div id="ui-overlay">
+      <div class="hud">
+        <div class="fighter-hud" id="p1hud">
+          <div class="fighter-name" id="p1name"></div>
+          <div class="bar-wrap"><div class="bar-fill hp-fill" id="p1hp" style="width:100%"></div></div>
+          <div class="bar-label" id="p1hplabel"></div>
+          <div class="bar-wrap"><div class="bar-fill ce-fill" id="p1ce" style="width:100%"></div></div>
+          <div class="bar-label" id="p1celabel"></div>
+        </div>
+        <div class="vs-badge">VS</div>
+        <div class="fighter-hud right" id="p2hud">
+          <div class="fighter-name" id="p2name"></div>
+          <div class="bar-wrap"><div class="bar-fill hp-fill" id="p2hp" style="width:100%"></div></div>
+          <div class="bar-label" id="p2hplabel"></div>
+          <div class="bar-wrap"><div class="bar-fill ce-fill" id="p2ce" style="width:100%"></div></div>
+          <div class="bar-label" id="p2celabel"></div>
+        </div>
+      </div>
+
+      <div class="arena-wrap" style="position:relative;">
+        <canvas id="arena" width="640" height="280"></canvas>
+        <div id="result-overlay" class="result-overlay" style="display:none;">
+          <div class="result-title" id="result-title"></div>
+          <div class="result-sub" id="result-sub"></div>
+          <button class="result-btn" onclick="goPickScreen()">Rematch</button>
+        </div>
+        <div id="domain-flash" class="domain-flash" style="display:none;"></div>
+      </div>
+
+      <div class="controls">
+        <div class="control-side">
+          <h4 id="p1ctrl-label">YOUR MOVES</h4>
+          <div class="move-grid" id="p1-moves"></div>
+        </div>
+        <div class="control-side" style="text-align:right;">
+          <h4>OPPONENT <span class="ai-tag">AI</span></h4>
+          <div style="font-size:12px;color:var(--color-text-secondary);margin-top:4px;" id="ai-status">Thinking...</div>
+        </div>
+      </div>
+      <div class="log-strip" id="log-strip">The battle begins!</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const CHARS=[
+  {id:'yuji',name:'Yuji Itadori',avatar:'👊',style:'Divergent Fist',hp:130,maxHp:130,ce:80,maxCe:80,
+   moves:[
+    {name:'Divergent Fist',dmg:[18,26],cost:0,type:'normal',desc:'Delayed cursed energy punch'},
+    {name:'Black Flash',dmg:[28,40],cost:20,type:'special',desc:'4D cursed energy strike'},
+    {name:'Rush Combo',dmg:[12,18],cost:0,type:'normal',desc:'Fast 3-hit combo'},
+    {name:'Boost Inhale',dmg:[0,0],cost:0,type:'heal',healAmt:[15,25],desc:'Recover cursed energy'},
+    {name:'Divergent Slam',dmg:[22,32],cost:25,type:'special',desc:'Ground shatter blast'},
+    {name:'Sukuna Vessel',dmg:[45,65],cost:60,type:'domain',desc:'Momentary channel of Sukuna'},
+   ]},
+  {id:'megumi',name:'Megumi Fushiguro',avatar:'🐕',style:'Ten Shadows',hp:110,maxHp:110,ce:110,maxCe:110,
+   moves:[
+    {name:'Divine Dog',dmg:[14,22],cost:10,type:'special',desc:'Summon Divine Dogs'},
+    {name:'Nue Strike',dmg:[20,28],cost:15,type:'special',desc:'Owl shikigami dive'},
+    {name:'Shadow Bind',dmg:[8,14],cost:8,type:'normal',desc:'Restrain with shadows'},
+    {name:'Toad Ambush',dmg:[16,24],cost:12,type:'special',desc:'Toad summon trap'},
+    {name:'CE Recover',dmg:[0,0],cost:0,type:'heal',healAmt:[20,30],desc:'Meditate to restore CE'},
+    {name:'Chimera Shadow Garden',dmg:[50,70],cost:70,type:'domain',desc:'Domain Expansion — shadow realm'},
+   ]},
+  {id:'nobara',name:'Nobara Kugisaki',avatar:'🔨',style:'Straw Doll',hp:105,maxHp:105,ce:90,maxCe:90,
+   moves:[
+    {name:'Hairpin',dmg:[22,30],cost:10,type:'special',desc:'Nail infused with CE'},
+    {name:'Resonance',dmg:[18,26],cost:12,type:'special',desc:'Curse through effigy'},
+    {name:'Hammer Swing',dmg:[14,20],cost:0,type:'normal',desc:'Pure strength strike'},
+    {name:'Nail Barrage',dmg:[10,16],cost:8,type:'normal',desc:'Rapid nail volley'},
+    {name:'CE Pulse',dmg:[0,0],cost:0,type:'heal',healAmt:[18,26],desc:'Restore cursed energy'},
+    {name:'Straw Doll Domain',dmg:[48,62],cost:65,type:'domain',desc:'Domain Expansion — infinite nails'},
+   ]},
+  {id:'todo',name:'Aoi Todo',avatar:'🌸',style:'Boogie Woogie',hp:140,maxHp:140,ce:70,maxCe:70,
+   moves:[
+    {name:'Boogie Woogie',dmg:[0,0],cost:15,type:'swap',desc:'Swap positions — confuse enemy'},
+    {name:'Piledriver',dmg:[24,34],cost:0,type:'normal',desc:'Crushing body slam'},
+    {name:'Clap Combo',dmg:[16,24],cost:10,type:'special',desc:'CE clap + swap feint'},
+    {name:'Pure Strength',dmg:[20,28],cost:0,type:'normal',desc:'Raw power attack'},
+    {name:'CE Charge',dmg:[0,0],cost:0,type:'heal',healAmt:[12,20],desc:'Charge up cursed energy'},
+    {name:'Phantom Parade',dmg:[52,68],cost:60,type:'domain',desc:'Domain Expansion — phantom clones'},
+   ]},
+  {id:'gojo',name:'Satoru Gojo',avatar:'🔵',style:'Infinity',hp:100,maxHp:100,ce:150,maxCe:150,
+   moves:[
+    {name:'Hollow Purple',dmg:[35,50],cost:30,type:'special',desc:'Imaginary mass compression'},
+    {name:'Infinity Block',dmg:[0,0],cost:15,type:'block',desc:'Negate incoming attack'},
+    {name:'Blue Pull',dmg:[18,26],cost:12,type:'special',desc:'Negative mass attract'},
+    {name:'Red Repulse',dmg:[22,30],cost:15,type:'special',desc:'Positive mass blast'},
+    {name:'CE Limitless',dmg:[0,0],cost:0,type:'heal',healAmt:[25,40],desc:'Limitless energy restore'},
+    {name:'Unlimited Void',dmg:[55,80],cost:80,type:'domain',desc:'Domain Expansion — Unlimited Void'},
+   ]},
+  {id:'sukuna',name:'Ryomen Sukuna',avatar:'👹',style:'Dismantle & Cleave',hp:150,maxHp:150,ce:140,maxCe:140,
+   moves:[
+    {name:'Dismantle',dmg:[30,42],cost:20,type:'special',desc:'Slashing cursed energy cuts'},
+    {name:'Cleave',dmg:[25,38],cost:18,type:'special',desc:'Adapts to target cursed energy'},
+    {name:'Malevolent Shrine',dmg:[60,90],cost:85,type:'domain',desc:'Domain Expansion — open-air shrine'},
+    {name:'Flame Arrow',dmg:[20,30],cost:12,type:'special',desc:'Fire cursed technique'},
+    {name:'Reverse CE',dmg:[0,0],cost:25,type:'heal',healAmt:[35,55],desc:'Reverse cursed technique heal'},
+    {name:'King Strike',dmg:[28,40],cost:0,type:'normal',desc:'Raw king of curses power'},
+   ]},
+];
+
+let p1=null,p2=null,aiLocked=false,turnLocked=false,playerChoice=null;
+
+function goPickScreen(){
+  document.getElementById('pick-screen').classList.add('active');
+  document.getElementById('fight-screen').classList.remove('active');
+  playerChoice=null;
+  document.getElementById('start-btn').disabled=true;
+  document.getElementById('start-btn').textContent='Select a fighter to start';
+  renderPicker();
+}
+
+function renderPicker(){
+  const grid=document.getElementById('char-picker');
+  grid.innerHTML='';
+  CHARS.forEach(c=>{
+    const card=document.createElement('div');
+    card.className='char-card';
+    card.innerHTML=`<div class="char-avatar">${c.avatar}</div>
+      <div class="char-cname">${c.name}</div>
+      <div class="char-style">${c.style}</div>
+      <div class="char-stat">HP ${c.hp} | CE ${c.ce}</div>`;
+    card.onclick=()=>{
+      document.querySelectorAll('.char-card').forEach(x=>x.classList.remove('selected'));
+      card.classList.add('selected');
+      playerChoice=c.id;
+      document.getElementById('start-btn').disabled=false;
+      document.getElementById('start-btn').textContent=`Fight as ${c.name}!`;
+    };
+    grid.appendChild(card);
+  });
+}
+
+function cloneChar(id){
+  const c=CHARS.find(x=>x.id===id);
+  return JSON.parse(JSON.stringify(c));
+}
+
+function startFight(){
+  if(!playerChoice)return;
+  p1=cloneChar(playerChoice);
+  const others=CHARS.filter(x=>x.id!==playerChoice);
+  p2=cloneChar(others[Math.floor(Math.random()*others.length)].id);
+  document.getElementById('pick-screen').classList.remove('active');
+  document.getElementById('fight-screen').classList.add('active');
+  document.getElementById('result-overlay').style.display='none';
+  turnLocked=false;
+  updateHUD();
+  renderMoves();
+  drawArena();
+  log('The fight begins! '+p1.name+' vs '+p2.name+'!');
+}
+
+function updateHUD(){
+  document.getElementById('p1name').textContent=p1.avatar+' '+p1.name;
+  document.getElementById('p2name').textContent=p2.avatar+' '+p2.name;
+  const p1hpPct=Math.max(0,Math.round(p1.hp/p1.maxHp*100));
+  const p2hpPct=Math.max(0,Math.round(p2.hp/p2.maxHp*100));
+  const p1cePct=Math.max(0,Math.round(p1.ce/p1.maxCe*100));
+  const p2cePct=Math.max(0,Math.round(p2.ce/p2.maxCe*100));
+  document.getElementById('p1hp').style.width=p1hpPct+'%';
+  document.getElementById('p2hp').style.width=p2hpPct+'%';
+  document.getElementById('p1ce').style.width=p1cePct+'%';
+  document.getElementById('p2ce').style.width=p2cePct+'%';
+  document.getElementById('p1hplabel').textContent='HP '+Math.max(0,Math.round(p1.hp))+' / '+p1.maxHp;
+  document.getElementById('p2hplabel').textContent='HP '+Math.max(0,Math.round(p2.hp))+' / '+p2.maxHp;
+  document.getElementById('p1celabel').textContent='CE '+Math.max(0,Math.round(p1.ce))+' / '+p1.maxCe;
+  document.getElementById('p2celabel').textContent='CE '+Math.max(0,Math.round(p2.ce))+' / '+p2.maxCe;
+}
+
+function renderMoves(){
+  const grid=document.getElementById('p1-moves');
+  grid.innerHTML='';
+  p1.moves.forEach((m,i)=>{
+    const btn=document.createElement('button');
+    const canUse=p1.ce>=m.cost&&!turnLocked;
+    btn.className='move-btn'+(m.type==='domain'?' domain':m.type==='special'||m.type==='block'||m.type==='swap'?' special':'');
+    btn.disabled=!canUse;
+    btn.innerHTML=`<strong>${m.name}</strong><br><span style="font-size:10px;opacity:0.7">${m.cost>0?'CE: '+m.cost:'Free'}${m.type==='heal'?' (Heal)':m.type==='block'?' (Block)':m.type==='swap'?' (Swap)':''}</span>`;
+    btn.onclick=()=>playerMove(i);
+    grid.appendChild(btn);
+  });
+}
+
+function rng(min,max){return Math.floor(Math.random()*(max-min+1))+min;}
+
+function applyMove(attacker,defender,move,isPlayer){
+  let result='';
+  attacker.ce=Math.max(0,attacker.ce-move.cost);
+
+  if(move.type==='heal'){
+    const heal=rng(move.healAmt[0],move.healAmt[1]);
+    attacker.ce=Math.min(attacker.maxCe,attacker.ce+heal);
+    result=`${attacker.name} used ${move.name} — restored ${heal} CE!`;
+  } else if(move.type==='block'){
+    attacker._blocking=true;
+    result=`${attacker.name} activated Infinity — next attack blocked!`;
+  } else if(move.type==='swap'){
+    result=`${attacker.name} used Boogie Woogie — position swapped! Enemy confused (-10 next dmg)!`;
+    defender._confused=true;
+  } else if(move.type==='domain'){
+    flashDomain();
+    let dmg=rng(move.dmg[0],move.dmg[1]);
+    if(defender._blocking){dmg=Math.round(dmg*0.3);defender._blocking=false;result=`DOMAIN EXPANSION: ${move.name}! But enemy partially resisted! ${dmg} dmg!`;}
+    else{result=`DOMAIN EXPANSION: ${move.name}! Overwhelming cursed energy! ${dmg} dmg!`;}
+    defender.hp-=dmg;
+  } else {
+    let dmg=rng(move.dmg[0],move.dmg[1]);
+    if(defender._blocking){dmg=0;defender._blocking=false;result=`${attacker.name} used ${move.name} — BLOCKED by Infinity!`;}
+    else{
+      if(defender._confused){dmg=Math.max(1,dmg-10);defender._confused=false;}
+      const crit=Math.random()<0.12;
+      if(crit){dmg=Math.round(dmg*1.5);result=`${attacker.name} used ${move.name} — CRITICAL! ${dmg} dmg!`;}
+      else result=`${attacker.name} used ${move.name} — ${dmg} dmg!`;
+      defender.hp-=dmg;
+    }
+  }
+  return result;
+}
+
+function flashDomain(){
+  const el=document.getElementById('domain-flash');
+  el.style.display='block';
+  setTimeout(()=>el.style.display='none',500);
+}
+
+function log(msg){
+  document.getElementById('log-strip').textContent=msg;
+}
+
+function checkWinner(){
+  if(p1.hp<=0){
+    showResult(p2.name+' wins!',p1.name+' has been defeated. Cursed energy depleted.');
+    return true;
+  }
+  if(p2.hp<=0){
+    showResult(p1.name+' wins!',p2.name+' has been overwhelmed. You are victorious!');
+    return true;
+  }
+  return false;
+}
+
+function showResult(title,sub){
+  document.getElementById('result-title').textContent=title;
+  document.getElementById('result-sub').textContent=sub;
+  document.getElementById('result-overlay').style.display='flex';
+  turnLocked=true;
+  renderMoves();
+}
+
+function aiTurn(){
+  document.getElementById('ai-status').textContent='Acting...';
+  setTimeout(()=>{
+    const affordable=p2.moves.filter(m=>p2.ce>=m.cost);
+    let chosen;
+    if(p2.ce/p2.maxCe<0.2){
+      const healMove=affordable.find(m=>m.type==='heal');
+      if(healMove)chosen=healMove;
+    }
+    if(!chosen&&p2.hp/p2.maxHp<0.3){
+      const domainMove=affordable.find(m=>m.type==='domain');
+      if(domainMove)chosen=domainMove;
+    }
+    if(!chosen){
+      const weighted=affordable.map(m=>({m,w:m.type==='domain'?3:m.type==='special'?2:1}));
+      const total=weighted.reduce((s,x)=>s+x.w,0);
+      let roll=Math.random()*total;
+      for(const {m,w} of weighted){roll-=w;if(roll<=0){chosen=m;break;}}
+    }
+    if(!chosen)chosen=p2.moves[0];
+    const result=applyMove(p2,p1,chosen,false);
+    p1.hp=Math.max(0,p1.hp);p2.hp=Math.max(0,p2.hp);
+    updateHUD();drawArena();
+    log(result);
+    document.getElementById('ai-status').textContent='Waiting...';
+    if(!checkWinner()){
+      turnLocked=false;
+      renderMoves();
+    }
+  },600);
+}
+
+function playerMove(idx){
+  if(turnLocked)return;
+  const move=p1.moves[idx];
+  if(p1.ce<move.cost){log('Not enough cursed energy!');return;}
+  turnLocked=true;
+  renderMoves();
+  const result=applyMove(p1,p2,move,true);
+  p1.hp=Math.max(0,p1.hp);p2.hp=Math.max(0,p2.hp);
+  updateHUD();drawArena();
+  log(result);
+  if(!checkWinner()){
+    document.getElementById('ai-status').textContent='Thinking...';
+    p1.ce=Math.min(p1.maxCe,p1.ce+8);
+    p2.ce=Math.min(p2.maxCe,p2.ce+8);
+    updateHUD();
+    aiTurn();
+  }
+}
+
+function drawArena(){
+  const canvas=document.getElementById('arena');
+  const ctx=canvas.getContext('2d');
+  const W=canvas.width,H=canvas.height;
+  ctx.clearRect(0,0,W,H);
+
+  ctx.fillStyle='#1a1a2e';ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle='rgba(142,68,173,0.15)';ctx.lineWidth=1;
+  for(let x=0;x<W;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+  for(let y=0;y<H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+
+  ctx.fillStyle='rgba(255,255,255,0.04)';ctx.fillRect(0,H*0.75,W,H*0.25);
+  ctx.strokeStyle='rgba(255,255,255,0.08)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(0,H*0.75);ctx.lineTo(W,H*0.75);ctx.stroke();
+
+  drawFighter(ctx,p1,120,H*0.72,false);
+  drawFighter(ctx,p2,W-120,H*0.72,true);
+}
+
+function drawFighter(ctx,fighter,x,y,flip){
+  const hpRatio=Math.max(0,fighter.hp/fighter.maxHp);
+  ctx.save();
+  if(flip){ctx.scale(-1,1);x=-x;}
+
+  const bodyColor=hpRatio>0.5?'#e8e0ff':hpRatio>0.25?'#f0a500':'#e74c3c';
+
+  ctx.fillStyle='rgba(142,68,173,0.12)';
+  ctx.beginPath();ctx.ellipse(x,y+5,28,8,0,0,Math.PI*2);ctx.fill();
+
+  ctx.font='52px serif';ctx.textAlign='center';ctx.textBaseline='alphabetic';
+  ctx.fillText(fighter.avatar,x,y);
+
+  ctx.fillStyle=bodyColor;
+  ctx.font='bold 11px sans-serif';ctx.textAlign='center';ctx.textBaseline='top';
+  ctx.fillText(fighter.name.split(' ')[0],x,y+8);
+
+  if(fighter._blocking){
+    ctx.strokeStyle='#3b82f6';ctx.lineWidth=2;
+    ctx.beginPath();ctx.arc(x,y-28,32,0,Math.PI*2);ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+renderPicker();
+</script>
+
+</body>
+</html>

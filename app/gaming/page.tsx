@@ -212,45 +212,86 @@ export default function GamingPage() {
             </p>
           </div>
 
+          {/* ───────── ZOKU21 CREATOR DROPS ───────── */}
           <div className="rounded-3xl border border-amber-400/30 bg-gradient-to-br from-amber-500/15 via-fuchsia-500/10 to-transparent p-6 sm:p-10">
-            <p className="text-xs uppercase tracking-[0.3em] text-amber-400">
-              Featured Creator Game
-            </p>
-            <h2 className="mt-3 text-3xl font-black uppercase sm:text-4xl">
-              TDC: Trading Digital Cards
-            </h2>
-            <p className="mt-4 max-w-2xl text-white/75">
-              {"A pack-opening + trading game by A Zoku21. Anime-themed packs (One Piece, JJK, Pokémon, Naruto, Bleach, Digital Circus), an NPC trade post, sell duplicates for coins, and a luck shop that boosts your rarity pulls."}
-            </p>
-
-            <div className="mt-6 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-xl border border-white/10 bg-black/40 p-4">
-                <p className="text-xs uppercase tracking-[0.25em] text-amber-300">
-                  Packs
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <p className="font-display text-xs tracking-[0.3em] text-amber-400">
+                  ▌ CREATOR DROPS · ZOKU21
                 </p>
-                <p className="mt-1 text-2xl font-black">6</p>
+                <h2 className="mt-2 font-display text-3xl tracking-[0.04em] sm:text-4xl">
+                  ZOKU21 // GAMES &amp; APPS
+                </h2>
               </div>
-              <div className="rounded-xl border border-white/10 bg-black/40 p-4">
-                <p className="text-xs uppercase tracking-[0.25em] text-amber-300">
-                  Modes
-                </p>
-                <p className="mt-1 text-2xl font-black">4</p>
-              </div>
-              <div className="rounded-xl border border-white/10 bg-black/40 p-4">
-                <p className="text-xs uppercase tracking-[0.25em] text-amber-300">
-                  Creator
-                </p>
-                <p className="mt-1 text-lg font-black">A Zoku21</p>
-              </div>
+              <span className="rounded-md border border-amber-400/40 bg-black px-3 py-1 font-display text-xs tracking-[0.25em] text-amber-300">
+                4 DROPS
+              </span>
             </div>
+            <p className="mt-4 max-w-2xl text-white/75">
+              {"Hosted on Respawn Riot — small, sharp builds from creator Zoku21. New drops land here as they ship."}
+            </p>
 
-            <div className="mt-8">
-              <Link
-                href="/trading-cards"
-                className="inline-block rounded-xl bg-amber-400 px-6 py-3 font-black uppercase tracking-widest text-black transition hover:scale-105"
-              >
-                Play TDC
-              </Link>
+            <div className="mt-8 grid gap-4 sm:grid-cols-2">
+              {[
+                {
+                  href: "/trading-cards",
+                  emoji: "🃏",
+                  title: "TDC: Trading Digital Cards",
+                  blurb: "Pack-opening + trading. Anime-themed packs, NPC trade post, sell duplicates, luck shop.",
+                  cta: "Open a pack",
+                  accent: "border-amber-400/50 hover:border-amber-300",
+                  chip: "text-amber-300",
+                },
+                {
+                  href: "/jjk-fight",
+                  emoji: "👁",
+                  title: "Jujutsu Shenanigans",
+                  blurb: "1v1 cursed energy fighter. Six characters, domain expansions, AI opponent.",
+                  cta: "Pick a fighter",
+                  accent: "border-fuchsia-400/50 hover:border-fuchsia-300",
+                  chip: "text-fuchsia-300",
+                },
+                {
+                  href: "/pc-builder",
+                  emoji: "🖥",
+                  title: "PC Builder",
+                  blurb: "Pick parts, check compatibility, see estimated 1080p / 1440p / 4K performance.",
+                  cta: "Build a rig",
+                  accent: "border-cyan-400/50 hover:border-cyan-300",
+                  chip: "text-cyan-300",
+                },
+                {
+                  href: "/quest-list",
+                  emoji: "⚔",
+                  title: "QuestList",
+                  blurb: "Gamified task tracker. XP, levels, coins. Local-only — your data stays on your machine.",
+                  cta: "Start questing",
+                  accent: "border-lime-400/50 hover:border-lime-300",
+                  chip: "text-lime-300",
+                },
+              ].map((d) => (
+                <Link
+                  key={d.href}
+                  href={d.href}
+                  className={`group flex flex-col gap-3 rounded-2xl border bg-black/40 p-5 transition ${d.accent}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-3xl">{d.emoji}</span>
+                    <div>
+                      <p className={`font-display text-[11px] tracking-[0.25em] ${d.chip}`}>
+                        ZOKU21
+                      </p>
+                      <h3 className="font-display text-lg tracking-wide text-white">
+                        {d.title}
+                      </h3>
+                    </div>
+                  </div>
+                  <p className="text-sm leading-6 text-white/70">{d.blurb}</p>
+                  <p className="mt-auto pt-2 font-display text-xs tracking-[0.25em] text-white/80 group-hover:text-white">
+                    {d.cta} →
+                  </p>
+                </Link>
+              ))}
             </div>
           </div>
         </div>

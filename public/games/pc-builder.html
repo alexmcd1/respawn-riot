@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>PC Builder — Zoku21</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
+<style>
+  :root {
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --color-text-primary: #ededed;
+    --color-text-secondary: #a0a0c8;
+    --color-text-tertiary: #6b6b8c;
+    --color-text-info: #67e8f9;
+    --color-text-success: #86efac;
+    --color-text-warning: #fcd34d;
+    --color-text-danger: #fca5a5;
+    --color-background-primary: #0a0a14;
+    --color-background-secondary: #14141f;
+    --color-background-tertiary: #1c1c2a;
+    --color-background-info: rgba(34,211,238,0.12);
+    --color-background-success: rgba(34,197,94,0.15);
+    --color-background-warning: rgba(245,158,11,0.15);
+    --color-background-danger: rgba(239,68,68,0.15);
+    --color-border-primary: rgba(255,255,255,0.30);
+    --color-border-secondary: rgba(255,255,255,0.18);
+    --color-border-tertiary: rgba(255,255,255,0.10);
+    --color-border-info: rgba(34,211,238,0.5);
+    --color-border-success: rgba(34,197,94,0.5);
+    --color-border-warning: rgba(245,158,11,0.5);
+    --color-border-danger: rgba(239,68,68,0.5);
+    --border-radius-md: 8px;
+    --border-radius-lg: 12px;
+  }
+  html, body { background: var(--color-background-primary); color: var(--color-text-primary); }
+  body { padding: 16px; max-width: 900px; margin: 0 auto; }
+  button {
+    background: var(--color-background-secondary);
+    color: var(--color-text-primary);
+    border: 0.5px solid var(--color-border-secondary);
+    border-radius: var(--border-radius-md);
+    padding: 8px 14px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+  }
+  button:hover:not(:disabled) { background: var(--color-background-tertiary); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  input[type="text"], input[type="search"], .picker-search {
+    background: var(--color-background-primary);
+    color: var(--color-text-primary);
+    border: 0.5px solid var(--color-border-tertiary);
+    border-radius: var(--border-radius-md);
+    padding: 6px 10px;
+    font-family: inherit;
+  }
+</style>
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:var(--font-sans);color:var(--color-text-primary);background:transparent;}
+h2.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);}
+.app{padding:1rem 0;}
+.app-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;}
+.app-title{font-size:18px;font-weight:500;}
+.budget-row{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--color-text-secondary);}
+.total-pill{font-size:14px;font-weight:500;padding:4px 14px;border-radius:20px;border:0.5px solid var(--color-border-secondary);background:var(--color-background-secondary);}
+.total-pill.over{background:var(--color-background-danger);color:var(--color-text-danger);border-color:var(--color-border-danger,var(--color-border-secondary));}
+.total-pill.ok{background:var(--color-background-success);color:var(--color-text-success);border-color:var(--color-border-success,var(--color-border-secondary));}
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:1rem;}
+.metric{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:10px 12px;}
+.metric-lbl{font-size:11px;color:var(--color-text-secondary);margin-bottom:3px;letter-spacing:0.3px;}
+.metric-val{font-size:20px;font-weight:500;}
+.compat-banner{border-radius:var(--border-radius-md);padding:8px 12px;font-size:12px;margin-bottom:1rem;display:flex;align-items:flex-start;gap:8px;line-height:1.5;}
+.compat-banner.ok{background:var(--color-background-success);color:var(--color-text-success);}
+.compat-banner.warn{background:var(--color-background-warning);color:var(--color-text-warning);}
+.compat-banner.err{background:var(--color-background-danger);color:var(--color-text-danger);}
+.parts-list{display:flex;flex-direction:column;gap:8px;margin-bottom:1rem;}
+.part-row{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);overflow:hidden;}
+.part-header{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;user-select:none;}
+.part-header:hover{background:var(--color-background-secondary);}
+.part-icon{width:32px;height:32px;border-radius:var(--border-radius-md);background:var(--color-background-secondary);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px;}
+.part-label{font-size:12px;color:var(--color-text-secondary);margin-bottom:1px;}
+.part-selected{font-size:13px;font-weight:500;flex:1;}
+.part-price{font-size:13px;font-weight:500;color:var(--color-text-secondary);margin-right:6px;}
+.expand-icon{font-size:14px;color:var(--color-text-tertiary);transition:transform 0.2s;}
+.expand-icon.open{transform:rotate(180deg);}
+.part-picker{border-top:0.5px solid var(--color-border-tertiary);background:var(--color-background-secondary);padding:10px 12px;}
+.picker-search{width:100%;margin-bottom:10px;font-size:13px;}
+.picker-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:7px;max-height:220px;overflow-y:auto;}
+.picker-card{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:9px 11px;cursor:pointer;transition:border-color 0.15s;}
+.picker-card:hover{border-color:var(--color-border-primary);}
+.picker-card.active{border:2px solid var(--color-border-info);background:var(--color-background-info);}
+.picker-card.active .pc-name{color:var(--color-text-info);}
+.picker-card.active .pc-spec{color:var(--color-text-info);}
+.pc-name{font-size:12px;font-weight:500;margin-bottom:2px;line-height:1.3;}
+.pc-spec{font-size:11px;color:var(--color-text-secondary);margin-bottom:4px;line-height:1.4;}
+.pc-price{font-size:12px;font-weight:500;color:var(--color-text-primary);}
+.pc-badge{display:inline-block;font-size:10px;padding:1px 6px;border-radius:10px;margin-left:4px;background:var(--color-background-success);color:var(--color-text-success);}
+.pc-badge.warn{background:var(--color-background-warning);color:var(--color-text-warning);}
+.actions-row{display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap;}
+.actions-row button{font-size:13px;}
+.perf-section{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:14px;margin-bottom:1rem;}
+.perf-title{font-size:13px;font-weight:500;margin-bottom:10px;color:var(--color-text-secondary);}
+.perf-row{display:flex;align-items:center;gap:10px;margin-bottom:7px;}
+.perf-lbl{font-size:12px;width:90px;flex-shrink:0;color:var(--color-text-secondary);}
+.perf-bar-bg{flex:1;height:8px;background:var(--color-background-secondary);border-radius:4px;overflow:hidden;}
+.perf-bar{height:100%;border-radius:4px;transition:width 0.4s ease;background:#378ADD;}
+.perf-bar.green{background:#639922;}
+.perf-bar.amber{background:#BA7517;}
+.perf-bar.red{background:#E24B4A;}
+.perf-val{font-size:12px;font-weight:500;width:28px;text-align:right;color:var(--color-text-primary);}
+.preset-row{display:flex;gap:7px;margin-bottom:1rem;flex-wrap:wrap;}
+.preset-btn{font-size:12px;padding:5px 12px;border-radius:20px;border:0.5px solid var(--color-border-secondary);background:var(--color-background-secondary);color:var(--color-text-secondary);cursor:pointer;transition:all 0.15s;}
+.preset-btn:hover{border-color:var(--color-border-primary);color:var(--color-text-primary);}
+</style>
+</head>
+<body>
+
+<h2 class="sr-only">PC builder — choose components, check compatibility, and see estimated performance</h2>
+
+<div class="app">
+  <div class="app-header">
+    <div class="app-title"><i class="ti ti-cpu" style="font-size:18px;vertical-align:-2px;margin-right:6px" aria-hidden="true"></i>PC Builder</div>
+    <div class="budget-row">
+      <span>Total:</span>
+      <span class="total-pill" id="total-pill">$0</span>
+    </div>
+  </div>
+
+  <div class="preset-row">
+    <span style="font-size:12px;color:var(--color-text-secondary);align-self:center">Presets:</span>
+    <button class="preset-btn" onclick="applyPreset('budget')">Budget ($600)</button>
+    <button class="preset-btn" onclick="applyPreset('mid')">Mid-range ($1200)</button>
+    <button class="preset-btn" onclick="applyPreset('high')">High-end ($2200)</button>
+    <button class="preset-btn" onclick="applyPreset('ultra')">Ultra ($3800)</button>
+  </div>
+
+  <div class="summary-grid">
+    <div class="metric"><div class="metric-lbl">Gaming</div><div class="metric-val" id="score-gaming">—</div></div>
+    <div class="metric"><div class="metric-lbl">Productivity</div><div class="metric-val" id="score-prod">—</div></div>
+    <div class="metric"><div class="metric-lbl">Power draw</div><div class="metric-val" id="score-tdp">—W</div></div>
+    <div class="metric"><div class="metric-lbl">PSU needed</div><div class="metric-val" id="score-psu">—W</div></div>
+    <div class="metric"><div class="metric-lbl">Parts selected</div><div class="metric-val" id="score-parts">0/8</div></div>
+  </div>
+
+  <div class="compat-banner ok" id="compat-banner">
+    <i class="ti ti-info-circle" style="font-size:16px;flex-shrink:0;margin-top:1px" aria-hidden="true"></i>
+    <span id="compat-text">Select components to check compatibility.</span>
+  </div>
+
+  <div class="parts-list" id="parts-list"></div>
+
+  <div class="perf-section">
+    <div class="perf-title"><i class="ti ti-chart-bar" style="font-size:14px;vertical-align:-2px;margin-right:5px" aria-hidden="true"></i>Estimated performance</div>
+    <div id="perf-bars"></div>
+  </div>
+
+  <div class="actions-row">
+    <button onclick="clearBuild()"><i class="ti ti-trash" style="font-size:14px;vertical-align:-2px;margin-right:4px" aria-hidden="true"></i>Clear build</button>
+    <button onclick="exportBuild()"><i class="ti ti-copy" style="font-size:14px;vertical-align:-2px;margin-right:4px" aria-hidden="true"></i>Copy build summary</button>
+  </div>
+</div>
+
+<script>
+// Stub for the host-only sendPrompt so the bundled code doesn't error.
+window.sendPrompt = window.sendPrompt || function(){};
+
+const PARTS_DB = {
+  cpu: [
+    {id:'i3-12100f',name:'Intel Core i3-12100F',spec:'4C/8T, 3.3–4.3GHz, LGA1700',price:110,socket:'LGA1700',tdp:58,gaming:42,prod:38,tier:1},
+    {id:'r5-5600',name:'AMD Ryzen 5 5600',spec:'6C/12T, 3.5–4.4GHz, AM4',price:130,socket:'AM4',tdp:65,gaming:55,prod:52,tier:2},
+    {id:'i5-12600k',name:'Intel Core i5-12600K',spec:'10C/16T, 3.7–4.9GHz, LGA1700',price:200,socket:'LGA1700',tdp:125,gaming:68,prod:66,tier:2},
+    {id:'r5-7600x',name:'AMD Ryzen 5 7600X',spec:'6C/12T, 4.7–5.3GHz, AM5',price:230,socket:'AM5',tdp:105,gaming:72,prod:68,tier:2},
+    {id:'i7-13700k',name:'Intel Core i7-13700K',spec:'16C/24T, 3.4–5.4GHz, LGA1700',price:380,socket:'LGA1700',tdp:125,gaming:82,prod:85,tier:3},
+    {id:'r7-7700x',name:'AMD Ryzen 7 7700X',spec:'8C/16T, 4.5–5.4GHz, AM5',price:340,socket:'AM5',tdp:105,gaming:80,prod:83,tier:3},
+    {id:'r9-7950x',name:'AMD Ryzen 9 7950X',spec:'16C/32T, 4.5–5.7GHz, AM5',price:690,socket:'AM5',tdp:170,gaming:85,prod:98,tier:4},
+    {id:'i9-13900k',name:'Intel Core i9-13900K',spec:'24C/32T, 3.0–5.8GHz, LGA1700',price:550,socket:'LGA1700',tdp:125,gaming:88,prod:97,tier:4},
+  ],
+  motherboard: [
+    {id:'b660m',name:'MSI PRO B660M-A DDR4',spec:'MicroATX, LGA1700, DDR4',price:110,socket:'LGA1700',ddr:'DDR4',formFactor:'mATX',tier:1},
+    {id:'b550m',name:'ASUS ROG Strix B550-F',spec:'ATX, AM4, DDR4',price:140,socket:'AM4',ddr:'DDR4',formFactor:'ATX',tier:2},
+    {id:'z690',name:'MSI MAG Z690 Tomahawk',spec:'ATX, LGA1700, DDR4/5',price:200,socket:'LGA1700',ddr:'DDR4',formFactor:'ATX',tier:3},
+    {id:'b650',name:'ASUS Prime B650-Plus',spec:'ATX, AM5, DDR5',price:190,socket:'AM5',ddr:'DDR5',formFactor:'ATX',tier:2},
+    {id:'x670e',name:'ASUS ROG Crosshair X670E',spec:'ATX, AM5, DDR5',price:380,socket:'AM5',ddr:'DDR5',formFactor:'ATX',tier:4},
+    {id:'z790',name:'ASUS ROG Maximus Z790',spec:'ATX, LGA1700, DDR5',price:420,socket:'LGA1700',ddr:'DDR5',formFactor:'ATX',tier:4},
+  ],
+  ram: [
+    {id:'ddr4-16-3200',name:'Corsair Vengeance 16GB DDR4',spec:'2x8GB, 3200MHz, DDR4',price:45,ddr:'DDR4',capacity:16,speed:3200,tier:1},
+    {id:'ddr4-32-3600',name:'G.Skill Ripjaws 32GB DDR4',spec:'2x16GB, 3600MHz, DDR4',price:75,ddr:'DDR4',capacity:32,speed:3600,tier:2},
+    {id:'ddr5-16-5200',name:'Kingston Fury Beast 16GB DDR5',spec:'2x8GB, 5200MHz, DDR5',price:80,ddr:'DDR5',capacity:16,speed:5200,tier:2},
+    {id:'ddr5-32-6000',name:'G.Skill Trident Z5 32GB DDR5',spec:'2x16GB, 6000MHz, DDR5',price:130,ddr:'DDR5',capacity:32,speed:6000,tier:3},
+    {id:'ddr5-64-5600',name:'Corsair Dominator 64GB DDR5',spec:'2x32GB, 5600MHz, DDR5',price:220,ddr:'DDR5',capacity:64,speed:5600,tier:4},
+  ],
+  gpu: [
+    {id:'rx6600',name:'AMD Radeon RX 6600',spec:'8GB GDDR6, 1080p gaming',price:230,tdp:132,gaming:55,prod:40,tier:1},
+    {id:'rtx3060',name:'NVIDIA RTX 3060',spec:'12GB GDDR6, 1080p–1440p',price:280,tdp:170,gaming:62,prod:55,tier:2},
+    {id:'rx6700xt',name:'AMD Radeon RX 6700 XT',spec:'12GB GDDR6, 1440p gaming',price:320,tdp:230,gaming:68,prod:52,tier:2},
+    {id:'rtx4060ti',name:'NVIDIA RTX 4060 Ti',spec:'16GB GDDR6, 1440p gaming',price:420,tdp:165,gaming:75,prod:65,tier:3},
+    {id:'rx7900xt',name:'AMD Radeon RX 7900 XT',spec:'20GB GDDR6, 4K gaming',price:750,tdp:315,gaming:88,prod:72,tier:3},
+    {id:'rtx4080',name:'NVIDIA RTX 4080',spec:'16GB GDDR6X, 4K gaming',price:1100,tdp:320,gaming:92,prod:85,tier:4},
+    {id:'rtx4090',name:'NVIDIA RTX 4090',spec:'24GB GDDR6X, flagship',price:1700,tdp:450,gaming:100,prod:95,tier:4},
+  ],
+  storage: [
+    {id:'ssd-500',name:'Kingston NV2 500GB NVMe',spec:'NVMe M.2, 3500MB/s read',price:45,tier:1},
+    {id:'ssd-1tb',name:'Samsung 980 1TB NVMe',spec:'NVMe M.2, 3500MB/s read',price:75,tier:2},
+    {id:'ssd-2tb',name:'WD Black SN850X 2TB NVMe',spec:'NVMe M.2, 7300MB/s read',price:140,tier:3},
+    {id:'ssd-4tb',name:'Samsung 990 Pro 4TB NVMe',spec:'NVMe M.2, 7450MB/s read',price:310,tier:4},
+  ],
+  psu: [
+    {id:'psu-550',name:'EVGA 550 B5 550W',spec:'80+ Bronze, Semi-modular',price:60,wattage:550,tier:1},
+    {id:'psu-650',name:'Seasonic Focus GX-650W',spec:'80+ Gold, Fully-modular',price:90,wattage:650,tier:2},
+    {id:'psu-750',name:'Corsair RM750x 750W',spec:'80+ Gold, Fully-modular',price:110,wattage:750,tier:2},
+    {id:'psu-850',name:'be quiet! Straight Power 850W',spec:'80+ Gold, Fully-modular',price:140,wattage:850,tier:3},
+    {id:'psu-1000',name:'ASUS ROG Thor 1000W',spec:'80+ Platinum, Fully-modular',price:220,wattage:1000,tier:3},
+    {id:'psu-1200',name:'Seasonic PRIME TX-1200W',spec:'80+ Titanium, Fully-modular',price:320,wattage:1200,tier:4},
+  ],
+  cooler: [
+    {id:'stock',name:'Stock Cooler (Included)',spec:'Bundled with CPU',price:0,tier:1},
+    {id:'hyper212',name:'Cooler Master Hyper 212',spec:'Single tower air cooler',price:35,tier:1},
+    {id:'nh-d15',name:'Noctua NH-D15',spec:'Dual tower, flagship air',price:100,tier:3},
+    {id:'aio-240',name:'Corsair H100i 240mm AIO',spec:'240mm liquid cooler',price:110,tier:2},
+    {id:'aio-360',name:'NZXT Kraken Z73 360mm',spec:'360mm liquid cooler',price:200,tier:3},
+    {id:'aio-420',name:'Corsair iCUE H150i 420mm',spec:'420mm liquid cooler',price:240,tier:4},
+  ],
+  case: [
+    {id:'case-budget',name:'Fractal Design Core 1000',spec:'MicroATX, 2 fans included',price:45,tier:1},
+    {id:'case-mid',name:'NZXT H510',spec:'MicroATX/ATX, tempered glass',price:80,tier:2},
+    {id:'case-meshify',name:'Fractal Meshify 2',spec:'ATX, high airflow mesh',price:120,tier:3},
+    {id:'case-lian',name:'Lian Li PC-O11 Dynamic',spec:'ATX, dual chamber design',price:150,tier:3},
+    {id:'case-ultra',name:'Corsair 7000X Airflow',spec:'E-ATX, 6 fans included',price:250,tier:4},
+  ],
+};
+
+const PART_META = {
+  cpu:{label:'CPU',icon:'ti-cpu'},
+  motherboard:{label:'Motherboard',icon:'ti-circuit-board'},
+  ram:{label:'RAM',icon:'ti-server'},
+  gpu:{label:'GPU',icon:'ti-device-desktop'},
+  storage:{label:'Storage',icon:'ti-database'},
+  psu:{label:'Power supply',icon:'ti-bolt'},
+  cooler:{label:'CPU cooler',icon:'ti-wind'},
+  case:{label:'Case',icon:'ti-box'},
+};
+
+const PERF_BENCHMARKS = [
+  {label:'1080p gaming',key:'gaming'},
+  {label:'1440p gaming',key:'gaming14'},
+  {label:'4K gaming',key:'gaming4k'},
+  {label:'Content creation',key:'prod'},
+  {label:'Streaming',key:'stream'},
+];
+
+const PRESETS = {
+  budget:{cpu:'r5-5600',motherboard:'b550m',ram:'ddr4-16-3200',gpu:'rx6600',storage:'ssd-1tb',psu:'psu-550',cooler:'hyper212',case:'case-budget'},
+  mid:{cpu:'i5-12600k',motherboard:'z690',ram:'ddr4-32-3600',gpu:'rtx4060ti',storage:'ssd-2tb',psu:'psu-750',cooler:'aio-240',case:'case-mid'},
+  high:{cpu:'r7-7700x',motherboard:'b650',ram:'ddr5-32-6000',gpu:'rx7900xt',storage:'ssd-2tb',psu:'psu-850',cooler:'aio-360',case:'case-meshify'},
+  ultra:{cpu:'r9-7950x',motherboard:'x670e',ram:'ddr5-64-5600',gpu:'rtx4090',storage:'ssd-4tb',psu:'psu-1200',cooler:'aio-420',case:'case-ultra'},
+};
+
+let build = {cpu:null,motherboard:null,ram:null,gpu:null,storage:null,psu:null,cooler:null,case:null};
+let openSection = null;
+let searches = {};
+
+function getPartById(cat, id){ return PARTS_DB[cat].find(p=>p.id===id)||null; }
+
+function applyPreset(name){
+  const p = PRESETS[name];
+  Object.keys(p).forEach(cat=>{ build[cat]=p[cat]; });
+  openSection=null;
+  render();
+}
+
+function clearBuild(){
+  Object.keys(build).forEach(k=>build[k]=null);
+  openSection=null;
+  render();
+}
+
+function totalCost(){
+  return Object.keys(build).reduce((sum,cat)=>{
+    const part = build[cat]?getPartById(cat,build[cat]):null;
+    return sum + (part?part.price:0);
+  },0);
+}
+
+function getCompatIssues(){
+  const issues=[];
+  const cpu = build.cpu?getPartById('cpu',build.cpu):null;
+  const mb = build.motherboard?getPartById('motherboard',build.motherboard):null;
+  const ram = build.ram?getPartById('ram',build.ram):null;
+  if(cpu&&mb&&cpu.socket!==mb.socket) issues.push({type:'err',msg:`Socket mismatch: ${cpu.name} (${cpu.socket}) is not compatible with ${mb.name} (${mb.socket}).`});
+  if(mb&&ram&&mb.ddr!==ram.ddr) issues.push({type:'err',msg:`RAM type mismatch: ${mb.name} requires ${mb.ddr}, but ${ram.name} is ${ram.ddr}.`});
+  const totalTdp = (cpu?cpu.tdp:0)+(build.gpu?getPartById('gpu',build.gpu)?.tdp||0:0);
+  const psu = build.psu?getPartById('psu',build.psu):null;
+  if(psu&&totalTdp>0&&psu.wattage<totalTdp+100) issues.push({type:'warn',msg:`PSU may be underpowered. Estimated draw ~${totalTdp}W, PSU is ${psu.wattage}W. Recommended: ${totalTdp+150}W+.`});
+  if(cpu&&cpu.tdp>95&&build.cooler==='stock') issues.push({type:'warn',msg:`${cpu.name} (${cpu.tdp}W TDP) may thermal-throttle with a stock cooler. Consider an aftermarket cooler.`});
+  return issues;
+}
+
+function calcScores(){
+  const cpu=build.cpu?getPartById('cpu',build.cpu):null;
+  const gpu=build.gpu?getPartById('gpu',build.gpu):null;
+  const ram=build.ram?getPartById('ram',build.ram):null;
+  if(!cpu&&!gpu) return null;
+  const cpuG=cpu?cpu.gaming:0, gpuG=gpu?gpu.gaming:0;
+  const cpuP=cpu?cpu.prod:0, gpuP=gpu?gpu.prod:0;
+  const gaming=Math.round(gpuG*0.7+cpuG*0.3);
+  const gaming14=Math.round(gaming*0.82);
+  const gaming4k=Math.round(gaming*0.62);
+  const prod=Math.round(cpuP*0.65+gpuP*0.35);
+  const stream=Math.round(cpuP*0.55+gpuP*0.25+(ram&&ram.capacity>=32?15:0));
+  const totalTdp=(cpu?cpu.tdp:0)+(gpu?gpu.tdp:0);
+  return {gaming,gaming14,gaming4k,prod,stream,totalTdp};
+}
+
+function barColor(v){
+  if(v>=80) return 'green';
+  if(v>=50) return '';
+  if(v>=30) return 'amber';
+  return 'red';
+}
+
+function render(){
+  const cost=totalCost();
+  const pill=document.getElementById('total-pill');
+  pill.textContent='$'+cost.toLocaleString();
+  pill.className='total-pill'+(cost>0?' ok':'');
+
+  const scores=calcScores();
+  const partsCount=Object.values(build).filter(Boolean).length;
+  document.getElementById('score-gaming').textContent=scores?scores.gaming+'/100':'—';
+  document.getElementById('score-prod').textContent=scores?scores.prod+'/100':'—';
+  const totalTdp=(build.cpu?getPartById('cpu',build.cpu)?.tdp||0:0)+(build.gpu?getPartById('gpu',build.gpu)?.tdp||0:0);
+  document.getElementById('score-tdp').textContent=totalTdp||'—';
+  document.getElementById('score-psu').textContent=totalTdp?totalTdp+150:'—';
+  document.getElementById('score-parts').textContent=partsCount+'/8';
+
+  const issues=getCompatIssues();
+  const banner=document.getElementById('compat-banner');
+  const bannerText=document.getElementById('compat-text');
+  const errs=issues.filter(i=>i.type==='err');
+  const warns=issues.filter(i=>i.type==='warn');
+  if(errs.length){banner.className='compat-banner err';bannerText.textContent=errs.map(i=>i.msg).join(' | ');}
+  else if(warns.length){banner.className='compat-banner warn';bannerText.textContent=warns.map(i=>i.msg).join(' | ');}
+  else if(partsCount===8){banner.className='compat-banner ok';bannerText.textContent='All parts compatible! Build looks great.';}
+  else{banner.className='compat-banner ok';bannerText.textContent='Select components to check compatibility.';}
+
+  const perfEl=document.getElementById('perf-bars');
+  if(scores){
+    perfEl.innerHTML=PERF_BENCHMARKS.map(b=>{
+      const v=scores[b.key]||0;
+      return `<div class="perf-row">
+        <span class="perf-lbl">${b.label}</span>
+        <div class="perf-bar-bg"><div class="perf-bar ${barColor(v)}" style="width:${v}%"></div></div>
+        <span class="perf-val">${v}</span>
+      </div>`;
+    }).join('');
+  } else {
+    perfEl.innerHTML='<div style="font-size:13px;color:var(--color-text-secondary);padding:8px 0;">Select a CPU and GPU to see performance estimates.</div>';
+  }
+
+  const list=document.getElementById('parts-list');
+  list.innerHTML='';
+  Object.keys(PART_META).forEach(cat=>{
+    const meta=PART_META[cat];
+    const selectedId=build[cat];
+    const part=selectedId?getPartById(cat,selectedId):null;
+    const isOpen=openSection===cat;
+
+    const row=document.createElement('div');
+    row.className='part-row';
+
+    const header=document.createElement('div');
+    header.className='part-header';
+    header.innerHTML=`
+      <div class="part-icon"><i class="ti ${meta.icon}" aria-hidden="true"></i></div>
+      <div style="flex:1;min-width:0;">
+        <div class="part-label">${meta.label}</div>
+        <div class="part-selected" style="${!part?'color:var(--color-text-tertiary);font-weight:400':''}">
+          ${part?part.name:'Click to select...'}
+        </div>
+      </div>
+      ${part?`<span class="part-price">$${part.price}</span>`:''}
+      <i class="ti ti-chevron-down expand-icon ${isOpen?'open':''}" aria-hidden="true"></i>
+    `;
+    header.onclick=()=>{ openSection=isOpen?null:cat; render(); };
+    row.appendChild(header);
+
+    if(isOpen){
+      const picker=document.createElement('div');
+      picker.className='part-picker';
+      const searchVal=searches[cat]||'';
+      picker.innerHTML=`<input class="picker-search" type="text" placeholder="Search ${meta.label.toLowerCase()}..." value="${searchVal}" id="search-${cat}">
+        <div class="picker-grid" id="grid-${cat}"></div>`;
+      row.appendChild(picker);
+
+      const grid=picker.querySelector(`#grid-${cat}`);
+      const filtered=PARTS_DB[cat].filter(p=>!searchVal||p.name.toLowerCase().includes(searchVal.toLowerCase())||p.spec.toLowerCase().includes(searchVal.toLowerCase()));
+
+      filtered.forEach(p=>{
+        const card=document.createElement('div');
+        card.className='picker-card'+(selectedId===p.id?' active':'');
+        const issues=getCompatIssuesForPart(cat,p);
+        card.innerHTML=`<div class="pc-name">${p.name}${issues.length?`<span class="pc-badge warn">!</span>`:''}</div>
+          <div class="pc-spec">${p.spec}</div>
+          <div class="pc-price">$${p.price}${p.price===0?' (free)':''}</div>`;
+        card.onclick=(e)=>{
+          e.stopPropagation();
+          build[cat]=(selectedId===p.id)?null:p.id;
+          openSection=null;
+          render();
+        };
+        grid.appendChild(card);
+      });
+
+      setTimeout(()=>{
+        const inp=document.getElementById('search-'+cat);
+        if(inp){ inp.focus(); inp.oninput=e=>{ searches[cat]=e.target.value; render(); }; }
+      },10);
+    }
+    list.appendChild(row);
+  });
+}
+
+function getCompatIssuesForPart(cat,part){
+  const issues=[];
+  if(cat==='motherboard'&&build.cpu){
+    const cpu=getPartById('cpu',build.cpu);
+    if(cpu&&cpu.socket!==part.socket) issues.push('socket');
+  }
+  if(cat==='ram'&&build.motherboard){
+    const mb=getPartById('motherboard',build.motherboard);
+    if(mb&&mb.ddr!==part.ddr) issues.push('ddr');
+  }
+  if(cat==='cpu'&&build.motherboard){
+    const mb=getPartById('motherboard',build.motherboard);
+    if(mb&&mb.socket!==part.socket) issues.push('socket');
+  }
+  return issues;
+}
+
+function getBuildSummary(){
+  const lines=Object.keys(build).map(cat=>{
+    const part=build[cat]?getPartById(cat,build[cat]):null;
+    return `${PART_META[cat].label}: ${part?part.name+' ($'+part.price+')':'Not selected'}`;
+  });
+  lines.push('Total: $'+totalCost().toLocaleString());
+  return lines.join(', ');
+}
+
+function exportBuild(){
+  const lines=['=== PC Build Summary ===',''];
+  Object.keys(build).forEach(cat=>{
+    const part=build[cat]?getPartById(cat,build[cat]):null;
+    lines.push(`${PART_META[cat].label}: ${part?part.name+' — $'+part.price:'Not selected'}`);
+  });
+  lines.push('');lines.push('Total: $'+totalCost().toLocaleString());
+  const scores=calcScores();
+  if(scores){lines.push('');lines.push('Estimated gaming score: '+scores.gaming+'/100');lines.push('Estimated productivity score: '+scores.prod+'/100');}
+  try{navigator.clipboard.writeText(lines.join('\n'));}catch(e){}
+  const btn=event.target.closest('button');
+  if(btn){const orig=btn.textContent;btn.textContent='Copied!';setTimeout(()=>btn.textContent=orig,1500);}
+}
+
+render();
+</script>
+
+</body>
+</html>
