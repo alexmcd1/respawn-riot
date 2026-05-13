@@ -15,6 +15,29 @@ const G: any = {
   inventory: [] as any[],
   maxInv: 100,
   chests: {} as any,
+  badges: [] as string[],   // badge IDs collected (one per boss beaten, max 8)
+  bossesBeaten: 0,          // raw boss defeats (used as the next-badge index)
+  ninjasBeaten: 0,          // master-ninja trial progress (0..10)
+  worldX: undefined as any,
+}
+
+// ─── Badges (one per defeated boss) ───────────────────────────────────────────
+const BADGES = [
+  { id: 'forest',  name: 'Forest Crest',  color: 0x44aa55, glyph: '✿' },
+  { id: 'tide',    name: 'Tide Crest',    color: 0x44aaff, glyph: '~' },
+  { id: 'ember',   name: 'Ember Crest',   color: 0xff7744, glyph: '▲' },
+  { id: 'shadow',  name: 'Shadow Crest',  color: 0x6644aa, glyph: '◐' },
+  { id: 'thunder', name: 'Thunder Crest', color: 0xffdd44, glyph: '⚡' },
+  { id: 'crystal', name: 'Crystal Crest', color: 0x88eeff, glyph: '◆' },
+  { id: 'wind',    name: 'Wind Crest',    color: 0xddffdd, glyph: '⤴' },
+  { id: 'star',    name: 'Star Crest',    color: 0xffffaa, glyph: '★' },
+]
+
+function awardNextBadge(): { id: string, name: string, color: number, glyph: string } | null {
+  if (G.badges.length >= BADGES.length) return null
+  const next = BADGES[G.badges.length]
+  G.badges.push(next.id)
+  return next
 }
 
 // ─── Level / XP / evolution helpers ───────────────────────────────────────────
@@ -1511,11 +1534,24 @@ function createHomeScene(Phaser: any) {
       // zone. Edge zones (Fruit Tree, Doorway) used to be unreachable.
       this.zones = [
         { x: 50,  label: 'Fruit Tree',   prompt: '[SPACE] EAT',     action: () => this.pickFruit(),  draw: this.drawFruitTree.bind(this) },
-        { x: 150, label: 'Punching Bag', prompt: '[SPACE] TRAIN',   action: () => this.train(),     draw: this.drawBag.bind(this) },
-        { x: 240, label: 'Fidget Rings', prompt: '[SPACE] PLAY',    action: () => this.fidget(),    draw: this.drawFidget.bind(this) },
-        { x: 335, label: 'Bed',          prompt: '[SPACE] SLEEP',   action: () => this.sleep(),     draw: this.drawBed.bind(this) },
-        { x: 435, label: 'Doorway',      prompt: '[SPACE] EXPLORE', action: () => { G.worldX = undefined; this.scene.start('WorldScene') }, draw: this.drawDoor.bind(this) },
+        { x: 130, label: 'Punching Bag', prompt: '[SPACE] TRAIN',   action: () => this.train(),     draw: this.drawBag.bind(this) },
+        { x: 210, label: 'Fidget Rings', prompt: '[SPACE] PLAY',    action: () => this.fidget(),    draw: this.drawFidget.bind(this) },
+        { x: 290, label: 'Bed',          prompt: '[SPACE] SLEEP',   action: () => this.sleep(),     draw: this.drawBed.bind(this) },
+        { x: 370, label: 'Doorway',      prompt: '[SPACE] EXPLORE', action: () => { G.worldX = undefined; this.scene.start('WorldScene') }, draw: this.drawDoor.bind(this) },
       ]
+      // Master Ninja Trial gate — appears once you've collected all 8 badges.
+      if ((G.badges?.length || 0) >= BADGES.length) {
+        this.zones.push({
+          x: 450,
+          label: 'Trial Gate',
+          prompt: '[SPACE] NINJA TRIAL',
+          action: () => {
+            G.ninjasBeaten = 0
+            this.scene.start('BattleScene', { isBoss: false, fromWorld: false, fromNinja: true })
+          },
+          draw: this.drawTrialGate.bind(this),
+        })
+      }
       for (const z of this.zones) {
         z.gfx = this.add.graphics()
         z.draw(z)
@@ -1624,7 +1660,8 @@ function createHomeScene(Phaser: any) {
     updHUD() {
       ;['HP','FOOD','MOOD','XP'].forEach(k => this.updBar(k))
       this.nameT.setText(G.name + '   Lv.' + G.level)
-      this.dayT.setText('Day ' + G.day + '   ·   Stage ' + G.stage)
+      const badgeCount = G.badges?.length || 0
+      this.dayT.setText('Day ' + G.day + '   ·   Stage ' + G.stage + '   ·   Badges ' + badgeCount + '/' + BADGES.length)
       this.bagT.setText('BAG ' + invTotal() + '/' + G.maxInv)
     }
 
@@ -1678,6 +1715,21 @@ function createHomeScene(Phaser: any) {
       g.fillStyle(0x88ddff, 0.7); g.fillCircle(x - 7, fy - 26, 1.5)
       g.fillStyle(0xff66bb, 0.6); g.fillCircle(x + 5, fy - 16, 1.2)
       g.fillStyle(0xffdd44); g.fillRect(x + 7, fy - 28, 2, 4)
+    }
+
+    drawTrialGate(z: any) {
+      const g = z.gfx, x = z.x, fy = this.floorY
+      // Stone torii-style gate with crimson banner
+      g.fillStyle(0x4a0a1a); g.fillRect(x - 16, fy - 56, 32, 4)        // top crossbar
+      g.fillStyle(0x6a0a1a); g.fillRect(x - 18, fy - 60, 36, 5)        // top crown
+      g.fillStyle(0x4a0a1a); g.fillRect(x - 14, fy - 50, 4, 50)        // left pillar
+      g.fillStyle(0x4a0a1a); g.fillRect(x + 10, fy - 50, 4, 50)        // right pillar
+      // Glowing rune in the middle
+      g.fillStyle(0xff3366, 0.85); g.fillCircle(x, fy - 30, 5)
+      g.fillStyle(0xffdd44, 0.9); g.fillCircle(x, fy - 30, 2)
+      // Hanging banner
+      g.fillStyle(0x880020); g.fillRect(x - 4, fy - 48, 8, 14)
+      g.fillStyle(0xffdd44); g.fillRect(x - 1, fy - 44, 2, 6)
     }
 
     tryActivate() { if (this.nearZone) this.nearZone.action() }
@@ -1780,7 +1832,7 @@ function createHomeScene(Phaser: any) {
       G.happy = Math.min(100, G.happy + Phaser.Math.Between(5, 12))
       G.hunger = Math.max(0, G.hunger - 3)
       let line = 'You played and felt happy!'
-      if (Math.random() < 0.3 && invAdd('shard', 1)) line = 'Played +Happy   Found a Crystal!'
+      if (Math.random() < 0.3 && invAdd('shard', 1)) line = 'Found a Crystal!  Open BAG (B) to use it for +5 XP'
       const r = gainXp(3)
       this.msg(line); this.updHUD()
       this.resetSprite()
@@ -2068,15 +2120,16 @@ function createWorldScene(Phaser: any) {
         }
       }
 
-      // Boss zone (far right)
+      // Boss zone (far right) — shows current boss tier so progression is visible.
       const bossG = this.add.graphics()
       bossG.fillStyle(0xaa0033, 0.4); bossG.fillRect(1700, this.floorY - 14, 80, 18)
       bossG.lineStyle(1, 0xff3366, 0.85)
       bossG.beginPath(); bossG.moveTo(1706, this.floorY - 5); bossG.lineTo(1716, this.floorY); bossG.lineTo(1726, this.floorY - 5); bossG.strokePath()
-      // Pulsing skull-like marker
       const bossSkull = this.add.text(1740, this.floorY - 50, '☠', { fontSize: '20px', color: '#ff5577' }).setOrigin(0.5)
       this.tweens.add({ targets: bossSkull, scale: 1.2, duration: 700, yoyo: true, repeat: -1 })
-      this.add.text(1740, this.floorY - 30, 'BOSS', { fontSize: '10px', color: '#ff5577', fontStyle: 'bold', stroke: '#000', strokeThickness: 2 }).setOrigin(0.5)
+      const bossTier = Math.min((G.bossesBeaten || 0) + 1, BADGES.length)
+      const bossLabel = (G.badges?.length || 0) >= BADGES.length ? 'BOSS  ALL CLEAR' : `BOSS ${bossTier}/${BADGES.length}`
+      this.add.text(1740, this.floorY - 30, bossLabel, { fontSize: '10px', color: '#ff5577', fontStyle: 'bold', stroke: '#000', strokeThickness: 2 }).setOrigin(0.5)
 
       // Player
       this.cGfx = this.add.graphics().setDepth(3)
@@ -2331,9 +2384,12 @@ function createInventoryScene(Phaser: any) {
       this.add.rectangle(W/2, H/2 - 106, 400, 24, 0x1a2a4a)
       this.add.text(W/2, H/2 - 106, 'BACKPACK   ' + invTotal() + ' / ' + G.maxInv, { fontSize: '11px', color: '#ddeeff', fontStyle: 'bold', letterSpacing: 2 }).setOrigin(0.5)
 
+      // Highlighted hint at the top so first-time players know what to do.
+      this.add.text(W/2, H/2 - 88, '▶  TAP an item below to USE its effect  ◀', { fontSize: '8px', color: '#ffdd66', fontStyle: 'bold' }).setOrigin(0.5)
+
       const cols = 5, slotW = 70, slotH = 38
       const startX = W/2 - (cols * slotW) / 2 + slotW/2
-      const startY = H/2 - 70
+      const startY = H/2 - 60
       const items = G.inventory.slice(0, 25)
       for (let i = 0; i < 25; i++) {
         const r = Math.floor(i / cols), c = i % cols
@@ -2342,23 +2398,33 @@ function createInventoryScene(Phaser: any) {
         if (items[i]) {
           const it = items[i]; const def = ITEMS[it.id]
           slot.setInteractive({ useHandCursor: true })
+          // Subtle pulse so they look interactive, not decorative.
+          this.tweens.add({ targets: slot, fillAlpha: 0.7, duration: 900, yoyo: true, repeat: -1 })
           this.add.circle(sx, sy - 6, 6, def.color)
           this.add.text(sx, sy + 6, def.name + ' x' + it.qty, { fontSize: '7px', color: '#ddeeff' }).setOrigin(0.5)
-          this.add.text(sx, sy + 13, def.desc, { fontSize: '6px', color: '#7799bb' }).setOrigin(0.5)
+          this.add.text(sx, sy + 13, def.desc, { fontSize: '6px', color: '#88ddaa' }).setOrigin(0.5)
           slot.on('pointerdown', () => {
             if (invUse(it.id)) {
               this.scene.stop()
               this.scene.resume(this.from)
               this.scene.launch('InventoryScene', { from: this.from }); this.scene.pause(this.from)
             } else {
-              const tip = this.add.text(sx, sy - 18, "Can't use", { fontSize: '7px', color: '#ff8888' }).setOrigin(0.5)
-              this.time.delayedCall(700, () => tip.destroy())
+              const tip = this.add.text(sx, sy - 18, 'Already maxed', { fontSize: '7px', color: '#ff8888', backgroundColor: '#000', padding: { x: 3, y: 1 } as any }).setOrigin(0.5)
+              this.time.delayedCall(900, () => tip.destroy())
             }
           })
         }
       }
 
-      this.add.text(W/2, H/2 + 102, 'Tap an item to use it', { fontSize: '8px', color: '#7788aa' }).setOrigin(0.5)
+      // Empty-bag prompt
+      if (invTotal() === 0) {
+        this.add.text(W/2, H/2 - 20,
+          'Your bag is empty.\nPick fruit at HOME, find items in the OVERWORLD,\nor open chests to fill it.',
+          { fontSize: '9px', color: '#88aacc', align: 'center' }
+        ).setOrigin(0.5)
+      }
+
+      this.add.text(W/2, H/2 + 108, 'Berries +HP   ·   Apples +FOOD   ·   Herbs +MOOD   ·   Crystals +XP', { fontSize: '7px', color: '#7788aa' }).setOrigin(0.5)
       const close = () => { this.scene.stop(); this.scene.resume(this.from) }
       // Tappable close button
       const xBtn = this.add.rectangle(W/2 + 188, H/2 - 106, 22, 18, 0x4a1010, 0.95).setStrokeStyle(1, 0xaa4444).setInteractive({ useHandCursor: true })
@@ -2500,8 +2566,27 @@ function createCodexScene(Phaser: any) {
       const nextEvo = G.stage < 5 ? `Next evolution at Lv ${evoNext}  (${Math.max(0, evoNext - G.level)} levels to go)` : 'You have reached the final form!'
       this.add.text(W/2, 234, nextEvo, { fontSize: '9px', color: '#ffdd44', fontStyle: 'italic' }).setOrigin(0.5)
 
-      this.add.text(W/2, 256, 'Each level: +3 HP   +1 ATK   +1 DEF   +1 SPD every 2 levels', { fontSize: '8px', color: '#88aacc' }).setOrigin(0.5)
-      this.add.text(W/2, 272, 'XP: training (+6), wild battles (+18-44), bosses (+95-155), crystals (+5)', { fontSize: '8px', color: '#7788aa' }).setOrigin(0.5)
+      this.add.text(W/2, 250, 'Each level: +3 HP   +1 ATK   +1 DEF   +1 SPD every 2 levels', { fontSize: '8px', color: '#88aacc' }).setOrigin(0.5)
+      this.add.text(W/2, 262, 'XP: training (+6), wild battles (+18-44), bosses (+95-155), crystals (+5)', { fontSize: '8px', color: '#7788aa' }).setOrigin(0.5)
+
+      // Badge collection row
+      this.add.text(W/2, 280, 'BADGES', { fontSize: '9px', color: '#ffdd66', fontStyle: 'bold', letterSpacing: 2 }).setOrigin(0.5)
+      const badgeY = 296
+      const slotW = 30
+      const startBX = W/2 - (BADGES.length * slotW) / 2 + slotW/2
+      for (let i = 0; i < BADGES.length; i++) {
+        const b = BADGES[i]
+        const bx = startBX + i * slotW
+        const owned = G.badges?.includes(b.id)
+        this.add.circle(bx, badgeY, 9, owned ? b.color : 0x1a1a2a).setStrokeStyle(1, owned ? 0xffffff : 0x445566)
+        this.add.text(bx, badgeY, b.glyph, { fontSize: '10px', color: owned ? '#ffffff' : '#445566', fontStyle: 'bold' }).setOrigin(0.5)
+        this.add.text(bx, badgeY + 11, b.name.replace(' Crest',''), { fontSize: '6px', color: owned ? '#ffeebb' : '#445566' }).setOrigin(0.5)
+      }
+      const badgeCount = G.badges?.length || 0
+      const trialMsg = badgeCount >= BADGES.length
+        ? '★ MASTER NINJA TRIAL UNLOCKED — Visit the Trial Gate at HOME ★'
+        : `Defeat the boss to earn the next badge.  ${badgeCount}/${BADGES.length} collected.`
+      this.add.text(W/2, H - 24, trialMsg, { fontSize: '8px', color: badgeCount >= BADGES.length ? '#ff66bb' : '#88aacc', fontStyle: 'italic' }).setOrigin(0.5)
 
       const close = () => { this.scene.stop(); this.scene.resume(this.from) }
       const xBtn = this.add.rectangle(W - 26, 26, 22, 18, 0x4a1010, 0.95).setStrokeStyle(1, 0xaa4444).setInteractive({ useHandCursor: true })
@@ -2516,7 +2601,7 @@ function createCodexScene(Phaser: any) {
 // ─── BattleScene ──────────────────────────────────────────────────────────────
 function createBattleScene(Phaser: any) {
   return class BattleScene extends Phaser.Scene {
-    private isBoss = false; private fromWorld = false
+    private isBoss = false; private fromWorld = false; private fromNinja = false
     private turn = 'player'; private animating = false
     private defending = false; private eDefending = false
     private enemy: any = {}
@@ -2531,6 +2616,7 @@ function createBattleScene(Phaser: any) {
     create(data: any) {
       this.isBoss    = data?.isBoss    || false
       this.fromWorld = data?.fromWorld || false
+      this.fromNinja = data?.fromNinja || false
       this.turn = 'player'; this.animating = false
       this.defending = false; this.eDefending = false
       this.enemy = this.genEnemy()
@@ -2584,31 +2670,57 @@ function createBattleScene(Phaser: any) {
     }
 
     genEnemy() {
-      // Pick a random species (any of the three) so wild enemies look varied.
-      const speciesIdx = Phaser.Math.Between(0, 2)
-      const minStage = this.isBoss ? Math.min(4, G.stage + 1) : Math.max(1, G.stage - 1)
-      const maxStage = this.isBoss ? Math.min(5, G.stage + 1) : Math.min(4, G.stage + 1)
-      const s = Phaser.Math.Between(minStage, Math.max(minStage, maxStage))
+      const bossTier = G.bossesBeaten || 0  // 0..7+, scales boss difficulty up
 
-      // Themed name pool per species.
+      // Themed name pools — 10 per species so wild encounters feel varied.
       const namesBySpecies = [
-        ['Sharptooth', 'Crestrunner', 'Spinejaw', 'Clawfoot', 'Frillback', 'Marshcreeper', 'Boneripper'],
-        ['Marshfin', 'Tideling', 'Coralfang', 'Drakefry', 'Brinepup', 'Kelpcrest', 'Stormjaw'],
-        ['Mossback', 'Stoneshell', 'Wildmane', 'Cubguard', 'Driftpaw', 'Grovekeeper', 'Boulderpaw'],
+        // Dino flavor
+        ['Sharptooth','Crestrunner','Spinejaw','Clawfoot','Frillback','Marshcreeper','Boneripper','Plumeback','Rockshorn','Razorthorn'],
+        // Water flavor
+        ['Marshfin','Tideling','Coralfang','Drakefry','Brinepup','Kelpcrest','Stormjaw','Reefclaw','Mistsnake','Pearlfin'],
+        // Lion-turtle / earth flavor
+        ['Mossback','Stoneshell','Wildmane','Cubguard','Driftpaw','Grovekeeper','Boulderpaw','Hornshell','Sageclaw','Fernmane'],
       ]
-      const bn = ['VORAX', 'TITANEX', 'NECROSAUR', 'SHADOWFANG', 'OBLIVIRA', 'TEMPESTRYX', 'GLOOMHELM']
-      const name = this.isBoss
-        ? bn[Phaser.Math.Between(0, bn.length - 1)]
-        : namesBySpecies[speciesIdx][Phaser.Math.Between(0, namesBySpecies[speciesIdx].length - 1)]
+      // Eight unique bosses, one per badge tier.
+      const bossNames = [
+        'VORAX', 'TITANEX', 'NECROSAUR', 'SHADOWFANG',
+        'OBLIVIRA', 'TEMPESTRYX', 'GLOOMHELM', 'AETHERIX',
+      ]
+      // Ten Master Ninjas for the trial.
+      const ninjaNames = [
+        'Master Hayato', 'Master Sakura', 'Master Renji', 'Master Mei',
+        'Master Kaito',  'Master Yumi',   'Master Tora',  'Master Aki',
+        'Master Ryo',    'Grand Master Kuro',
+      ]
 
-      const hp = Math.floor((14 + s * 12) * (this.isBoss ? 2.2 : 1))
+      let name: string
+      let s: number
+      let species = Phaser.Math.Between(0, 2)
+
+      if (this.fromNinja) {
+        const idx = Math.min(9, G.ninjasBeaten || 0)
+        name = ninjaNames[idx]
+        species = idx % 3
+        s = idx >= 9 ? 5 : 4
+      } else if (this.isBoss) {
+        name = bossNames[bossTier % bossNames.length]
+        s = Math.min(5, 3 + Math.floor(bossTier / 2))   // 3, 3, 4, 4, 5, 5, 5, 5
+      } else {
+        name = namesBySpecies[species][Phaser.Math.Between(0, namesBySpecies[species].length - 1)]
+        s = Phaser.Math.Clamp(G.stage - 1 + Phaser.Math.Between(0, 2), 1, 4)
+      }
+
+      // Difficulty scaling: bosses ramp with bossTier, ninjas ramp with idx.
+      const bossMult  = this.isBoss   ? (2.0 + bossTier * 0.12)              : 1
+      const ninjaMult = this.fromNinja ? (1.6 + (G.ninjasBeaten || 0) * 0.08) : 1
+      const mult = Math.max(bossMult, ninjaMult, 1)
+      const hp = Math.floor((14 + s * 12) * mult)
       return {
-        name, species: speciesIdx, stage: s, hp, maxHp: hp,
-        atk: (3 + s * 3) * (this.isBoss ? 1.6 : 1),
+        name, species, stage: s, hp, maxHp: hp,
+        atk: (3 + s * 3) * (this.isBoss ? 1.55 : (this.fromNinja ? 1.4 : 1)),
         def: 2 + s * 2,
         spd: 3 + s,
-        // Clamp to >=1 so a low-level player doesn't see "Lv.0" enemies.
-        level: Math.max(1, G.level + (this.isBoss ? 2 : Phaser.Math.Between(-1, 1))),
+        level: Math.max(1, G.level + (this.isBoss ? 2 : (this.fromNinja ? 1 : Phaser.Math.Between(-1, 1)))),
       }
     }
 
@@ -2702,9 +2814,12 @@ function createBattleScene(Phaser: any) {
     }
 
     end(result: string) {
+      let badgeAwarded: any = null
+      let allBadges = false
+      let ninjaProgressed = false
+      let ninjaCleared = false
+
       if (result === 'win') {
-        // Battles should reward more than training. Wild scales with stage,
-        // bosses give a hefty chunk.
         const xp = this.isBoss
           ? 80 + this.enemy.stage * 15
           : 18 + this.enemy.stage * 5 + Phaser.Math.Between(0, 6)
@@ -2713,6 +2828,7 @@ function createBattleScene(Phaser: any) {
         const r = gainXp(xp)
         this.cameras.main.flash(600, 255, 210, 50)
         this.setLog('Victory! +' + xp + ' XP', this.isBoss ? 'Boss defeated!' : '')
+
         if (r.leveled) {
           theme.chime()
           this.cameras.main.flash(450, 255, 230, 120)
@@ -2727,16 +2843,61 @@ function createBattleScene(Phaser: any) {
           G.maxHp += 15; G.hp = G.maxHp; G.atk += 4; G.def += 3; G.spd += 2
           this.time.delayedCall(500, () => this.setLog('EVOLVED into ' + G.name + '!', 'Stats increased!'))
         }
+
+        // Boss win: award the next badge in sequence and bump the boss counter.
+        if (this.isBoss) {
+          G.bossesBeaten = (G.bossesBeaten || 0) + 1
+          badgeAwarded = awardNextBadge()
+          allBadges = G.badges.length >= BADGES.length
+          if (badgeAwarded) {
+            theme.chime()
+            this.cameras.main.flash(800, badgeAwarded.color >> 16 & 0xff, badgeAwarded.color >> 8 & 0xff, badgeAwarded.color & 0xff)
+            const bt = this.add.text(W/2, H/2 - 70,
+              'BADGE EARNED!\n' + badgeAwarded.glyph + '  ' + badgeAwarded.name + '  ' + badgeAwarded.glyph + '\n(' + G.badges.length + '/' + BADGES.length + ')',
+              { fontSize: '13px', color: '#ffeebb', fontStyle: 'bold', align: 'center', stroke: '#3a1a00', strokeThickness: 3 }
+            ).setOrigin(0.5).setDepth(25)
+            this.tweens.add({ targets: bt, y: bt.y - 30, alpha: 0, duration: 3200, onComplete: () => bt.destroy() })
+          }
+        }
+
+        // Master Ninja Trial: each win bumps progress; 10 wins clears the trial.
+        if (this.fromNinja) {
+          G.ninjasBeaten = (G.ninjasBeaten || 0) + 1
+          ninjaProgressed = true
+          if (G.ninjasBeaten >= 10) ninjaCleared = true
+        }
+
       } else if (result === 'lose') {
         G.happy = Math.max(0, G.happy - 20); G.hp = Math.floor(G.maxHp * 0.3)
         this.cameras.main.flash(600, 255, 0, 0)
         this.setLog('Defeated...', 'Recovered with ' + G.hp + ' HP. Returned home.')
+        // A loss in the ninja trial resets the streak.
+        if (this.fromNinja) G.ninjasBeaten = 0
       } else {
         this.setLog('Escaped safely!')
       }
-      this.time.delayedCall(2000, () =>
-        this.fromWorld ? this.scene.start('WorldScene', { result }) : this.scene.start('HomeScene')
-      )
+
+      // Where to go next:
+      //   Boss win  → straight to HOME so player sees badge + Codex
+      //   Ninja win → continue the trial unless cleared, then HOME
+      //   Wild win/lose from world → back to WorldScene
+      //   Anything else → HOME
+      const delay = (this.isBoss && result === 'win') ? 3500 : 2000
+      this.time.delayedCall(delay, () => {
+        if (result === 'win' && this.isBoss) {
+          this.scene.start('HomeScene')
+        } else if (this.fromNinja) {
+          if (result === 'win' && !ninjaCleared) {
+            this.scene.start('BattleScene', { isBoss: false, fromWorld: false, fromNinja: true })
+          } else {
+            this.scene.start('HomeScene')
+          }
+        } else if (this.fromWorld) {
+          this.scene.start('WorldScene', { result })
+        } else {
+          this.scene.start('HomeScene')
+        }
+      })
     }
   }
 }
@@ -2754,6 +2915,7 @@ export default function PhaserGame() {
       atk: 5, def: 3, spd: 4, hunger: 80, happy: 80,
       xp: 0, level: 1, wins: 0, lastFed: 0,
       day: 1, inventory: [], maxInv: 100, chests: {},
+      badges: [], bossesBeaten: 0, ninjasBeaten: 0, worldX: undefined,
     })
 
     import('phaser').then((PhaserModule) => {
