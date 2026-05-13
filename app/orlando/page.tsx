@@ -1,6 +1,19 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import { fetchManyRss, formatRelative, type Feed } from "../_lib/rss";
+
+const DISNEY_FEEDS: Feed[] = [
+  { url: "https://wdwnt.com/feed/", source: "WDW News Today" },
+  { url: "https://www.disneytouristblog.com/feed/", source: "Disney Tourist Blog" },
+  { url: "https://allears.net/feed/", source: "AllEars" },
+];
+
+const UNIVERSAL_FEEDS: Feed[] = [
+  { url: "https://www.insideuniversal.net/feed/", source: "Inside Universal" },
+  { url: "https://orlandoparkstop.com/feed/", source: "Orlando Park Stop" },
+  { url: "https://insidethemagic.net/feed/", source: "Inside the Magic" },
+];
 
 export const metadata: Metadata = {
   title: "Orlando — Respawn Riot",
@@ -101,79 +114,11 @@ function fmtDate(iso?: string | null): string | null {
   }
 }
 
-const disneyNews = [
-  {
-    headline:
-      "Big Thunder Mountain Railroad first-look — new effects + returning critters",
-    href: "https://wdwnt.com/2026/05/disney-shares-first-look-photos-video-of-big-thunder-mountain-railroad-updates-including-new-effects-returning-critters-at-walt-disney-world/",
-    source: "WDW News Today",
-  },
-  {
-    headline:
-      "May 22: Smugglers Run gets a Mando + Grogu story overhaul; new destinations open",
-    href: "https://www.disneytouristblog.com/15-reasons-why-may-2026-is-disney-worlds-biggest-month-of-the-year/",
-    source: "Disney Tourist Blog",
-  },
-  {
-    headline:
-      "May 26: Soarin' Across America premieres + Rock 'n' Roller Coaster reopens with Muppets",
-    href: "https://www.disneytouristblog.com/15-reasons-why-may-2026-is-disney-worlds-biggest-month-of-the-year/",
-    source: "Disney Tourist Blog",
-  },
-  {
-    headline: "Bluey's Wild World opens at Animal Kingdom",
-    href: "https://www.clickorlando.com/theme-parks/2026/05/05/heres-why-may-is-a-big-month-at-walt-disney-world/",
-    source: "ClickOrlando",
-  },
-  {
-    headline: "Haunted Mansion facing extended downtime at Magic Kingdom",
-    href: "https://www.wdwmagic.com/attractions/haunted-mansion/news/03may2026-haunted-mansion-facing-extended-downtime-at-magic-kingdom.htm",
-    source: "WDWMagic",
-  },
-  {
-    headline: "Walt Disney World — last 14 days news roll-up",
-    href: "https://www.wdwmagic.com/news.htm",
-    source: "WDWMagic",
-  },
-];
-
-const universalNews = [
-  {
-    headline:
-      "Spielberg Summer Blockbusters lineup runs May 23 – Aug 10 at Universal Studios Florida",
-    href: "https://www.fantasylandnews.com/2026/05/02/universal-orlando-summer-2026-experiences/",
-    source: "Fantasy Land News",
-  },
-  {
-    headline:
-      "Universal halts Epic Universe expansions; refocuses on new theme park",
-    href: "https://insidethemagic.net/2026/05/universal-halts-epic-universe-expansions-focuses-on-new-theme-park-coming-in-2026/",
-    source: "Inside the Magic",
-  },
-  {
-    headline:
-      "Around the Universe — Universal Orlando news roundup, May 2026",
-    href: "https://touringplans.com/blog/around-the-universe-universal-orlando-news-roundup-for-may-2026-draft/",
-    source: "TouringPlans",
-  },
-  {
-    headline:
-      "Donkey Kong Mine-Cart Madness — one-day closure scheduled",
-    href: "https://www.insideuniversal.net/2026/03/donkey-kong-mine-cart-madness-one-day-closure-set-for-may-2026-at-epic-universe/",
-    source: "Inside Universal",
-  },
-  {
-    headline: "Park-to-park 2026 tickets now include Epic Universe",
-    href: "https://www.fox35orlando.com/news/universal-orlando-rolls-out-new-multi-day-options-epic-universe",
-    source: "FOX 35 Orlando",
-  },
-  {
-    headline:
-      "Popular Epic Universe attraction temporarily closing soon",
-    href: "https://allears.net/2026/04/30/this-popular-epic-universal-attraction-temporarily-closes-soon/",
-    source: "AllEars.Net",
-  },
-];
+// Keyword filters used to keep mixed-coverage feeds focused on the
+// right park section. (Inside the Magic + Orlando Park Stop publish
+// both Disney and Universal content.)
+const DISNEY_KEYS = /(disney|wdw|epcot|magic kingdom|hollywood studios|animal kingdom|disneyland|pixar|marvel|star wars|frozen|pandora|galaxy['’]s edge|toy story|d23|four parks|disney world)/i;
+const UNIVERSAL_KEYS = /(universal|epic universe|harry potter|wizarding world|hagrid|hogwarts|jurassic|jaws|nintendo world|mario|donkey kong|volcano bay|islands of adventure)/i;
 
 const trafficLinks = [
   {
@@ -229,7 +174,7 @@ const trafficHeadlines = [
 ];
 
 export default async function OrlandoPage() {
-  const [observation, forecastData, alertsData] = await Promise.all([
+  const [observation, forecastData, alertsData, disneyRaw, universalRaw] = await Promise.all([
     fetchJson<{ properties: Observation }>(
       "https://api.weather.gov/stations/KMCO/observations/latest"
     ),
@@ -239,7 +184,29 @@ export default async function OrlandoPage() {
     fetchJson<{ features: Alert[] }>(
       "https://api.weather.gov/alerts/active?point=28.5383,-81.3792"
     ),
+    fetchManyRss(DISNEY_FEEDS, 8, 18),
+    fetchManyRss(UNIVERSAL_FEEDS, 8, 18),
   ]);
+
+  // Filter mixed-coverage feeds. Items from sources that ONLY cover the
+  // matching park (WDWNT, Disney Tourist Blog, Inside Universal) pass
+  // through. Items from Inside the Magic / Orlando Park Stop must match
+  // the keyword regex for the section they're in.
+  const disneyOnlySources = new Set(["WDW News Today", "Disney Tourist Blog"]);
+  const universalOnlySources = new Set(["Inside Universal"]);
+
+  const disneyNews = disneyRaw
+    .filter((n) =>
+      disneyOnlySources.has(n.source) || DISNEY_KEYS.test(n.title)
+    )
+    .filter((n) => !UNIVERSAL_KEYS.test(n.title) || DISNEY_KEYS.test(n.title))
+    .slice(0, 9);
+  const universalNews = universalRaw
+    .filter((n) =>
+      universalOnlySources.has(n.source) || UNIVERSAL_KEYS.test(n.title)
+    )
+    .filter((n) => !DISNEY_KEYS.test(n.title) || UNIVERSAL_KEYS.test(n.title))
+    .slice(0, 9);
 
   const obs = observation?.properties;
   const tempF = cToF(obs?.temperature?.value);
@@ -429,60 +396,102 @@ export default async function OrlandoPage() {
       {/* Disney */}
       <section className="border-t border-white/10 bg-zinc-950 px-6 py-12">
         <div className="mx-auto max-w-7xl">
-          <h2 className="font-display text-3xl tracking-[0.04em] sm:text-4xl">
-            ✦ DISNEY WORLD
-          </h2>
-          <p className="mt-2 text-white/60">
-            {"What's announced, opening, or breaking at WDW right now."}
-          </p>
-          <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {disneyNews.map((n) => (
-              <Link
-                key={n.headline}
-                href={n.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group rounded-2xl border border-white/10 bg-white/[0.03] p-5 transition hover:border-blue-400/50 hover:bg-white/[0.05]"
-              >
-                <p className="font-display text-xs tracking-[0.3em] text-blue-300">
-                  {n.source}
-                </p>
-                <h3 className="mt-2 font-display text-base tracking-wide group-hover:text-white">
-                  {n.headline} ↗
-                </h3>
-              </Link>
-            ))}
+          <div className="flex items-end justify-between gap-4">
+            <h2 className="font-display text-3xl tracking-[0.04em] sm:text-4xl">
+              ✦ DISNEY WORLD
+            </h2>
+            <span className="hidden font-display text-[10px] tracking-[0.3em] text-white/40 sm:block">
+              LIVE · UPDATES HOURLY
+            </span>
           </div>
+          <p className="mt-2 text-white/60">
+            {"Latest from WDWNT, Disney Tourist Blog, and AllEars."}
+          </p>
+          {disneyNews.length === 0 ? (
+            <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-center text-sm text-white/60">
+              {"Couldn't reach the Disney feeds right now. Try refreshing in a bit."}
+            </div>
+          ) : (
+            <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {disneyNews.map((n) => {
+                const rel = formatRelative(n.pubDate);
+                return (
+                  <Link
+                    key={n.link}
+                    href={n.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group rounded-2xl border border-white/10 bg-white/[0.03] p-5 transition hover:border-blue-400/50 hover:bg-white/[0.05]"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-display text-xs tracking-[0.3em] text-blue-300">
+                        {n.source}
+                      </p>
+                      {rel && (
+                        <span className="font-mono text-[10px] text-white/40">
+                          {rel}
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="mt-2 font-display text-base tracking-wide group-hover:text-white">
+                      {n.title} ↗
+                    </h3>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
         </div>
       </section>
 
       {/* Universal */}
       <section className="px-6 py-12">
         <div className="mx-auto max-w-7xl">
-          <h2 className="font-display text-3xl tracking-[0.04em] sm:text-4xl">
-            ◢ UNIVERSAL ORLANDO
-          </h2>
+          <div className="flex items-end justify-between gap-4">
+            <h2 className="font-display text-3xl tracking-[0.04em] sm:text-4xl">
+              ◢ UNIVERSAL ORLANDO
+            </h2>
+            <span className="hidden font-display text-[10px] tracking-[0.3em] text-white/40 sm:block">
+              LIVE · UPDATES HOURLY
+            </span>
+          </div>
           <p className="mt-2 text-white/60">
             Studios Florida, Islands of Adventure, Volcano Bay, Epic Universe.
           </p>
-          <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {universalNews.map((n) => (
-              <Link
-                key={n.headline}
-                href={n.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group rounded-2xl border border-white/10 bg-white/[0.03] p-5 transition hover:border-red-400/50 hover:bg-white/[0.05]"
-              >
-                <p className="font-display text-xs tracking-[0.3em] text-red-300">
-                  {n.source}
-                </p>
-                <h3 className="mt-2 font-display text-base tracking-wide group-hover:text-white">
-                  {n.headline} ↗
-                </h3>
-              </Link>
-            ))}
-          </div>
+          {universalNews.length === 0 ? (
+            <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-center text-sm text-white/60">
+              {"Couldn't reach the Universal feeds right now. Try refreshing in a bit."}
+            </div>
+          ) : (
+            <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {universalNews.map((n) => {
+                const rel = formatRelative(n.pubDate);
+                return (
+                  <Link
+                    key={n.link}
+                    href={n.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group rounded-2xl border border-white/10 bg-white/[0.03] p-5 transition hover:border-red-400/50 hover:bg-white/[0.05]"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-display text-xs tracking-[0.3em] text-red-300">
+                        {n.source}
+                      </p>
+                      {rel && (
+                        <span className="font-mono text-[10px] text-white/40">
+                          {rel}
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="mt-2 font-display text-base tracking-wide group-hover:text-white">
+                      {n.title} ↗
+                    </h3>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
         </div>
       </section>
 

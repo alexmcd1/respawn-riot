@@ -1,12 +1,22 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import { fetchManyRss, formatRelative, type Feed } from "../_lib/rss";
 
 export const metadata: Metadata = {
   title: "Pop Punk — Respawn Riot",
   description:
     "Tour news, comeback albums, and the new wave keeping the genre loud.",
 };
+
+// Auto-refresh news every hour
+export const revalidate = 3600;
+
+const POP_PUNK_FEEDS: Feed[] = [
+  { url: "https://www.altpress.com/feed/", source: "Alternative Press" },
+  { url: "https://www.punktastic.com/feed/", source: "Punktastic" },
+  { url: "https://substreammagazine.com/feed/", source: "Substream" },
+];
 
 const bands = [
   {
@@ -123,29 +133,6 @@ const newWave = [
   },
 ];
 
-const news = [
-  {
-    headline: "When We Were Young Music Festival Cancelled for 2026",
-    href: "https://parade.com/news/when-we-were-young-music-festival-cancelled-las-vegas-rock-emo-pop-punk-2026",
-    source: "Parade",
-  },
-  {
-    headline: "Warped Tour confirms a 2026 run",
-    href: "https://parade.com/news/is-when-we-were-young-festival-returning-2026",
-    source: "Parade",
-  },
-  {
-    headline: "Blink-182 Tour Announcements & Dates",
-    href: "https://www.songkick.com/artists/479410-blink182",
-    source: "Songkick",
-  },
-  {
-    headline: "Fall Out Boy 2026 Tour Dates",
-    href: "https://www.vividseats.com/fall-out-boy-tickets/performer/5429",
-    source: "Vivid Seats",
-  },
-];
-
 function BandCard({
   name,
   img,
@@ -193,7 +180,8 @@ function BandCard({
   );
 }
 
-export default function PopPunkPage() {
+export default async function PopPunkPage() {
+  const news = await fetchManyRss(POP_PUNK_FEEDS, 6, 8);
   return (
     <main className="bg-black text-white">
       <section className="relative overflow-hidden border-b border-white/10">
@@ -286,31 +274,52 @@ export default function PopPunkPage() {
 
       <section className="border-t border-white/10 bg-zinc-950 px-6 py-16">
         <div className="mx-auto max-w-7xl">
-          <h2 className="text-2xl font-black uppercase sm:text-3xl">
-            Headlines
-          </h2>
+          <div className="flex items-end justify-between gap-4">
+            <h2 className="text-2xl font-black uppercase sm:text-3xl">
+              Headlines
+            </h2>
+            <span className="hidden font-display text-[10px] tracking-[0.3em] text-white/40 sm:block">
+              LIVE · UPDATES HOURLY
+            </span>
+          </div>
           <p className="mt-2 text-white/60">
-            What the genre press is reporting this month.
+            Latest from Alternative Press, Punktastic, and Substream.
           </p>
 
-          <div className="mt-8 grid gap-4 md:grid-cols-2">
-            {news.map((n) => (
-              <Link
-                key={n.headline}
-                href={n.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group rounded-2xl border border-white/10 bg-white/[0.03] p-5 transition hover:border-pink-400/50 hover:bg-white/[0.05]"
-              >
-                <p className="text-xs uppercase tracking-[0.25em] text-pink-300">
-                  {n.source}
-                </p>
-                <h3 className="mt-2 text-base font-black uppercase leading-snug group-hover:text-white">
-                  {n.headline} ↗
-                </h3>
-              </Link>
-            ))}
-          </div>
+          {news.length === 0 ? (
+            <div className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-center text-sm text-white/60">
+              {"Couldn't reach the feeds right now. Try refreshing in a bit."}
+            </div>
+          ) : (
+            <div className="mt-8 grid gap-4 md:grid-cols-2">
+              {news.map((n) => {
+                const rel = formatRelative(n.pubDate);
+                return (
+                  <Link
+                    key={n.link}
+                    href={n.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group rounded-2xl border border-white/10 bg-white/[0.03] p-5 transition hover:border-pink-400/50 hover:bg-white/[0.05]"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs uppercase tracking-[0.25em] text-pink-300">
+                        {n.source}
+                      </p>
+                      {rel && (
+                        <span className="font-mono text-[10px] text-white/40">
+                          {rel}
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="mt-2 text-base font-black uppercase leading-snug group-hover:text-white">
+                      {n.title} ↗
+                    </h3>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
         </div>
       </section>
     </main>

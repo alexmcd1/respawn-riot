@@ -1,11 +1,21 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { fetchManyRss, formatRelative, type Feed } from "../_lib/rss";
 
 export const metadata: Metadata = {
   title: "Anime — Respawn Riot",
   description:
     "Top tier characters, the five anime everyone is watching right now, and where to find more.",
 };
+
+// Auto-refresh news every hour
+export const revalidate = 3600;
+
+const ANIME_FEEDS: Feed[] = [
+  { url: "https://www.animenewsnetwork.com/all/rss.xml?ann-edition=us", source: "Anime News Network" },
+  { url: "https://animecorner.me/feed/", source: "Anime Corner" },
+  { url: "https://www.crunchyroll.com/news/rss", source: "Crunchyroll News" },
+];
 
 const characters = [
   { name: "Gojo Satoru", from: "Jujutsu Kaisen", vibe: "Infinity. Cursed swagger.", mal: "https://myanimelist.net/character/164471/Satoru_Gojou" },
@@ -61,39 +71,6 @@ const top5 = [
   },
 ];
 
-const news = [
-  {
-    headline: "Witch Hat Atelier dominates Spring 2026 anime rankings — Anime Trending",
-    href: "https://www.anitrendz.com/charts/top-anime",
-    source: "Anime Trending",
-  },
-  {
-    headline: "5 Best Spring 2026 Anime Series, Ranked by Their Premieres",
-    href: "https://comicbook.com/anime/list/5-best-spring-2026-anime-series-ranked-by-their-premieres/",
-    source: "ComicBook.com",
-  },
-  {
-    headline: "CBR's Spring 2026 Anime Series Power Ranking",
-    href: "https://www.cbr.com/spring-2026-anime-most-popular-best-series-ranking-2/",
-    source: "CBR",
-  },
-  {
-    headline: "Best of Spring 2026 — weekly viewer rankings",
-    href: "https://www.animenewsnetwork.com/weekly-ranking/2026/spring/.237079",
-    source: "Anime News Network",
-  },
-  {
-    headline: "AniChart: Spring 2026 Seasonal Chart",
-    href: "https://anichart.net/Spring-2026",
-    source: "AniChart",
-  },
-  {
-    headline: "Spring 2026 Anime Rankings — Week 2",
-    href: "https://animecorner.me/spring-2026-anime-rankings-week-2/",
-    source: "Anime Corner",
-  },
-];
-
 const findCool = [
   { title: "Crunchyroll", body: "Where most current-season anime stream subbed and dubbed.", href: "https://www.crunchyroll.com" },
   { title: "Netflix Anime", body: "Solo Leveling lives here, plus a deep back catalog.", href: "https://www.netflix.com/browse/genre/7424" },
@@ -103,7 +80,8 @@ const findCool = [
   { title: "Anime News Network", body: "Industry reporting, interviews, and the news beat.", href: "https://www.animenewsnetwork.com" },
 ];
 
-export default function AnimePage() {
+export default async function AnimePage() {
+  const news = await fetchManyRss(ANIME_FEEDS, 6, 9);
   return (
     <main className="bg-black text-white">
       <section className="relative overflow-hidden border-b border-white/10">
@@ -199,31 +177,52 @@ export default function AnimePage() {
 
       <section className="px-6 py-16">
         <div className="mx-auto max-w-7xl">
-          <h2 className="text-2xl font-black uppercase sm:text-3xl">
-            This Week in Anime
-          </h2>
+          <div className="flex items-end justify-between gap-4">
+            <h2 className="text-2xl font-black uppercase sm:text-3xl">
+              This Week in Anime
+            </h2>
+            <span className="hidden font-display text-[10px] tracking-[0.3em] text-white/40 sm:block">
+              LIVE · UPDATES HOURLY
+            </span>
+          </div>
           <p className="mt-2 text-white/60">
-            Live coverage from outlets actually watching the season.
+            Latest from ANN, Anime Corner, and Crunchyroll News.
           </p>
 
-          <div className="mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {news.map((n) => (
-              <Link
-                key={n.headline}
-                href={n.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group rounded-2xl border border-white/10 bg-white/[0.03] p-5 transition hover:border-fuchsia-400/50 hover:bg-white/[0.05]"
-              >
-                <p className="text-xs uppercase tracking-[0.25em] text-fuchsia-300">
-                  {n.source}
-                </p>
-                <h3 className="mt-2 text-base font-black uppercase leading-snug group-hover:text-white">
-                  {n.headline} ↗
-                </h3>
-              </Link>
-            ))}
-          </div>
+          {news.length === 0 ? (
+            <div className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-center text-sm text-white/60">
+              {"Couldn't reach the feeds right now. Try refreshing in a bit."}
+            </div>
+          ) : (
+            <div className="mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {news.map((n) => {
+                const rel = formatRelative(n.pubDate);
+                return (
+                  <Link
+                    key={n.link}
+                    href={n.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group rounded-2xl border border-white/10 bg-white/[0.03] p-5 transition hover:border-fuchsia-400/50 hover:bg-white/[0.05]"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs uppercase tracking-[0.25em] text-fuchsia-300">
+                        {n.source}
+                      </p>
+                      {rel && (
+                        <span className="font-mono text-[10px] text-white/40">
+                          {rel}
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="mt-2 text-base font-black uppercase leading-snug group-hover:text-white">
+                      {n.title} ↗
+                    </h3>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
         </div>
       </section>
 
