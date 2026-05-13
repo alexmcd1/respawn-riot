@@ -9,10 +9,18 @@ const DISNEY_FEEDS: Feed[] = [
   { url: "https://allears.net/feed/", source: "AllEars" },
 ];
 
+const DISNEY_FALLBACKS: Feed[] = [
+  { url: "https://news.google.com/rss/search?q=Walt+Disney+World+Orlando&hl=en-US&gl=US&ceid=US:en", source: "Google News (Disney)" },
+];
+
 const UNIVERSAL_FEEDS: Feed[] = [
   { url: "https://www.insideuniversal.net/feed/", source: "Inside Universal" },
   { url: "https://orlandoparkstop.com/feed/", source: "Orlando Park Stop" },
   { url: "https://insidethemagic.net/feed/", source: "Inside the Magic" },
+];
+
+const UNIVERSAL_FALLBACKS: Feed[] = [
+  { url: "https://news.google.com/rss/search?q=Universal+Orlando+Epic+Universe&hl=en-US&gl=US&ceid=US:en", source: "Google News (Universal)" },
 ];
 
 export const metadata: Metadata = {
@@ -184,8 +192,8 @@ export default async function OrlandoPage() {
     fetchJson<{ features: Alert[] }>(
       "https://api.weather.gov/alerts/active?point=28.5383,-81.3792"
     ),
-    fetchManyRss(DISNEY_FEEDS, 8, 18),
-    fetchManyRss(UNIVERSAL_FEEDS, 8, 18),
+    fetchManyRss(DISNEY_FEEDS, { perFeedMax: 8, totalMax: 18, fallbacks: DISNEY_FALLBACKS, minBeforeFallback: 4 }),
+    fetchManyRss(UNIVERSAL_FEEDS, { perFeedMax: 8, totalMax: 18, fallbacks: UNIVERSAL_FALLBACKS, minBeforeFallback: 4 }),
   ]);
 
   // Filter mixed-coverage feeds. Items from sources that ONLY cover the

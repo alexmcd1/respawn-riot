@@ -17,6 +17,10 @@ const ANIME_FEEDS: Feed[] = [
   { url: "https://www.crunchyroll.com/news/rss", source: "Crunchyroll News" },
 ];
 
+const ANIME_FALLBACKS: Feed[] = [
+  { url: "https://news.google.com/rss/search?q=anime+news&hl=en-US&gl=US&ceid=US:en", source: "Google News (anime)" },
+];
+
 const characters = [
   { name: "Gojo Satoru", from: "Jujutsu Kaisen", vibe: "Infinity. Cursed swagger.", mal: "https://myanimelist.net/character/164471/Satoru_Gojou" },
   { name: "Frieren", from: "Frieren: Beyond Journey's End", vibe: "Quiet elf, devastating spells.", mal: "https://myanimelist.net/character/180420/Frieren" },
@@ -81,7 +85,12 @@ const findCool = [
 ];
 
 export default async function AnimePage() {
-  const news = await fetchManyRss(ANIME_FEEDS, 6, 9);
+  const news = await fetchManyRss(ANIME_FEEDS, {
+    perFeedMax: 6,
+    totalMax: 9,
+    fallbacks: ANIME_FALLBACKS,
+    minBeforeFallback: 4,
+  });
   return (
     <main className="bg-black text-white">
       <section className="relative overflow-hidden border-b border-white/10">

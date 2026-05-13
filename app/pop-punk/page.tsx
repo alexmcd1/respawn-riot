@@ -1,7 +1,15 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { fetchManyRss, formatRelative, type Feed } from "../_lib/rss";
+import {
+  fetchManyRss,
+  fetchTopGoogleNews,
+  formatRelative,
+  REVALIDATE_HOURLY,
+  REVALIDATE_WEEKLY,
+  type Feed,
+  type NewsItem,
+} from "../_lib/rss";
 
 export const metadata: Metadata = {
   title: "Pop Punk — Respawn Riot",
@@ -9,8 +17,10 @@ export const metadata: Metadata = {
     "Tour news, comeback albums, and the new wave keeping the genre loud.",
 };
 
-// Auto-refresh news every hour
-export const revalidate = 3600;
+// Page-level revalidate is the SHORTEST cadence anything on the page
+// uses (the headlines feed). Per-band Google News results have their
+// own 1-week revalidate set on the fetch.
+export const revalidate = REVALIDATE_HOURLY;
 
 const POP_PUNK_FEEDS: Feed[] = [
   { url: "https://www.altpress.com/feed/", source: "Alternative Press" },
@@ -18,170 +28,256 @@ const POP_PUNK_FEEDS: Feed[] = [
   { url: "https://substreammagazine.com/feed/", source: "Substream" },
 ];
 
-const bands = [
+const POP_PUNK_FALLBACKS: Feed[] = [
+  { url: "https://news.google.com/rss/search?q=pop+punk+tour+OR+album&hl=en-US&gl=US&ceid=US:en", source: "Google News (pop punk)" },
+];
+
+// ─── Static config — names, photos, official sites, and a fallback
+//     blurb shown if Google News has nothing fresh for the band.
+//     Auto-curation runs once a week per band via the Google News
+//     RSS search. Tour cards search "<band> tour", album cards search
+//     "<band> album", new-wave cards search "<band>".
+
+type BandConfig = {
+  name: string;
+  img: string;
+  fallbackHref: string;
+  fallbackSource: string;
+  fallbackHeadline: string;
+  fallbackBlurb: string;
+};
+
+const TOUR_BANDS: BandConfig[] = [
   {
     name: "Blink-182",
     img: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Blink-182_2025_%28cropped_2%29.jpg/330px-Blink-182_2025_%28cropped_2%29.jpg",
-    headline: "Headlining Innings Festival Feb 22, 2026 in Tempe",
-    blurb:
-      "First confirmed 2026 date is the Innings Fest headline slot in Tempe, AZ. More tour dates pending.",
-    href: "https://www.songkick.com/artists/479410-blink182",
-    source: "Songkick",
+    fallbackHref: "https://www.songkick.com/artists/479410-blink182",
+    fallbackSource: "Songkick",
+    fallbackHeadline: "Tour dates rolling out",
+    fallbackBlurb: "Check Songkick for the latest list of confirmed shows.",
   },
   {
     name: "Fall Out Boy",
     img: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/58/Fall_Out_Boy%2C_Heaven%2C_London_%2852755936394%29.jpg/330px-Fall_Out_Boy%2C_Heaven%2C_London_%2852755936394%29.jpg",
-    headline: "Innings Festival + Boston Calling on the 2026 calendar",
-    blurb:
-      "Festival circuit is the move this year. Vivid Seats lists the rolling tour as it expands.",
-    href: "https://www.vividseats.com/fall-out-boy-tickets/performer/5429",
-    source: "Vivid Seats",
+    fallbackHref: "https://www.vividseats.com/fall-out-boy-tickets/performer/5429",
+    fallbackSource: "Vivid Seats",
+    fallbackHeadline: "Festival circuit + tour dates",
+    fallbackBlurb: "Vivid Seats has the rolling list as it expands.",
   },
   {
     name: "Green Day",
     img: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ac/GreenDay_Isle_of_Wight_Montage.jpg/330px-GreenDay_Isle_of_Wight_Montage.jpg",
-    headline: "Saviors Tour rolls on with full-album sets",
-    blurb:
-      "Playing Dookie and American Idiot front to back at select dates. Yes, all of it.",
-    href: "https://www.greenday.com/tour",
-    source: "greenday.com",
+    fallbackHref: "https://www.greenday.com/tour",
+    fallbackSource: "greenday.com",
+    fallbackHeadline: "Saviors Tour rolls on",
+    fallbackBlurb: "Full-album sets at select dates. Check the official tour page.",
   },
   {
     name: "Paramore",
     img: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b8/Paramore_2023.jpg/330px-Paramore_2023.jpg",
-    headline: "On a planned hiatus — Hayley Williams shows still surface",
-    blurb:
-      "No new tour announced for the band, but the lead singer keeps surprising small venues.",
-    href: "https://www.paramore.net/",
-    source: "paramore.net",
+    fallbackHref: "https://www.paramore.net/",
+    fallbackSource: "paramore.net",
+    fallbackHeadline: "Watch this space",
+    fallbackBlurb: "On a planned hiatus — Hayley Williams shows still surface.",
   },
 ];
 
-const albums = [
+const ALBUM_BANDS: BandConfig[] = [
   {
     name: "My Chemical Romance",
     img: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/MCR820_%28cropped%29.jpg/330px-MCR820_%28cropped%29.jpg",
-    headline: "Long Live The Black Parade tour rolls into 2026",
-    blurb:
-      "The Black Parade revival run keeps the album-five conversation hot. No release date confirmed.",
-    href: "https://www.mychemicalromance.com/",
-    source: "mychemicalromance.com",
+    fallbackHref: "https://www.mychemicalromance.com/",
+    fallbackSource: "mychemicalromance.com",
+    fallbackHeadline: "The album-five conversation continues",
+    fallbackBlurb: "Black Parade revival keeps it hot. No release date confirmed.",
   },
   {
     name: "Sum 41",
     img: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/af/Sum_41_-_Southside_Festival_2024_-_DSC2886.jpg/330px-Sum_41_-_Southside_Festival_2024_-_DSC2886.jpg",
-    headline: "Heaven :x: Hell was the farewell — and it slaps",
-    blurb:
-      "The double album closed the chapter with one half pop punk, one half thrash. Final tour wrapped.",
-    href: "https://en.wikipedia.org/wiki/Heaven_:x:_Hell",
-    source: "Wikipedia",
+    fallbackHref: "https://en.wikipedia.org/wiki/Heaven_:x:_Hell",
+    fallbackSource: "Wikipedia",
+    fallbackHeadline: "Heaven :x: Hell — the farewell record",
+    fallbackBlurb: "Pop punk + thrash double album, final tour wrapped.",
   },
   {
     name: "Yellowcard",
     img: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/70/Yellowcard_-_Southside_Festival_2025_-_DSC2157.jpg/330px-Yellowcard_-_Southside_Festival_2025_-_DSC2157.jpg",
-    headline: "Childhood Eyes era + new singles still coming",
-    blurb: "Back from the dead and recording. The violin lives.",
-    href: "https://yellowcardrock.com/",
-    source: "yellowcardrock.com",
+    fallbackHref: "https://yellowcardrock.com/",
+    fallbackSource: "yellowcardrock.com",
+    fallbackHeadline: "Childhood Eyes era + new singles",
+    fallbackBlurb: "Back from the dead and recording. The violin lives.",
   },
   {
     name: "New Found Glory",
     img: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/71/NFG_SlamDunk_2019.jpg/330px-NFG_SlamDunk_2019.jpg",
-    headline: "Make The Most Of It deluxe pressings keep moving",
-    blurb: "Still touring the album that proved they never lost a step.",
-    href: "https://www.newfoundglory.com/",
-    source: "newfoundglory.com",
+    fallbackHref: "https://www.newfoundglory.com/",
+    fallbackSource: "newfoundglory.com",
+    fallbackHeadline: "Make The Most Of It deluxe pressings keep moving",
+    fallbackBlurb: "Still touring the album that proved they never lost a step.",
   },
 ];
 
-const newWave = [
+type ArtistConfig = {
+  name: string;
+  img: string;
+  fallbackHref: string;
+  fallbackBlurb: string;
+};
+
+const NEW_WAVE_ARTISTS: ArtistConfig[] = [
   {
-    artist: "Meet Me @ The Altar",
+    name: "Meet Me @ The Altar",
     img: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/48/Meet_me_at_the_alter.jpg/330px-Meet_me_at_the_alter.jpg",
-    why: "Pop punk torch carriers. Massive hooks, three-piece firepower.",
-    href: "https://meetmeatthealtarofficial.com/",
+    fallbackHref: "https://meetmeatthealtarofficial.com/",
+    fallbackBlurb: "Pop punk torch carriers. Massive hooks, three-piece firepower.",
   },
   {
-    artist: "Stand Atlantic",
+    name: "Stand Atlantic",
     img: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/17/Stand_Atlantic.jpg/330px-Stand_Atlantic.jpg",
-    why: "Australian crew bending pop punk into hyperpop and back.",
-    href: "https://www.standatlantic.com/",
+    fallbackHref: "https://www.standatlantic.com/",
+    fallbackBlurb: "Australian crew bending pop punk into hyperpop and back.",
   },
   {
-    artist: "Pinkshift",
+    name: "Pinkshift",
     img: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Liberation_Weekend_2025-05-30_Pinkshift_03_cropped.jpg/330px-Liberation_Weekend_2025-05-30_Pinkshift_03_cropped.jpg",
-    why: "Riot-grrrl roots, scream-it-in-the-pit choruses.",
-    href: "https://www.pinkshiftband.com/",
+    fallbackHref: "https://www.pinkshiftband.com/",
+    fallbackBlurb: "Riot-grrrl roots, scream-it-in-the-pit choruses.",
   },
   {
-    artist: "Hot Mulligan",
+    name: "Hot Mulligan",
     img: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/35/Hot_mulligan_2.jpg/330px-Hot_mulligan_2.jpg",
-    why: "Midwest emo adjacent. Gang vocals you'll lose your voice to.",
-    href: "https://hotmulligan.bandcamp.com/",
+    fallbackHref: "https://hotmulligan.bandcamp.com/",
+    fallbackBlurb: "Midwest emo adjacent. Gang vocals you'll lose your voice to.",
   },
   {
-    artist: "Spanish Love Songs",
+    name: "Spanish Love Songs",
     img: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9c/Spanish_Love_Songs_live.jpg/330px-Spanish_Love_Songs_live.jpg",
-    why: "Sad-bastard pop punk that hits like a chest punch.",
-    href: "https://spanishlovesongs.net/",
+    fallbackHref: "https://spanishlovesongs.net/",
+    fallbackBlurb: "Sad-bastard pop punk that hits like a chest punch.",
   },
   {
-    artist: "jxdn",
+    name: "jxdn",
     img: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/df/Jaden_Hossler.jpg/330px-Jaden_Hossler.jpg",
-    why: "Travis Barker-produced, gen-z pop punk with the hooks turned up.",
-    href: "https://www.jxdn.com/",
+    fallbackHref: "https://www.jxdn.com/",
+    fallbackBlurb: "Travis Barker-produced, gen-z pop punk with the hooks turned up.",
   },
 ];
 
-function BandCard({
-  name,
-  img,
-  headline,
-  blurb,
-  href,
-  source,
-}: {
+// ─── Per-band fetch helper. Builds a Google News query, returns the
+//     top result with its publication name, or null. Caches for a week
+//     per band — one fetch, one slot, no API key.
+
+async function fetchBandHeadline(
+  band: string,
+  topic: string
+): Promise<NewsItem | null> {
+  // Quote the band name so multi-word bands don't fragment the search.
+  return fetchTopGoogleNews(`"${band}" ${topic}`, REVALIDATE_WEEKLY);
+}
+
+// ─── Card components
+
+type BandCardData = {
   name: string;
   img: string;
   headline: string;
   blurb: string;
   href: string;
   source: string;
-}) {
+  pubDate?: string;
+  isLive: boolean;
+};
+
+function BandCard(data: BandCardData) {
+  const rel = formatRelative(data.pubDate);
   return (
     <Link
-      href={href}
+      href={data.href}
       target="_blank"
       rel="noopener noreferrer"
       className="group flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] transition hover:border-pink-400/60 hover:bg-white/[0.05]"
     >
       <div className="relative aspect-[16/9] w-full overflow-hidden bg-black">
         <Image
-          src={img}
-          alt={name}
+          src={data.img}
+          alt={data.name}
           fill
           sizes="(min-width: 768px) 50vw, 100vw"
           className="object-cover opacity-90 transition group-hover:scale-105 group-hover:opacity-100"
         />
+        {data.isLive && (
+          <span className="absolute right-2 top-2 rounded border border-pink-400/50 bg-black/70 px-2 py-0.5 font-display text-[9px] tracking-[0.3em] text-pink-300">
+            LIVE
+          </span>
+        )}
       </div>
       <div className="p-5">
-        <p className="text-xs uppercase tracking-[0.3em] text-pink-300">
-          {name}
-        </p>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs uppercase tracking-[0.3em] text-pink-300">
+            {data.name}
+          </p>
+          {rel && (
+            <span className="font-mono text-[10px] text-white/40">{rel}</span>
+          )}
+        </div>
         <h3 className="mt-2 text-lg font-black uppercase leading-snug">
-          {headline}
+          {data.headline}
         </h3>
-        <p className="mt-2 text-sm leading-6 text-white/70">{blurb}</p>
+        <p className="mt-2 text-sm leading-6 text-white/70">{data.blurb}</p>
         <p className="mt-3 text-xs uppercase tracking-widest text-pink-300/80">
-          {source} ↗
+          {data.source} ↗
         </p>
       </div>
     </Link>
   );
 }
 
+function buildBandCard(cfg: BandConfig, item: NewsItem | null): BandCardData {
+  if (item) {
+    return {
+      name: cfg.name,
+      img: cfg.img,
+      headline: item.title,
+      blurb: item.description ?? `Latest mention via ${item.publisher ?? "Google News"}.`,
+      href: item.link,
+      source: item.publisher ?? "Google News",
+      pubDate: item.pubDate,
+      isLive: true,
+    };
+  }
+  return {
+    name: cfg.name,
+    img: cfg.img,
+    headline: cfg.fallbackHeadline,
+    blurb: cfg.fallbackBlurb,
+    href: cfg.fallbackHref,
+    source: cfg.fallbackSource,
+    isLive: false,
+  };
+}
+
 export default async function PopPunkPage() {
-  const news = await fetchManyRss(POP_PUNK_FEEDS, 6, 8);
+  // Fire all per-band searches + the headlines feed in parallel.
+  const [
+    headlines,
+    tourResults,
+    albumResults,
+    newWaveResults,
+  ] = await Promise.all([
+    fetchManyRss(POP_PUNK_FEEDS, {
+      perFeedMax: 6,
+      totalMax: 8,
+      fallbacks: POP_PUNK_FALLBACKS,
+      minBeforeFallback: 4,
+    }),
+    Promise.all(TOUR_BANDS.map((b) => fetchBandHeadline(b.name, "tour OR concert OR setlist"))),
+    Promise.all(ALBUM_BANDS.map((b) => fetchBandHeadline(b.name, "album OR EP OR record OR single"))),
+    Promise.all(NEW_WAVE_ARTISTS.map((a) => fetchBandHeadline(a.name, "tour OR album OR single"))),
+  ]);
+
+  const tourCards = TOUR_BANDS.map((cfg, i) => buildBandCard(cfg, tourResults[i]));
+  const albumCards = ALBUM_BANDS.map((cfg, i) => buildBandCard(cfg, albumResults[i]));
+
   return (
     <main className="bg-black text-white">
       <section className="relative overflow-hidden border-b border-white/10">
@@ -201,16 +297,21 @@ export default async function PopPunkPage() {
 
       <section className="px-6 py-16">
         <div className="mx-auto max-w-7xl">
-          <h2 className="text-2xl font-black uppercase sm:text-3xl">
-            Tour News
-          </h2>
+          <div className="flex items-end justify-between gap-4">
+            <h2 className="text-2xl font-black uppercase sm:text-3xl">
+              Tour News
+            </h2>
+            <span className="hidden font-display text-[10px] tracking-[0.3em] text-white/40 sm:block">
+              LIVE · UPDATES WEEKLY
+            </span>
+          </div>
           <p className="mt-2 text-white/60">
             {"Who's on the road, who's about to be."}
           </p>
 
           <div className="mt-8 grid gap-5 md:grid-cols-2">
-            {bands.map((b) => (
-              <BandCard key={b.name} {...b} />
+            {tourCards.map((c) => (
+              <BandCard key={c.name} {...c} />
             ))}
           </div>
         </div>
@@ -218,16 +319,21 @@ export default async function PopPunkPage() {
 
       <section className="border-t border-white/10 bg-zinc-950 px-6 py-16">
         <div className="mx-auto max-w-7xl">
-          <h2 className="text-2xl font-black uppercase sm:text-3xl">
-            Album News
-          </h2>
+          <div className="flex items-end justify-between gap-4">
+            <h2 className="text-2xl font-black uppercase sm:text-3xl">
+              Album News
+            </h2>
+            <span className="hidden font-display text-[10px] tracking-[0.3em] text-white/40 sm:block">
+              LIVE · UPDATES WEEKLY
+            </span>
+          </div>
           <p className="mt-2 text-white/60">
             Records, reissues, and the rumor mill.
           </p>
 
           <div className="mt-8 grid gap-5 md:grid-cols-2">
-            {albums.map((a) => (
-              <BandCard key={a.name} {...a} />
+            {albumCards.map((c) => (
+              <BandCard key={c.name} {...c} />
             ))}
           </div>
         </div>
@@ -235,39 +341,68 @@ export default async function PopPunkPage() {
 
       <section className="px-6 py-16">
         <div className="mx-auto max-w-7xl">
-          <h2 className="text-2xl font-black uppercase sm:text-3xl">
-            New Musicians, Same Energy
-          </h2>
+          <div className="flex items-end justify-between gap-4">
+            <h2 className="text-2xl font-black uppercase sm:text-3xl">
+              New Musicians, Same Energy
+            </h2>
+            <span className="hidden font-display text-[10px] tracking-[0.3em] text-white/40 sm:block">
+              LIVE · UPDATES WEEKLY
+            </span>
+          </div>
           <p className="mt-2 text-white/60">
             The bands keeping the flag in the air right now.
           </p>
 
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {newWave.map((n) => (
-              <Link
-                key={n.artist}
-                href={n.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-pink-500/10 to-transparent transition hover:border-pink-400/60"
-              >
-                <div className="relative aspect-square w-full overflow-hidden bg-black">
-                  <Image
-                    src={n.img}
-                    alt={n.artist}
-                    fill
-                    sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
-                    className="object-cover opacity-90 transition group-hover:scale-105"
-                  />
-                </div>
-                <div className="p-4">
-                  <h3 className="text-base font-black uppercase">
-                    {n.artist}
-                  </h3>
-                  <p className="mt-2 text-sm text-white/70">{n.why}</p>
-                </div>
-              </Link>
-            ))}
+            {NEW_WAVE_ARTISTS.map((cfg, i) => {
+              const item = newWaveResults[i];
+              const href = item?.link ?? cfg.fallbackHref;
+              const headline = item?.title;
+              const rel = formatRelative(item?.pubDate);
+              return (
+                <Link
+                  key={cfg.name}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-pink-500/10 to-transparent transition hover:border-pink-400/60"
+                >
+                  <div className="relative aspect-square w-full overflow-hidden bg-black">
+                    <Image
+                      src={cfg.img}
+                      alt={cfg.name}
+                      fill
+                      sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+                      className="object-cover opacity-90 transition group-hover:scale-105"
+                    />
+                    {item && (
+                      <span className="absolute right-2 top-2 rounded border border-pink-400/50 bg-black/70 px-2 py-0.5 font-display text-[9px] tracking-[0.3em] text-pink-300">
+                        LIVE
+                      </span>
+                    )}
+                  </div>
+                  <div className="p-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <h3 className="text-base font-black uppercase">
+                        {cfg.name}
+                      </h3>
+                      {rel && (
+                        <span className="font-mono text-[10px] text-white/40">
+                          {rel}
+                        </span>
+                      )}
+                    </div>
+                    {headline ? (
+                      <p className="mt-2 text-sm leading-snug text-white/85">
+                        {headline}
+                      </p>
+                    ) : (
+                      <p className="mt-2 text-sm text-white/70">{cfg.fallbackBlurb}</p>
+                    )}
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -286,13 +421,13 @@ export default async function PopPunkPage() {
             Latest from Alternative Press, Punktastic, and Substream.
           </p>
 
-          {news.length === 0 ? (
+          {headlines.length === 0 ? (
             <div className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-center text-sm text-white/60">
               {"Couldn't reach the feeds right now. Try refreshing in a bit."}
             </div>
           ) : (
             <div className="mt-8 grid gap-4 md:grid-cols-2">
-              {news.map((n) => {
+              {headlines.map((n) => {
                 const rel = formatRelative(n.pubDate);
                 return (
                   <Link
