@@ -1316,6 +1316,18 @@ const SPECIES = [
 function sp() { return SPECIES[G.species] }
 function drawCreature(g: any, stage: number, x: number, y: number) { sp().draw(g, stage, x, y) }
 
+// ─── Sprite-art helpers (dino species uses real CC0 pixel art) ────────────────
+// Returns true if the dino sprite atlas was loaded by PickScene.preload().
+// Other species fall back to procedural drawCreature().
+function hasDinoSprite(scene: any) {
+  return scene.textures && scene.textures.exists('dino_idle_1')
+}
+// Pick the right idle/run frame for the current animation time + state.
+function dinoFrame(t: number, moving: boolean) {
+  if (moving) return 'dino_run_' + ((Math.floor(t * 6) % 3) + 1)
+  return 'dino_idle_' + ((Math.floor(t * 1.6) % 2) + 1)
+}
+
 // ─── PickScene — choose your companion ────────────────────────────────────────
 function createPickScene(Phaser: any) {
   return class PickScene extends Phaser.Scene {
@@ -1355,9 +1367,13 @@ function createPickScene(Phaser: any) {
         const cx = cardX[idx]
         const card = this.add.rectangle(cx, cardY, 140, 200, 0x10142a, 0.9).setStrokeStyle(1, 0x33446a).setInteractive({ useHandCursor: true })
 
-        // Sprite preview (stage 1 of this species)
+        // Sprite preview — dino card uses the real CC0 sprite, others stay procedural.
         const g = this.add.graphics()
-        s.draw(g, 1, cx, cardY - 38)
+        if (idx === 0 && hasDinoSprite(this)) {
+          this.add.image(cx, cardY - 38, 'dino_idle_1').setScale(0.09).setOrigin(0.5, 0.5)
+        } else {
+          s.draw(g, 1, cx, cardY - 38)
+        }
 
         // Subtle floating animation per card
         this.tweens.add({ targets: g, y: -4, duration: 1500 + idx * 200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' })
@@ -1482,6 +1498,9 @@ function createHomeScene(Phaser: any) {
   return class HomeScene extends Phaser.Scene {
     private t = 0
     private cGfx: any
+    private cImg: any        // Sprite-art player image (used when species = dino)
+    private cImgX = 0        // Tweened offset added to cImg position by action animations
+    private cImgY = 0
     private cX = 100
     private floorY = 252
     private bars: Record<string, any> = {}
@@ -1614,8 +1633,12 @@ function createHomeScene(Phaser: any) {
         this.musicT.setText(theme.isMuted ? '♪ OFF' : '♪ ON').setColor(theme.isMuted ? '#778899' : '#aaccee')
       })
 
-      // Player creature
+      // Player creature — graphics for procedural species, image for dino sprite.
       this.cGfx = this.add.graphics()
+      if (G.species === 0 && hasDinoSprite(this)) {
+        this.cImg = this.add.image(this.cX, this.floorY, 'dino_idle_1').setScale(0.085).setOrigin(0.5, 1)
+        this.cGfx.setVisible(false)
+      }
       this.drawC()
 
       // Prompt + msg
@@ -1660,9 +1683,25 @@ function createHomeScene(Phaser: any) {
       if (G.stage < 5 && G.level >= EVO_LEVEL[G.stage]) this.time.delayedCall(300, () => this.evolve())
     }
 
-    drawC() {
-      this.cGfx.clear()
-      drawCreature(this.cGfx, G.stage, this.cX, this.floorY - 22 + Math.sin(this.t * 2) * 1.5)
+    drawC(moving: boolean = false) {
+      const bob = Math.sin(this.t * 2) * 1.5
+      if (this.cImg) {
+        this.cImg.setX(this.cX + this.cImgX).setY(this.floorY + bob + this.cImgY)
+        this.cImg.setTexture(dinoFrame(this.t, moving))
+      } else {
+        this.cGfx.clear()
+        drawCreature(this.cGfx, G.stage, this.cX, this.floorY - 22 + bob)
+      }
+    }
+
+    // Bounce helpers: tween offsets if using sprite, transform if procedural.
+    bounceY(amount: number, repeat = 0) {
+      if (this.cImg) this.tweens.add({ targets: this, cImgY: amount, duration: 180, yoyo: true, repeat, onComplete: () => { this.cImgY = 0 } })
+      else this.tweens.add({ targets: this.cGfx, y: amount, duration: 180, yoyo: true, repeat })
+    }
+    bounceX(amount: number, repeat = 0) {
+      if (this.cImg) this.tweens.add({ targets: this, cImgX: amount, duration: 80, yoyo: true, repeat, onComplete: () => { this.cImgX = 0 } })
+      else this.tweens.add({ targets: this.cGfx, x: amount, duration: 80, yoyo: true, repeat })
     }
 
     mkBar(x: number, y: number, label: string, color: number) {
@@ -1762,8 +1801,10 @@ function createHomeScene(Phaser: any) {
     // Reset transform + cancel pending tweens before kicking off a new bounce.
     resetSprite() {
       this.tweens.killTweensOf(this.cGfx)
-      this.cGfx.x = 0
-      this.cGfx.y = 0
+      this.tweens.killTweensOf(this)  // kills our cImgX / cImgY tweens
+      this.cGfx.x = 0; this.cGfx.y = 0
+      this.cImgX = 0; this.cImgY = 0
+      if (this.cImg) this.cImg.setAlpha(1)
     }
 
     // Floating "+N STAT" label near the creature, with the matching bar pulsed.
@@ -1805,7 +1846,7 @@ function createHomeScene(Phaser: any) {
       if (invAdd(itemId, 1)) line += '   (+1 in bag)'
       this.msg(line); this.updHUD()
       this.resetSprite()
-      this.tweens.add({ targets: this.cGfx, y: -8, duration: 180, yoyo: true })
+      this.bounceY(-8)
     }
 
     train() {
@@ -1824,7 +1865,7 @@ function createHomeScene(Phaser: any) {
 
       // Player jab + camera shake
       this.resetSprite()
-      this.tweens.add({ targets: this.cGfx, x: 8, duration: 70, yoyo: true, repeat: 2 })
+      this.bounceX(8, 2)
       this.cameras.main.shake(120, 0.005)
 
       // Bag swing animation + impact sparks
@@ -1861,7 +1902,7 @@ function createHomeScene(Phaser: any) {
       const r = gainXp(3)
       this.msg(line); this.updHUD()
       this.resetSprite()
-      this.tweens.add({ targets: this.cGfx, y: -12, duration: 180, yoyo: true, repeat: 1 })
+      this.bounceY(-12, 1)
       if (r.leveled) this.showLevelUp(r.levelsGained)
       if (r.shouldEvolve) this.time.delayedCall(900, () => this.evolve())
     }
@@ -1929,7 +1970,9 @@ function createHomeScene(Phaser: any) {
       if (this.cursors.left.isDown  || this.wasd.A.isDown || this.touchLeft)  dx -= 1
       if (this.cursors.right.isDown || this.wasd.D.isDown || this.touchRight) dx += 1
       if (dx !== 0) this.cX = Math.max(20, Math.min(W - 20, this.cX + dx * this.SPEED))
-      this.drawC()
+      // Flip dino sprite to face direction of travel
+      if (this.cImg && dx !== 0) this.cImg.setFlipX(dx < 0)
+      this.drawC(dx !== 0)
 
       const nz = this.zones.find((z: any) => Math.abs(z.x - this.cX) <= 36) || null
       if (nz !== this.nearZone) {
@@ -2156,8 +2199,12 @@ function createWorldScene(Phaser: any) {
       const bossLabel = (G.badges?.length || 0) >= BADGES.length ? 'BOSS  ALL CLEAR' : `BOSS ${bossTier}/${BADGES.length}`
       this.add.text(1740, this.floorY - 30, bossLabel, { fontSize: '10px', color: '#ff5577', fontStyle: 'bold', stroke: '#000', strokeThickness: 2 }).setOrigin(0.5)
 
-      // Player
+      // Player — sprite for dino, procedural for other species
       this.cGfx = this.add.graphics().setDepth(3)
+      if (G.species === 0 && hasDinoSprite(this)) {
+        ;(this as any).cImg = this.add.image(this.pX, this.floorY, 'dino_idle_1').setScale(0.085).setOrigin(0.5, 1).setDepth(3)
+        this.cGfx.setVisible(false)
+      }
       this.drawPlayer()
 
       // HUD (fixed to camera) — taller two-row layout to match HOME
@@ -2268,9 +2315,15 @@ function createWorldScene(Phaser: any) {
       g.fillStyle(0x4a3a1a, 0.5); g.fillRect(x - 12, y + 7, 24, 2)
     }
 
-    drawPlayer() {
-      this.cGfx.clear()
-      drawCreature(this.cGfx, G.stage, this.pX, this.floorY - 22)
+    drawPlayer(moving: boolean = false) {
+      const cImg = (this as any).cImg
+      if (cImg) {
+        cImg.setX(this.pX).setY(this.floorY)
+        cImg.setTexture(dinoFrame((this as any)._t || 0, moving))
+      } else {
+        this.cGfx.clear()
+        drawCreature(this.cGfx, G.stage, this.pX, this.floorY - 22)
+      }
     }
 
     tryActivate() {
@@ -2306,11 +2359,15 @@ function createWorldScene(Phaser: any) {
       let dx = 0
       if (this.cursors.left.isDown  || this.wasd.A.isDown || this.touchLeft)  dx -= 1
       if (this.cursors.right.isDown || this.wasd.D.isDown || this.touchRight) dx += 1
+      // Track time for sprite animation framing
+      ;(this as any)._t = ((this as any)._t || 0) + dt * 0.001
+      const cImg = (this as any).cImg
+      if (cImg && dx !== 0) cImg.setFlipX(dx < 0)
       if (dx !== 0) {
         this.pX = Math.max(20, Math.min(this.wWidth - 20, this.pX + dx * 1.7))
-        this.drawPlayer()
         this.cameras.main.scrollX = Phaser.Math.Clamp(this.pX - W/2, 0, this.wWidth - W)
       }
+      this.drawPlayer(dx !== 0)
 
       // Mini-map: move the player triangle to the live world position
       if (this.mmPlayer) {
@@ -2670,7 +2727,19 @@ function createBattleScene(Phaser: any) {
 
       this.pX = W * 0.28; this.pY = H * 0.52
       this.pGfx = this.add.graphics()
-      drawCreature(this.pGfx, G.stage, this.pX, this.pY)
+      // Sprite art for dino species; procedural for water/lion-turtle
+      if (G.species === 0 && hasDinoSprite(this)) {
+        const pImg = this.add.image(this.pX, this.pY + 20, 'dino_idle_1').setScale(0.11).setOrigin(0.5, 1)
+        // Idle frame swap on a loop so the dino feels alive in battle
+        this.time.addEvent({ delay: 350, loop: true, callback: () => {
+          if (!pImg || !pImg.active) return
+          pImg.setTexture(pImg.texture.key === 'dino_idle_1' ? 'dino_idle_2' : 'dino_idle_1')
+        }})
+        ;(this as any).pImg = pImg
+        this.pGfx = pImg  // tweens already target pGfx — point them at the image instead
+      } else {
+        drawCreature(this.pGfx, G.stage, this.pX, this.pY)
+      }
 
       this.add.text(this.pX, H * 0.72, G.name, { fontSize: '11px', color: '#aaaaff', fontStyle: 'bold' }).setOrigin(0.5)
       this.add.text(this.pX, H * 0.79, 'Lv.' + G.level, { fontSize: '8px', color: '#7788cc' }).setOrigin(0.5)
@@ -2796,7 +2865,9 @@ function createBattleScene(Phaser: any) {
       }
       const d   = this.dmg(G.atk, this.enemy.def, action === 'special')
       const lbl = action === 'special' ? 'Special Attack' : 'Attack'
-      this.tweens.add({ targets: this.pGfx, x: 40, duration: 180, ease: 'Power2', yoyo: true })
+      // Lunge: graphics tween its transform offset 0->40, image needs absolute pX+30
+      const lungeX = (this as any).pImg ? (this.pX + 30) : 40
+      this.tweens.add({ targets: this.pGfx, x: lungeX, duration: 180, ease: 'Power2', yoyo: true })
       this.time.delayedCall(180, () => {
         this.enemy.hp -= d
         this.cameras.main.shake(130, 0.01)
