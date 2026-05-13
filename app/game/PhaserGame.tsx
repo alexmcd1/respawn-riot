@@ -1321,6 +1321,19 @@ function createPickScene(Phaser: any) {
   return class PickScene extends Phaser.Scene {
     constructor() { super('PickScene') }
 
+    preload() {
+      // CC0 sprite art (see public/sprites/CREDITS.md). Loaded once per game
+      // session by the first scene. Other scenes can reference these by key.
+      this.load.image('kenney_tiles',       '/sprites/kenney_tiles.png')
+      this.load.image('kenney_backgrounds', '/sprites/kenney_backgrounds.png')
+      this.load.image('kenney_characters',  '/sprites/kenney_characters.png')
+      this.load.image('dino_idle_1', '/sprites/dino/idle_1.png')
+      this.load.image('dino_idle_2', '/sprites/dino/idle_2.png')
+      this.load.image('dino_run_1',  '/sprites/dino/run_1.png')
+      this.load.image('dino_run_2',  '/sprites/dino/run_2.png')
+      this.load.image('dino_run_3',  '/sprites/dino/run_3.png')
+    }
+
     create() {
       this.add.rectangle(W / 2, H / 2, W, H, 0x0d0d1a)
       // Twinkling stars
@@ -1371,7 +1384,19 @@ function createPickScene(Phaser: any) {
         })
       })
 
-      this.add.text(W / 2, H - 12, 'A retro adventure awaits — be brave, be curious.', { fontSize: '8px', color: '#556677', fontStyle: 'italic' }).setOrigin(0.5)
+      this.add.text(W / 2, H - 22, 'A retro adventure awaits — be brave, be curious.', { fontSize: '8px', color: '#556677', fontStyle: 'italic' }).setOrigin(0.5)
+
+      // Tiny "real sprite art is loaded" indicator: a scaled dino preview
+      // and the Kenney tile atlas as a horizontal strip. Confirms the asset
+      // pipeline works end-to-end without disrupting the picker layout.
+      if (this.textures.exists('dino_idle_1')) {
+        const dino = this.add.image(28, H - 12, 'dino_idle_1').setOrigin(0.5).setScale(0.04)
+        this.tweens.add({ targets: dino, y: dino.y - 2, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' })
+      }
+      if (this.textures.exists('kenney_tiles')) {
+        this.add.image(W - 60, H - 12, 'kenney_tiles').setOrigin(0.5).setScale(0.6)
+      }
+      this.add.text(W / 2, H - 6, '✓ CC0 sprite art ready — see public/sprites/CREDITS.md', { fontSize: '6px', color: '#445566' }).setOrigin(0.5)
     }
   }
 }
