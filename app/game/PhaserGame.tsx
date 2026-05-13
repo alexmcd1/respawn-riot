@@ -1723,9 +1723,9 @@ function createHomeScene(Phaser: any) {
     }
     updHUD() {
       ;['HP','FOOD','MOOD','XP'].forEach(k => this.updBar(k))
-      this.nameT.setText(G.name + '   Lv.' + G.level)
       const badgeCount = G.badges?.length || 0
-      this.dayT.setText('Day ' + G.day + '   ·   Stage ' + G.stage + '   ·   Badges ' + badgeCount + '/' + BADGES.length)
+      this.nameT.setText(G.name + '   Lv.' + G.level + '   ★' + badgeCount + '/' + BADGES.length)
+      this.dayT.setText('Day ' + G.day + '   ·   Stage ' + G.stage)
       this.bagT.setText('BAG ' + invTotal() + '/' + G.maxInv)
     }
 
