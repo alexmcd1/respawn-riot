@@ -15,10 +15,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const OUT = join(__dirname, '..', 'qa-screenshots')
 mkdirSync(OUT, { recursive: true })
 
-const URL = process.env.GAME_URL || 'https://respawnriot.io/game'
+const TARGET = process.env.GAME_URL || 'https://respawnriot.io/game'
 const HEADLESS = process.env.HEADLESS !== 'false'  // default headless, set HEADLESS=false to watch
 
-console.log(`QA target: ${URL}`)
+console.log(`QA target: ${TARGET}`)
 console.log(`Headless:  ${HEADLESS}`)
 
 const consoleLog = []
@@ -36,7 +36,7 @@ page.on('pageerror', (err) => {
 // ─── Cross-route smoke test ───────────────────────────────────────────────
 // Catches regressions from other agents shipping concurrent changes to the
 // website. Any non-2xx response is logged and counted as a failure.
-const SITE_BASE = new URL(URL).origin
+const SITE_BASE = new URL(TARGET).origin
 const SMOKE_ROUTES = ['/', '/game', '/anime', '/pop-punk', '/gaming', '/orlando', '/quests']
 console.log(`\n== Cross-route smoke test (${SITE_BASE}) ==`)
 const smokeFailures = []
@@ -57,7 +57,7 @@ if (smokeFailures.length > 0) {
   consoleLog.push(...smokeFailures)
 }
 
-await page.goto(URL, { waitUntil: 'networkidle', timeout: 30000 })
+await page.goto(TARGET, { waitUntil: 'networkidle', timeout: 30000 })
 // Wait for Phaser canvas
 await page.waitForSelector('canvas', { timeout: 15000 })
 await page.waitForTimeout(1500)  // let scene fully render

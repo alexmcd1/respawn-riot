@@ -1319,9 +1319,12 @@ function drawCreature(g: any, stage: number, x: number, y: number) { sp().draw(g
 // ─── Sprite-art helpers (CC0 pixel art for each species) ─────────────────────
 // Texture keys to test for per species. Falls back to procedural drawCreature
 // if none of these exist (offline, 404, or asset never loaded).
-const SPRITE_KEYS = ['dino_idle_1', 'water_idle_1', 'turtle_walk']
+// null = no real sprite for that species; fall back to procedural draw.
+// (Lion turtle disabled because the source sprite has a solid blue background.)
+const SPRITE_KEYS: (string | null)[] = ['dino_idle_1', 'water_idle_1', null]
 function hasSprite(scene: any, speciesIdx: number) {
-  return !!(scene.textures && scene.textures.exists(SPRITE_KEYS[speciesIdx]))
+  const key = SPRITE_KEYS[speciesIdx]
+  return !!(key && scene.textures && scene.textures.exists(key))
 }
 // Create a sprite object for the current species at the floor position. The
 // caller still needs to setVisible(false) the procedural Graphics if it
@@ -1329,8 +1332,7 @@ function hasSprite(scene: any, speciesIdx: number) {
 // roughly matches the procedural footprint.
 function makeSpritePlayer(scene: any, speciesIdx: number, x: number, floorY: number) {
   if (speciesIdx === 0) return scene.add.image(x, floorY, 'dino_idle_1').setScale(0.085).setOrigin(0.5, 1)
-  if (speciesIdx === 1) return scene.add.image(x, floorY - 6, 'water_idle_1').setScale(0.5).setOrigin(0.5, 1)
-  if (speciesIdx === 2) return scene.add.sprite(x, floorY, 'turtle_walk', 0).setScale(0.55).setOrigin(0.5, 1)
+  if (speciesIdx === 1) return scene.add.image(x, floorY - 8, 'water_idle_1').setScale(1.1).setOrigin(0.5, 1)
   return null
 }
 // Update the sprite frame based on animation state.
@@ -1341,10 +1343,6 @@ function updateSpritePlayer(img: any, speciesIdx: number, t: number, moving: boo
   } else if (speciesIdx === 1) {
     // Fish gently alternates between its two idle frames (no run animation in source)
     img.setTexture((Math.floor(t * 2) % 2 === 0) ? 'water_idle_1' : 'water_idle_2')
-  } else if (speciesIdx === 2) {
-    // Turtle: cycle all 6 walk frames when moving, slow alternation at rest
-    const f = moving ? (Math.floor(t * 8) % 6) : (Math.floor(t * 1.5) % 2)
-    img.setFrame(f)
   }
 }
 
@@ -1403,12 +1401,9 @@ function createPickScene(Phaser: any) {
         const g = this.add.graphics()
         // Picker card sprite preview: real CC0 art if loaded, otherwise procedural.
         if (hasSprite(this, idx)) {
-          const previewKey = idx === 0 ? 'dino_idle_1' : idx === 1 ? 'water_idle_1' : 'turtle_walk'
-          const previewScale = idx === 0 ? 0.09 : idx === 1 ? 0.55 : 0.65
-          const obj = idx === 2
-            ? this.add.sprite(cx, cardY - 38, previewKey, 0).setScale(previewScale).setOrigin(0.5, 0.5)
-            : this.add.image(cx, cardY - 38, previewKey).setScale(previewScale).setOrigin(0.5, 0.5)
-          // Subtle bob so the previews feel alive
+          const previewKey = idx === 0 ? 'dino_idle_1' : 'water_idle_1'
+          const previewScale = idx === 0 ? 0.09 : 1.2
+          const obj = this.add.image(cx, cardY - 38, previewKey).setScale(previewScale).setOrigin(0.5, 0.5)
           this.tweens.add({ targets: obj, y: obj.y - 2, duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' })
         } else {
           s.draw(g, 1, cx, cardY - 38)
