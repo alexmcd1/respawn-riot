@@ -5,7 +5,6 @@ import {
   fetchManyRss,
   fetchTopGoogleNews,
   formatRelative,
-  REVALIDATE_HOURLY,
   REVALIDATE_WEEKLY,
   type Feed,
   type NewsItem,
@@ -17,10 +16,12 @@ export const metadata: Metadata = {
     "Tour news, comeback albums, and the new wave keeping the genre loud.",
 };
 
-// Page-level revalidate is the SHORTEST cadence anything on the page
-// uses (the headlines feed). Per-band Google News results have their
-// own 1-week revalidate set on the fetch.
-export const revalidate = REVALIDATE_HOURLY;
+// Page-level revalidate matches the SHORTEST cadence anything on the
+// page uses (the headlines feed, 1 hour). Per-band Google News results
+// have their own 1-week revalidate set on the fetch.
+// NOTE: Next.js requires this to be a literal number, not an imported
+// constant — its segment-config parser is statically analyzed.
+export const revalidate = 3600;
 
 const POP_PUNK_FEEDS: Feed[] = [
   { url: "https://www.altpress.com/feed/", source: "Alternative Press" },
