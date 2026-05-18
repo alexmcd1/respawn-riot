@@ -33,6 +33,30 @@ page.on('pageerror', (err) => {
   consoleLog.push(`[pageerror] ${err.message}`)
 })
 
+// ─── Cross-route smoke test ───────────────────────────────────────────────
+// Catches regressions from other agents shipping concurrent changes to the
+// website. Any non-2xx response is logged and counted as a failure.
+const SITE_BASE = new URL(URL).origin
+const SMOKE_ROUTES = ['/', '/game', '/anime', '/pop-punk', '/gaming', '/orlando', '/quests']
+console.log(`\n== Cross-route smoke test (${SITE_BASE}) ==`)
+const smokeFailures = []
+for (const route of SMOKE_ROUTES) {
+  try {
+    const res = await page.request.get(SITE_BASE + route, { timeout: 15000 })
+    const ok = res.status() >= 200 && res.status() < 400
+    console.log(`  ${ok ? '✓' : '✗'} ${route.padEnd(12)} ${res.status()}`)
+    if (!ok) smokeFailures.push(`${route} → ${res.status()}`)
+  } catch (e) {
+    console.log(`  ✗ ${route.padEnd(12)} ERROR ${e.message}`)
+    smokeFailures.push(`${route} → ${e.message}`)
+  }
+}
+if (smokeFailures.length > 0) {
+  console.log(`\n!! Smoke failures: ${smokeFailures.length}`)
+  consoleLog.push('--- SMOKE FAILURES ---')
+  consoleLog.push(...smokeFailures)
+}
+
 await page.goto(URL, { waitUntil: 'networkidle', timeout: 30000 })
 // Wait for Phaser canvas
 await page.waitForSelector('canvas', { timeout: 15000 })

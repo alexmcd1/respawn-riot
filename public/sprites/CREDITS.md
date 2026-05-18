@@ -8,6 +8,9 @@ unmodified copies.
 |---|---|---|---|
 | `kenney_tiles.png`, `kenney_backgrounds.png`, `kenney_characters.png` | [Kenney — Pixel Platformer](https://kenney.nl/assets/pixel-platformer) | CC0 (Public Domain) | Kenney (Asset Jesus) |
 | `dino/*.png` | [OpenGameArt — Free Dino Sprites](https://opengameart.org/content/free-dino-sprites) | CC0 (Public Domain) | demching |
+| `water/fish_idle.png`, `water/fish_idle_alt.png` | [Kenney Fish Pack via OpenGameArt](https://opengameart.org/content/fish-pack-0) | CC0 (Public Domain) | Kenney |
+| `turtle/turtle_walk.png` | [OpenGameArt — Pixel Turtle](https://opengameart.org/content/pixel-turtle) | CC0 (Public Domain) | bart |
+| `bg/sky.png`, `bg/clouds.png`, `bg/mountains_far.png`, `bg/mountains_mid.png`, `bg/mountains_near.png`, `bg/trees.png` | [OpenGameArt — Parallax Background Forest Pixel Art](https://opengameart.org/content/parallax-background-forest-pixel-art) | CC0 (Public Domain) | rgbabes |
 
 ## Tilemap atlas notes
 

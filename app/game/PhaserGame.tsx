@@ -1316,16 +1316,36 @@ const SPECIES = [
 function sp() { return SPECIES[G.species] }
 function drawCreature(g: any, stage: number, x: number, y: number) { sp().draw(g, stage, x, y) }
 
-// ─── Sprite-art helpers (dino species uses real CC0 pixel art) ────────────────
-// Returns true if the dino sprite atlas was loaded by PickScene.preload().
-// Other species fall back to procedural drawCreature().
-function hasDinoSprite(scene: any) {
-  return scene.textures && scene.textures.exists('dino_idle_1')
+// ─── Sprite-art helpers (CC0 pixel art for each species) ─────────────────────
+// Texture keys to test for per species. Falls back to procedural drawCreature
+// if none of these exist (offline, 404, or asset never loaded).
+const SPRITE_KEYS = ['dino_idle_1', 'water_idle_1', 'turtle_walk']
+function hasSprite(scene: any, speciesIdx: number) {
+  return !!(scene.textures && scene.textures.exists(SPRITE_KEYS[speciesIdx]))
 }
-// Pick the right idle/run frame for the current animation time + state.
-function dinoFrame(t: number, moving: boolean) {
-  if (moving) return 'dino_run_' + ((Math.floor(t * 6) % 3) + 1)
-  return 'dino_idle_' + ((Math.floor(t * 1.6) % 2) + 1)
+// Create a sprite object for the current species at the floor position. The
+// caller still needs to setVisible(false) the procedural Graphics if it
+// substitutes the sprite for it. Tweaked per-species scales so each creature
+// roughly matches the procedural footprint.
+function makeSpritePlayer(scene: any, speciesIdx: number, x: number, floorY: number) {
+  if (speciesIdx === 0) return scene.add.image(x, floorY, 'dino_idle_1').setScale(0.085).setOrigin(0.5, 1)
+  if (speciesIdx === 1) return scene.add.image(x, floorY - 6, 'water_idle_1').setScale(0.5).setOrigin(0.5, 1)
+  if (speciesIdx === 2) return scene.add.sprite(x, floorY, 'turtle_walk', 0).setScale(0.55).setOrigin(0.5, 1)
+  return null
+}
+// Update the sprite frame based on animation state.
+function updateSpritePlayer(img: any, speciesIdx: number, t: number, moving: boolean) {
+  if (!img) return
+  if (speciesIdx === 0) {
+    img.setTexture(moving ? ('dino_run_' + ((Math.floor(t * 6) % 3) + 1)) : ('dino_idle_' + ((Math.floor(t * 1.6) % 2) + 1)))
+  } else if (speciesIdx === 1) {
+    // Fish gently alternates between its two idle frames (no run animation in source)
+    img.setTexture((Math.floor(t * 2) % 2 === 0) ? 'water_idle_1' : 'water_idle_2')
+  } else if (speciesIdx === 2) {
+    // Turtle: cycle all 6 walk frames when moving, slow alternation at rest
+    const f = moving ? (Math.floor(t * 8) % 6) : (Math.floor(t * 1.5) % 2)
+    img.setFrame(f)
+  }
 }
 
 // ─── PickScene — choose your companion ────────────────────────────────────────
@@ -1339,11 +1359,23 @@ function createPickScene(Phaser: any) {
       this.load.image('kenney_tiles',       '/sprites/kenney_tiles.png')
       this.load.image('kenney_backgrounds', '/sprites/kenney_backgrounds.png')
       this.load.image('kenney_characters',  '/sprites/kenney_characters.png')
+      // Player sprites — one set per species
       this.load.image('dino_idle_1', '/sprites/dino/idle_1.png')
       this.load.image('dino_idle_2', '/sprites/dino/idle_2.png')
       this.load.image('dino_run_1',  '/sprites/dino/run_1.png')
       this.load.image('dino_run_2',  '/sprites/dino/run_2.png')
       this.load.image('dino_run_3',  '/sprites/dino/run_3.png')
+      this.load.image('water_idle_1', '/sprites/water/fish_idle.png')
+      this.load.image('water_idle_2', '/sprites/water/fish_idle_alt.png')
+      // Turtle walk cycle is a 6-frame strip; slice it via spritesheet
+      this.load.spritesheet('turtle_walk', '/sprites/turtle/turtle_walk.png', { frameWidth: 66, frameHeight: 66 })
+      // Parallax background layers
+      this.load.image('bg_sky',           '/sprites/bg/sky.png')
+      this.load.image('bg_clouds',        '/sprites/bg/clouds.png')
+      this.load.image('bg_mountains_far', '/sprites/bg/mountains_far.png')
+      this.load.image('bg_mountains_mid', '/sprites/bg/mountains_mid.png')
+      this.load.image('bg_mountains_near','/sprites/bg/mountains_near.png')
+      this.load.image('bg_trees',         '/sprites/bg/trees.png')
     }
 
     create() {
@@ -1369,8 +1401,15 @@ function createPickScene(Phaser: any) {
 
         // Sprite preview — dino card uses the real CC0 sprite, others stay procedural.
         const g = this.add.graphics()
-        if (idx === 0 && hasDinoSprite(this)) {
-          this.add.image(cx, cardY - 38, 'dino_idle_1').setScale(0.09).setOrigin(0.5, 0.5)
+        // Picker card sprite preview: real CC0 art if loaded, otherwise procedural.
+        if (hasSprite(this, idx)) {
+          const previewKey = idx === 0 ? 'dino_idle_1' : idx === 1 ? 'water_idle_1' : 'turtle_walk'
+          const previewScale = idx === 0 ? 0.09 : idx === 1 ? 0.55 : 0.65
+          const obj = idx === 2
+            ? this.add.sprite(cx, cardY - 38, previewKey, 0).setScale(previewScale).setOrigin(0.5, 0.5)
+            : this.add.image(cx, cardY - 38, previewKey).setScale(previewScale).setOrigin(0.5, 0.5)
+          // Subtle bob so the previews feel alive
+          this.tweens.add({ targets: obj, y: obj.y - 2, duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' })
         } else {
           s.draw(g, 1, cx, cardY - 38)
         }
@@ -1623,8 +1662,8 @@ function createHomeScene(Phaser: any) {
 
       // Player creature — graphics for procedural species, image for dino sprite.
       this.cGfx = this.add.graphics()
-      if (G.species === 0 && hasDinoSprite(this)) {
-        this.cImg = this.add.image(this.cX, this.floorY, 'dino_idle_1').setScale(0.085).setOrigin(0.5, 1)
+      if (hasSprite(this, G.species)) {
+        this.cImg = makeSpritePlayer(this, G.species, this.cX, this.floorY)
         this.cGfx.setVisible(false)
       }
       this.drawC()
@@ -1675,7 +1714,7 @@ function createHomeScene(Phaser: any) {
       const bob = Math.sin(this.t * 2) * 1.5
       if (this.cImg) {
         this.cImg.setX(this.cX + this.cImgX).setY(this.floorY + bob + this.cImgY)
-        this.cImg.setTexture(dinoFrame(this.t, moving))
+        updateSpritePlayer(this.cImg, G.species, this.t, moving)
       } else {
         this.cGfx.clear()
         drawCreature(this.cGfx, G.stage, this.cX, this.floorY - 22 + bob)
@@ -2028,9 +2067,27 @@ function createWorldScene(Phaser: any) {
         { name: 'Boss Crucible',    x1: 1500, x2: this.wWidth, sky: 0x300a14, mountain: 0x4a0a14, tree: 0x2a0010, ground: 0x4a0820, accent: 0xff3366 },
       ]
 
-      // Sky strips, one per biome
+      // Sky strips, one per biome — colored block per region
       for (const b of this.biomes) {
-        this.add.rectangle((b.x1 + b.x2)/2, H/2, b.x2 - b.x1, H, b.sky)
+        this.add.rectangle((b.x1 + b.x2)/2, H/2, b.x2 - b.x1, H, b.sky).setDepth(-12)
+      }
+      // Parallax background — CC0 forest layers, each scrolling at a different
+      // rate. setScrollFactor(0) pins them to the viewport, and we manually
+      // shift tilePositionX to fake horizontal parallax depth.
+      const usePx = this.textures.exists('bg_sky')
+      const pxLayers: any = {}
+      if (usePx) {
+        const mk = (key: string, depth: number, alpha = 1) => {
+          const t = this.add.tileSprite(W/2, H/2 + 12, W, H, key).setScrollFactor(0).setDepth(depth).setAlpha(alpha)
+          return t
+        }
+        pxLayers.sky          = mk('bg_sky',           -11, 0.55)
+        pxLayers.clouds       = mk('bg_clouds',        -10, 0.5)
+        pxLayers.mountainsFar = mk('bg_mountains_far', -9,  0.45)
+        pxLayers.mountainsMid = mk('bg_mountains_mid', -8,  0.5)
+        pxLayers.mountainsNear= mk('bg_mountains_near',-7,  0.55)
+        pxLayers.trees        = mk('bg_trees',         -6,  0.45)
+        ;(this as any)._pxLayers = pxLayers
       }
       // Stars (twinkling, sprinkled across the whole map)
       for (let i = 0; i < 90; i++) {
@@ -2189,8 +2246,8 @@ function createWorldScene(Phaser: any) {
 
       // Player — sprite for dino, procedural for other species
       this.cGfx = this.add.graphics().setDepth(3)
-      if (G.species === 0 && hasDinoSprite(this)) {
-        ;(this as any).cImg = this.add.image(this.pX, this.floorY, 'dino_idle_1').setScale(0.085).setOrigin(0.5, 1).setDepth(3)
+      if (hasSprite(this, G.species)) {
+        ;(this as any).cImg = makeSpritePlayer(this, G.species, this.pX, this.floorY).setDepth(3)
         this.cGfx.setVisible(false)
       }
       this.drawPlayer()
@@ -2307,7 +2364,7 @@ function createWorldScene(Phaser: any) {
       const cImg = (this as any).cImg
       if (cImg) {
         cImg.setX(this.pX).setY(this.floorY)
-        cImg.setTexture(dinoFrame((this as any)._t || 0, moving))
+        updateSpritePlayer(cImg, G.species, (this as any)._t || 0, moving)
       } else {
         this.cGfx.clear()
         drawCreature(this.cGfx, G.stage, this.pX, this.floorY - 22)
@@ -2356,6 +2413,18 @@ function createWorldScene(Phaser: any) {
         this.cameras.main.scrollX = Phaser.Math.Clamp(this.pX - W/2, 0, this.wWidth - W)
       }
       this.drawPlayer(dx !== 0)
+
+      // Parallax: shift each layer by a fraction of the camera scroll so that
+      // far layers barely move and near layers move quickly, creating depth.
+      const px = (this as any)._pxLayers
+      if (px) {
+        const sx = this.cameras.main.scrollX
+        if (px.clouds)        px.clouds.tilePositionX        = sx * 0.05 + (this as any)._t * 8
+        if (px.mountainsFar)  px.mountainsFar.tilePositionX  = sx * 0.12
+        if (px.mountainsMid)  px.mountainsMid.tilePositionX  = sx * 0.28
+        if (px.mountainsNear) px.mountainsNear.tilePositionX = sx * 0.45
+        if (px.trees)         px.trees.tilePositionX         = sx * 0.7
+      }
 
       // Mini-map: move the player triangle to the live world position
       if (this.mmPlayer) {
@@ -2715,13 +2784,15 @@ function createBattleScene(Phaser: any) {
 
       this.pX = W * 0.28; this.pY = H * 0.52
       this.pGfx = this.add.graphics()
-      // Sprite art for dino species; procedural for water/lion-turtle
-      if (G.species === 0 && hasDinoSprite(this)) {
-        const pImg = this.add.image(this.pX, this.pY + 20, 'dino_idle_1').setScale(0.11).setOrigin(0.5, 1)
-        // Idle frame swap on a loop so the dino feels alive in battle
-        this.time.addEvent({ delay: 350, loop: true, callback: () => {
+      // Sprite art if loaded for current species; procedural fallback
+      if (hasSprite(this, G.species)) {
+        const pImg = makeSpritePlayer(this, G.species, this.pX, this.pY + 20)
+        // Idle frame swap loop so the creature feels alive in battle
+        let bt = 0
+        this.time.addEvent({ delay: 200, loop: true, callback: () => {
           if (!pImg || !pImg.active) return
-          pImg.setTexture(pImg.texture.key === 'dino_idle_1' ? 'dino_idle_2' : 'dino_idle_1')
+          bt += 0.2
+          updateSpritePlayer(pImg, G.species, bt, false)
         }})
         ;(this as any).pImg = pImg
         this.pGfx = pImg  // tweens already target pGfx — point them at the image instead
