@@ -28,7 +28,7 @@ export default function FoodPage() {
             FOOD <span className="text-red-400">{"//"}</span> COOK OR GO OUT
           </h1>
           <p className="mt-3 max-w-2xl text-sm text-white/75 sm:text-base">
-            {"Paste a recipe, scale it 1–4×, find a restaurant nearby, or pick from what's in your fridge."}
+            {"Paste a recipe, scale it 1–4×, find a restaurant nearby, or cook from what's in the house."}
           </p>
 
           {/* Section anchor nav — mobile-friendly */}
@@ -37,10 +37,10 @@ export default function FoodPage() {
             className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-4"
           >
             <a
-              href="#parse"
+              href="#recipes"
               className="rounded-lg border border-red-400/40 bg-black/40 px-2 py-2.5 text-center font-display text-[11px] tracking-[0.2em] text-red-200 hover:bg-red-500/10 sm:text-xs"
             >
-              📋 PARSE
+              📋 RECIPES
             </a>
             <a
               href="#eat-out"
@@ -49,10 +49,10 @@ export default function FoodPage() {
               🍴 EAT OUT
             </a>
             <a
-              href="#fridge"
+              href="#in-the-house"
               className="rounded-lg border border-red-400/40 bg-black/40 px-2 py-2.5 text-center font-display text-[11px] tracking-[0.2em] text-red-200 hover:bg-red-500/10 sm:text-xs"
             >
-              🥘 FRIDGE
+              🏠 IN THE HOUSE
             </a>
             <a
               href="#my-recipes"
@@ -66,13 +66,13 @@ export default function FoodPage() {
 
       {/* Section 1: Recipe parser */}
       <section
-        id="parse"
+        id="recipes"
         className="scroll-mt-24 border-b border-white/10 px-4 py-10 sm:px-6 sm:py-14"
       >
         <div className="mx-auto max-w-3xl">
           <div className="mb-5">
             <p className="font-display text-[11px] tracking-[0.3em] text-red-400">
-              ▌ RECIPE PARSER
+              ▌ RECIPES
             </p>
             <h2 className="mt-2 font-display text-2xl tracking-wide sm:text-3xl">
               Bring a recipe in. Scale it.
@@ -108,22 +108,22 @@ export default function FoodPage() {
         </div>
       </section>
 
-      {/* Section 3: Fridge */}
+      {/* Section 3: In the House */}
       <section
-        id="fridge"
+        id="in-the-house"
         className="scroll-mt-24 px-4 py-10 sm:px-6 sm:py-14"
       >
         <div className="mx-auto max-w-3xl">
           <div className="mb-5">
             <p className="font-display text-[11px] tracking-[0.3em] text-red-400">
-              ▌ WHAT&apos;S IN YOUR FRIDGE?
+              ▌ WHAT&apos;S IN THE HOUSE?
             </p>
             <h2 className="mt-2 font-display text-2xl tracking-wide sm:text-3xl">
-              Check what you have. Find a recipe.
+              Cook from what you have.
             </h2>
             <p className="mt-2 text-sm text-white/65">
-              Tap any combination from the top-30 list, or add your own.
-              We&apos;ll search TheMealDB for recipes that contain all of them.
+              Tap what&apos;s in your kitchen, mark anything to avoid, hit Find.
+              Ranked by best match — perfect-match recipes get a green border.
             </p>
           </div>
           <IngredientFinder />
