@@ -49,6 +49,15 @@ const sections = [
     border: "hover:border-orange-400/60",
     chip: "text-orange-300",
   },
+  {
+    href: "/food",
+    tag: "Food",
+    title: "Cook or Go Out",
+    body: "Parse + scale a recipe, find restaurants by zip or exact location, or pick from what's in your fridge.",
+    accent: "from-red-500/20 to-transparent",
+    border: "hover:border-red-400/60",
+    chip: "text-red-300",
+  },
 ] as const;
 
 export default function Home() {
@@ -130,7 +139,7 @@ export default function Home() {
             {/* Stat strip */}
             <div className="mt-10 grid grid-cols-2 gap-2 sm:grid-cols-4">
               {[
-                { k: 'CHANNELS', v: '05' },
+                { k: 'CHANNELS', v: '06' },
                 { k: 'GAMES', v: '02' },
                 { k: 'DEVLOGS', v: '∞' },
                 { k: 'SLEEP', v: 'NONE' },

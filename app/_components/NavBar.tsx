@@ -22,6 +22,7 @@ const links: NavLink[] = [
   { href: '/trading-cards', label: 'TDC',      text: 'text-amber-300',     glow: 'hover:border-amber-400 hover:text-amber-300 shadow-amber-500/40',    num: '05' },
   { href: '/orlando',       label: 'Orlando',  text: 'text-orange-300',    glow: 'hover:border-orange-400 hover:text-orange-300 shadow-orange-500/40', num: '06' },
   { href: '/quest-list',    label: 'Quests',   text: 'text-violet-300',    glow: 'hover:border-violet-400 hover:text-violet-300 shadow-violet-500/40', num: '07' },
+  { href: '/food',          label: 'Food',     text: 'text-red-300',       glow: 'hover:border-red-400 hover:text-red-300 shadow-red-500/40',          num: '08' },
 ]
 
 const tickerItems = [
@@ -31,6 +32,7 @@ const tickerItems = [
   '◢ RC — RESPAWN CREATURES DEVLOG',
   '☼ ORLANDO LIVE WEATHER + PARK NEWS',
   '⚔ QUESTLIST BY KID_GHOST',
+  '🍴 NEW — FOOD CHANNEL: PARSE · EAT OUT · FRIDGE',
   '⚡ JOIN THE RIOT',
 ]
 
