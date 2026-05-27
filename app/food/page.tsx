@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import RecipeParser from "./_components/RecipeParser";
 import RestaurantFinder from "./_components/RestaurantFinder";
 import IngredientFinder from "./_components/IngredientFinder";
+import MyRecipes from "./_components/MyRecipes";
 
 export const metadata: Metadata = {
   title: "Food — Respawn Riot",
@@ -32,7 +33,7 @@ export default function FoodPage() {
           {/* Section anchor nav — mobile-friendly */}
           <nav
             aria-label="Sections"
-            className="mt-6 grid grid-cols-3 gap-2"
+            className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-4"
           >
             <a
               href="#parse"
@@ -51,6 +52,12 @@ export default function FoodPage() {
               className="rounded-lg border border-red-400/40 bg-black/40 px-2 py-2.5 text-center font-display text-[11px] tracking-[0.2em] text-red-200 hover:bg-red-500/10 sm:text-xs"
             >
               🥘 FRIDGE
+            </a>
+            <a
+              href="#my-recipes"
+              className="rounded-lg border border-red-400/40 bg-black/40 px-2 py-2.5 text-center font-display text-[11px] tracking-[0.2em] text-red-200 hover:bg-red-500/10 sm:text-xs"
+            >
+              ★ MY RECIPES
             </a>
           </nav>
         </div>
@@ -122,10 +129,33 @@ export default function FoodPage() {
         </div>
       </section>
 
+      {/* Section 4: My Recipes */}
+      <section
+        id="my-recipes"
+        className="scroll-mt-24 border-t border-white/10 bg-zinc-950 px-4 py-10 sm:px-6 sm:py-14"
+      >
+        <div className="mx-auto max-w-3xl">
+          <div className="mb-5">
+            <p className="font-display text-[11px] tracking-[0.3em] text-red-400">
+              ▌ MY RECIPES
+            </p>
+            <h2 className="mt-2 font-display text-2xl tracking-wide sm:text-3xl">
+              Your saved favorites.
+            </h2>
+            <p className="mt-2 text-sm text-white/65">
+              Anything you save from the sections above lives here. Rate them,
+              tag them, search by name or ingredient, scale + convert units on
+              the fly.
+            </p>
+          </div>
+          <MyRecipes />
+        </div>
+      </section>
+
       <footer className="border-t border-white/10 px-6 py-8 text-center text-xs text-white/45">
-        Recipe parsing reads schema.org/Recipe JSON-LD. Restaurant search
-        opens Google Maps. Recipe results via TheMealDB. Ratings stay in your
-        browser&apos;s local storage.
+        Recipe parsing reads schema.org/Recipe JSON-LD. Restaurant search uses
+        OpenStreetMap. Recipe results via TheMealDB. Ratings + saved recipes
+        stay in your browser&apos;s local storage.
       </footer>
     </main>
   );

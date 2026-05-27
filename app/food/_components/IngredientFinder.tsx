@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import SaveRecipeButton from './SaveRecipeButton'
 
 // Top 30 most-common ingredients across home cooking.
 // Strings are display names; we lowercase + underscore-ify when
@@ -396,6 +397,25 @@ export default function IngredientFinder() {
                                 ▶ YouTube
                               </a>
                             )}
+                          </div>
+
+                          {/* Save to My Recipes */}
+                          <div className="mt-3">
+                            <SaveRecipeButton
+                              name={ex.strMeal}
+                              source="mealdb"
+                              sourceUrl={`mealdb:${ex.idMeal}`}
+                              image={ex.strMealThumb}
+                              ingredients={extractIngredients(ex)}
+                              instructions={
+                                ex.strInstructions
+                                  ? ex.strInstructions
+                                      .split(/\r?\n+/)
+                                      .map((s) => s.trim())
+                                      .filter(Boolean)
+                                  : []
+                              }
+                            />
                           </div>
                         </div>
                       )}

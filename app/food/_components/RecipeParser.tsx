@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { transformIngredient, type System } from '../_lib/units'
+import SaveRecipeButton from './SaveRecipeButton'
 
 type ParsedRecipe = {
   name?: string
@@ -191,6 +192,19 @@ export default function RecipeParser() {
               source ↗
             </a>
           )}
+
+          {/* Save to My Recipes */}
+          <div className="mt-4">
+            <SaveRecipeButton
+              name={recipe.name ?? 'Untitled recipe'}
+              source={recipe.sourceUrl ? 'url' : 'pasted'}
+              sourceUrl={recipe.sourceUrl}
+              image={recipe.image}
+              yield={recipe.yield}
+              ingredients={recipe.ingredients}
+              instructions={recipe.instructions}
+            />
+          </div>
 
           {/* Scale + Units pickers — big touch targets for mobile */}
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
