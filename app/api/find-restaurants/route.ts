@@ -23,10 +23,25 @@ type RestaurantResult = {
   name: string;
   cuisine?: string;
   address?: string;
+  distanceMeters?: number;
   lat: number;
   lon: number;
   mapsUrl: string;
 };
+
+// Haversine — distance between two lat/lon points in meters
+function haversine(a: { lat: number; lon: number }, b: { lat: number; lon: number }): number {
+  const R = 6371000;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLon = toRad(b.lon - a.lon);
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.sin(dLon / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
 
 type Body = {
   mode?: "cuisine" | "name";
@@ -140,6 +155,7 @@ function formatCuisine(c: string | undefined): string | undefined {
 
 function dedupeAndNormalize(
   elements: OverpassElement[],
+  center: { lat: number; lon: number },
   limit: number
 ): RestaurantResult[] {
   const seen = new Set<string>();
@@ -155,20 +171,23 @@ function dedupeAndNormalize(
     const key = `${name.toLowerCase()}|${lat.toFixed(3)}|${lon.toFixed(3)}`;
     if (seen.has(key)) continue;
     seen.add(key);
+    const address = formatAddress(tags);
     out.push({
       id: `${e.type}/${e.id}`,
       name,
       cuisine: formatCuisine(tags.cuisine),
-      address: formatAddress(tags),
+      address,
+      distanceMeters: haversine(center, { lat, lon }),
       lat,
       lon,
       mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-        `${name} ${formatAddress(tags) ?? ""}`.trim()
+        `${name} ${address ?? ""}`.trim()
       )}`,
     });
-    if (out.length >= limit) break;
   }
-  return out;
+  // Sort by distance, then trim to limit
+  out.sort((a, b) => (a.distanceMeters ?? 0) - (b.distanceMeters ?? 0));
+  return out.slice(0, limit);
 }
 
 export async function POST(request: Request) {
@@ -211,7 +230,7 @@ export async function POST(request: Request) {
   const limit = Math.min(Math.max(body.limit ?? 30, 5), 60);
 
   const elements = await queryOverpass(lat, lon, radius, mode, query);
-  const results = dedupeAndNormalize(elements, limit);
+  const results = dedupeAndNormalize(elements, { lat, lon }, limit);
 
   return NextResponse.json({
     ok: true,
@@ -219,5 +238,10 @@ export async function POST(request: Request) {
     radiusMeters: radius,
     count: results.length,
     results,
+    // Fallback so the UI can offer "see all on Google Maps" when OSM
+    // coverage is thin
+    fallbackMapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+      `${query} near ${lat.toFixed(4)},${lon.toFixed(4)}`
+    )}`,
   });
 }

@@ -23,9 +23,30 @@ type RestaurantResult = {
   name: string
   cuisine?: string
   address?: string
+  distanceMeters?: number
   lat: number
   lon: number
   mapsUrl: string
+}
+
+const RADIUS_OPTIONS: { label: string; miles: number }[] = [
+  { label: '1 mi',  miles: 1 },
+  { label: '3 mi',  miles: 3 },
+  { label: '5 mi',  miles: 5 },
+  { label: '10 mi', miles: 10 },
+  { label: '25 mi', miles: 25 },
+]
+
+function milesToMeters(miles: number): number {
+  return Math.round(miles * 1609.344)
+}
+
+function formatDistance(meters?: number): string | null {
+  if (typeof meters !== 'number') return null
+  const miles = meters / 1609.344
+  if (miles < 0.1) return '<0.1 mi'
+  if (miles < 10) return `${miles.toFixed(1)} mi`
+  return `${Math.round(miles)} mi`
 }
 
 function loadRatings(): Rating[] {
@@ -63,9 +84,11 @@ export default function RestaurantFinder() {
   // ─── Cuisine search
   const [cuisine, setCuisine] = useState('Pizza')
   const [customCuisine, setCustomCuisine] = useState('')
+  const [radiusMiles, setRadiusMiles] = useState(5)
   const [results, setResults] = useState<RestaurantResult[]>([])
   const [searching, setSearching] = useState(false)
   const [searchError, setSearchError] = useState('')
+  const [fallbackMapsUrl, setFallbackMapsUrl] = useState<string | null>(null)
 
   // ─── Randomizer pick
   const [pick, setPick] = useState<RestaurantResult | Rating | null>(null)
@@ -144,6 +167,7 @@ export default function RestaurantFinder() {
   async function doSearch(e: React.FormEvent) {
     e.preventDefault()
     setSearchError('')
+    setFallbackMapsUrl(null)
     setPick(null)
     const term = (customCuisine.trim() || cuisine.trim()).trim()
     if (!term) return setSearchError('Pick a cuisine first')
@@ -154,7 +178,12 @@ export default function RestaurantFinder() {
       const res = await fetch('/api/find-restaurants', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'cuisine', query: term, ...loc }),
+        body: JSON.stringify({
+          mode: 'cuisine',
+          query: term,
+          radiusMeters: milesToMeters(radiusMiles),
+          ...loc,
+        }),
       })
       const data = await res.json().catch(() => ({}))
       if (!data.ok) {
@@ -162,8 +191,13 @@ export default function RestaurantFinder() {
         setResults([])
       } else {
         setResults(data.results ?? [])
+        if (typeof data.fallbackMapsUrl === 'string') {
+          setFallbackMapsUrl(data.fallbackMapsUrl)
+        }
         if ((data.results ?? []).length === 0) {
-          setSearchError(`No matches near you. Try a wider zip or a different cuisine.`)
+          setSearchError(
+            `No "${term}" places within ${radiusMiles} mi. Try a bigger radius or a different cuisine.`
+          )
         }
       }
     } catch {
@@ -186,7 +220,13 @@ export default function RestaurantFinder() {
       const res = await fetch('/api/find-restaurants', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'name', query: term, ...loc, limit: 12 }),
+        body: JSON.stringify({
+          mode: 'name',
+          query: term,
+          radiusMeters: milesToMeters(radiusMiles),
+          ...loc,
+          limit: 12,
+        }),
       })
       const data = await res.json().catch(() => ({}))
       if (!data.ok) {
@@ -334,6 +374,29 @@ export default function RestaurantFinder() {
 
           <div>
             <label className="font-display text-[10px] tracking-[0.3em] text-red-300">
+              ▌ DISTANCE
+            </label>
+            <div className="mt-2 grid grid-cols-5 gap-1.5">
+              {RADIUS_OPTIONS.map((opt) => (
+                <button
+                  key={opt.miles}
+                  type="button"
+                  onClick={() => setRadiusMiles(opt.miles)}
+                  aria-pressed={radiusMiles === opt.miles}
+                  className={`rounded-lg border py-2.5 font-display text-sm tracking-widest transition ${
+                    radiusMiles === opt.miles
+                      ? 'border-red-400 bg-red-500/15 text-red-100'
+                      : 'border-white/10 bg-black/30 text-white/70 hover:border-white/30'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="font-display text-[10px] tracking-[0.3em] text-red-300">
               ▌ WHERE
             </label>
             <div className="mt-2 flex flex-col gap-2 sm:flex-row">
@@ -456,45 +519,80 @@ export default function RestaurantFinder() {
         {/* Cuisine search results */}
         {results.length > 0 && (
           <div className="mt-3 space-y-2">
-            <p className="text-xs text-white/55">
-              {results.length} {results.length === 1 ? 'spot' : 'spots'} nearby — via OpenStreetMap
-            </p>
-            <ul className="grid gap-2 sm:grid-cols-2">
-              {results.map((r) => (
-                <li
-                  key={r.id}
-                  className="rounded-xl border border-white/10 bg-white/[0.03] p-3"
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs text-white/55">
+                {results.length} {results.length === 1 ? 'spot' : 'spots'} within {radiusMiles} mi — via OpenStreetMap
+              </p>
+              {fallbackMapsUrl && (
+                <a
+                  href={fallbackMapsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-red-300 hover:underline"
                 >
-                  <p className="font-display text-base text-white">{r.name}</p>
-                  {r.cuisine && (
-                    <p className="text-xs uppercase tracking-widest text-red-300/80">
-                      {r.cuisine}
-                    </p>
-                  )}
-                  {r.address && (
-                    <p className="mt-1 text-xs text-white/55">{r.address}</p>
-                  )}
-                  <div className="mt-2 flex gap-2">
-                    <a
-                      href={r.mapsUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="rounded-md border border-white/15 px-3 py-1.5 text-xs text-white/80 hover:border-red-400 hover:text-red-200"
-                    >
-                      ↗ Maps
-                    </a>
-                    <button
-                      type="button"
-                      onClick={() => pickFromNameResults(r)}
-                      className="rounded-md border border-red-400/60 bg-red-500/10 px-3 py-1.5 text-xs text-red-100 hover:bg-red-500/20"
-                    >
-                      + Rate this
-                    </button>
-                  </div>
-                </li>
-              ))}
+                  See more on Google Maps ↗
+                </a>
+              )}
+            </div>
+            <ul className="grid gap-2 sm:grid-cols-2">
+              {results.map((r) => {
+                const dist = formatDistance(r.distanceMeters)
+                return (
+                  <li
+                    key={r.id}
+                    className="rounded-xl border border-white/10 bg-white/[0.03] p-3"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="font-display text-base text-white">{r.name}</p>
+                      {dist && (
+                        <span className="shrink-0 rounded-md border border-white/15 bg-black/40 px-1.5 py-0.5 font-mono text-[10px] text-white/70">
+                          {dist}
+                        </span>
+                      )}
+                    </div>
+                    {r.cuisine && (
+                      <p className="text-xs uppercase tracking-widest text-red-300/80">
+                        {r.cuisine}
+                      </p>
+                    )}
+                    {r.address && (
+                      <p className="mt-1 text-xs text-white/55">{r.address}</p>
+                    )}
+                    <div className="mt-2 flex gap-2">
+                      <a
+                        href={r.mapsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="rounded-md border border-white/15 px-3 py-1.5 text-xs text-white/80 hover:border-red-400 hover:text-red-200"
+                      >
+                        ↗ Maps
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => pickFromNameResults(r)}
+                        className="rounded-md border border-red-400/60 bg-red-500/10 px-3 py-1.5 text-xs text-red-100 hover:bg-red-500/20"
+                      >
+                        + Rate this
+                      </button>
+                    </div>
+                  </li>
+                )
+              })}
             </ul>
           </div>
+        )}
+
+        {/* Fallback when 0 results — surface Google Maps so the user
+            still has somewhere to look (OSM coverage is uneven). */}
+        {results.length === 0 && fallbackMapsUrl && (
+          <a
+            href={fallbackMapsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block rounded-xl border border-white/10 bg-white/[0.03] p-3 text-center text-sm text-red-300 hover:bg-white/[0.05]"
+          >
+            Open this search in Google Maps ↗
+          </a>
         )}
       </section>
 
