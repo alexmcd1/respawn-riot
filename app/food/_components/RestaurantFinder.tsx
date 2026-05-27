@@ -9,12 +9,22 @@ const CUISINES = [
 ]
 
 type Rating = {
-  id: string         // stable id (timestamp)
+  id: string         // stable id (timestamp or osm id)
   name: string
   cuisine?: string
   stars: number      // 0-10
   note?: string
   ratedAt: number    // epoch ms
+}
+
+type RestaurantResult = {
+  id: string
+  name: string
+  cuisine?: string
+  address?: string
+  lat: number
+  lon: number
+  mapsUrl: string
 }
 
 const LS_KEY = 'respawn.food.ratings.v1'
@@ -39,26 +49,40 @@ function saveRatings(ratings: Rating[]) {
   }
 }
 
+type Coords = { lat: number; lon: number }
+type GeoStatus = 'idle' | 'locating' | 'ok' | 'denied' | 'error'
+
 export default function RestaurantFinder() {
-  // ─── Find restaurants
-  const [cuisine, setCuisine] = useState('Pizza')
-  const [customCuisine, setCustomCuisine] = useState('')
+  // ─── Location (shared across features)
   const [zip, setZip] = useState('')
   const [useExact, setUseExact] = useState(false)
-  const [geoStatus, setGeoStatus] = useState<'idle' | 'locating' | 'ok' | 'denied' | 'error'>('idle')
-  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null)
+  const [geoStatus, setGeoStatus] = useState<GeoStatus>('idle')
+  const [coords, setCoords] = useState<Coords | null>(null)
+
+  // ─── Cuisine search
+  const [cuisine, setCuisine] = useState('Pizza')
+  const [customCuisine, setCustomCuisine] = useState('')
+  const [results, setResults] = useState<RestaurantResult[]>([])
+  const [searching, setSearching] = useState(false)
   const [searchError, setSearchError] = useState('')
 
-  // ─── Ratings
+  // ─── Randomizer pick
+  const [pick, setPick] = useState<RestaurantResult | Rating | null>(null)
+  const [pickKind, setPickKind] = useState<'result' | 'rating' | null>(null)
+
+  // ─── By-name search (for adding ratings)
+  const [nameQuery, setNameQuery] = useState('')
+  const [nameResults, setNameResults] = useState<RestaurantResult[]>([])
+  const [nameSearching, setNameSearching] = useState(false)
+  const [nameError, setNameError] = useState('')
+
+  // ─── Ratings state
   const [ratings, setRatings] = useState<Rating[]>([])
   const [newName, setNewName] = useState('')
   const [newCuisine, setNewCuisine] = useState('')
   const [newStars, setNewStars] = useState(8)
   const [newNote, setNewNote] = useState('')
 
-  // Hydrate from localStorage after mount. Initial state must be [] so
-  // the server and first client render match — then we update to the
-  // saved data. This is the canonical pattern for browser-only state.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setRatings(loadRatings())
@@ -69,58 +93,172 @@ export default function RestaurantFinder() {
     saveRatings(next)
   }
 
-  async function requestLocation() {
-    if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      setGeoStatus('error')
-      return
-    }
-    setGeoStatus('locating')
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude })
-        setGeoStatus('ok')
-      },
-      (err) => {
-        if (err.code === err.PERMISSION_DENIED) setGeoStatus('denied')
-        else setGeoStatus('error')
-        setUseExact(false)
-      },
-      { enableHighAccuracy: true, timeout: 8000 }
-    )
+  // ─── Location helpers
+  async function requestLocation(): Promise<Coords | null> {
+    return new Promise((resolve) => {
+      if (typeof navigator === 'undefined' || !navigator.geolocation) {
+        setGeoStatus('error')
+        resolve(null)
+        return
+      }
+      setGeoStatus('locating')
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const c = { lat: pos.coords.latitude, lon: pos.coords.longitude }
+          setCoords(c)
+          setGeoStatus('ok')
+          resolve(c)
+        },
+        (err) => {
+          if (err.code === err.PERMISSION_DENIED) setGeoStatus('denied')
+          else setGeoStatus('error')
+          setUseExact(false)
+          resolve(null)
+        },
+        { enableHighAccuracy: true, timeout: 8000 }
+      )
+    })
   }
 
   function toggleExact(next: boolean) {
     setUseExact(next)
     setSearchError('')
+    setNameError('')
     if (next && !coords) requestLocation()
   }
 
-  function buildMapsUrl(): string | null {
-    const term = (customCuisine.trim() || cuisine.trim()).trim()
-    if (!term) {
-      setSearchError('Pick a cuisine first')
-      return null
-    }
-    if (useExact && coords) {
-      // Google Maps: query + center/zoom
-      const q = encodeURIComponent(`${term} restaurants`)
-      return `https://www.google.com/maps/search/?api=1&query=${q}&query_place_id=&center=${coords.lat},${coords.lng}`
-    }
-    if (!zip.trim()) {
-      setSearchError('Enter a zip code or flip "use my exact location"')
-      return null
-    }
-    const q = encodeURIComponent(`${term} restaurants near ${zip.trim()}`)
-    return `https://www.google.com/maps/search/?api=1&query=${q}`
+  function locationPayload(): { lat?: number; lon?: number; zip?: string } | null {
+    if (useExact && coords) return { lat: coords.lat, lon: coords.lon }
+    if (useExact) return null // still locating
+    const z = zip.trim()
+    if (z) return { zip: z }
+    return null
   }
 
-  function openSearch(e: React.FormEvent) {
+  // ─── Cuisine search
+  async function doSearch(e: React.FormEvent) {
     e.preventDefault()
     setSearchError('')
-    const url = buildMapsUrl()
-    if (url) window.open(url, '_blank', 'noopener')
+    setPick(null)
+    const term = (customCuisine.trim() || cuisine.trim()).trim()
+    if (!term) return setSearchError('Pick a cuisine first')
+    const loc = locationPayload()
+    if (!loc) return setSearchError('Enter a zip or toggle exact location')
+    setSearching(true)
+    try {
+      const res = await fetch('/api/find-restaurants', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'cuisine', query: term, ...loc }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!data.ok) {
+        setSearchError(typeof data.error === 'string' ? data.error : 'Search failed')
+        setResults([])
+      } else {
+        setResults(data.results ?? [])
+        if ((data.results ?? []).length === 0) {
+          setSearchError(`No matches near you. Try a wider zip or a different cuisine.`)
+        }
+      }
+    } catch {
+      setSearchError('Network error')
+    } finally {
+      setSearching(false)
+    }
   }
 
+  // ─── By-name search
+  async function doNameSearch(e: React.FormEvent) {
+    e.preventDefault()
+    setNameError('')
+    const term = nameQuery.trim()
+    if (!term) return
+    const loc = locationPayload()
+    if (!loc) return setNameError('Set your location above first')
+    setNameSearching(true)
+    try {
+      const res = await fetch('/api/find-restaurants', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'name', query: term, ...loc, limit: 12 }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!data.ok) {
+        setNameError(typeof data.error === 'string' ? data.error : 'Search failed')
+        setNameResults([])
+      } else {
+        setNameResults(data.results ?? [])
+        if ((data.results ?? []).length === 0) {
+          setNameError(`No "${term}" found nearby.`)
+        }
+      }
+    } catch {
+      setNameError('Network error')
+    } finally {
+      setNameSearching(false)
+    }
+  }
+
+  function pickFromNameResults(r: RestaurantResult) {
+    // Auto-fill the rating form so the user just sets stars + saves
+    setNewName(r.address ? `${r.name} — ${r.address}` : r.name)
+    setNewCuisine(r.cuisine ?? '')
+    setNameResults([])
+    setNameQuery('')
+    // Scroll the rating form into view
+    queueMicrotask(() => {
+      const el = document.getElementById('rating-form')
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    })
+  }
+
+  // ─── Randomizer
+  // Pool = current search results + saved ratings. Weight: rated places get
+  // (stars + 1); unrated search results get a baseline of 3 so they're still
+  // discoverable but high-rated favorites win out.
+  function randomize() {
+    type PoolEntry =
+      | { kind: 'result'; item: RestaurantResult; weight: number }
+      | { kind: 'rating'; item: Rating; weight: number }
+    const pool: PoolEntry[] = []
+    for (const r of results) pool.push({ kind: 'result', item: r, weight: 3 })
+    for (const r of ratings) pool.push({ kind: 'rating', item: r, weight: r.stars + 1 })
+    if (pool.length === 0) {
+      setSearchError(
+        'Pick a cuisine and search, or add a rating first — nothing to randomize.'
+      )
+      return
+    }
+    const totalWeight = pool.reduce((s, p) => s + p.weight, 0)
+    let roll = Math.random() * totalWeight
+    let chosen: PoolEntry = pool[0]
+    for (const p of pool) {
+      roll -= p.weight
+      if (roll <= 0) { chosen = p; break }
+    }
+    setPick(chosen.item)
+    setPickKind(chosen.kind)
+  }
+
+  function dismissPick() {
+    setPick(null)
+    setPickKind(null)
+  }
+
+  function ratePickedResult() {
+    if (!pick || pickKind !== 'result') return
+    const r = pick as RestaurantResult
+    setNewName(r.address ? `${r.name} — ${r.address}` : r.name)
+    setNewCuisine(r.cuisine ?? '')
+    dismissPick()
+    queueMicrotask(() => {
+      const el = document.getElementById('rating-form')
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    })
+  }
+
+  // ─── Rating CRUD
   function addRating(e: React.FormEvent) {
     e.preventDefault()
     const name = newName.trim()
@@ -146,110 +284,289 @@ export default function RestaurantFinder() {
 
   function updateStars(id: string, stars: number) {
     persist(
-      ratings.map((r) => (r.id === id ? { ...r, stars: Math.min(10, Math.max(0, stars)) } : r))
+      ratings.map((r) =>
+        r.id === id ? { ...r, stars: Math.min(10, Math.max(0, stars)) } : r
+      )
     )
   }
 
   const sortedRatings = [...ratings].sort((a, b) => b.stars - a.stars || b.ratedAt - a.ratedAt)
 
+  // ─── Render
   return (
     <div className="space-y-8">
       {/* ─── Find restaurants */}
-      <form onSubmit={openSearch} className="space-y-3">
-        <div>
-          <label className="font-display text-[10px] tracking-[0.3em] text-red-300">
-            ▌ CUISINE
-          </label>
-          <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4">
-            {CUISINES.map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => {
-                  setCuisine(c)
-                  setCustomCuisine('')
-                }}
-                className={`rounded-lg border px-2 py-2.5 text-sm transition ${
-                  cuisine === c && !customCuisine
-                    ? 'border-red-400 bg-red-500/15 text-red-100'
-                    : 'border-white/10 bg-black/30 text-white/70 hover:border-white/30'
-                }`}
-              >
-                {c}
-              </button>
-            ))}
-          </div>
-          <input
-            type="text"
-            value={customCuisine}
-            onChange={(e) => setCustomCuisine(e.target.value)}
-            placeholder="…or type a custom cuisine (e.g. Ethiopian)"
-            className="mt-2 w-full rounded-xl border border-white/15 bg-black/40 px-4 py-3 text-sm text-white outline-none placeholder:text-white/35 focus:border-red-400"
-          />
-        </div>
-
-        <div>
-          <label className="font-display text-[10px] tracking-[0.3em] text-red-300">
-            ▌ WHERE
-          </label>
-          <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+      <section className="space-y-3">
+        <form onSubmit={doSearch} className="space-y-3">
+          <div>
+            <label className="font-display text-[10px] tracking-[0.3em] text-red-300">
+              ▌ CUISINE
+            </label>
+            <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4">
+              {CUISINES.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => { setCuisine(c); setCustomCuisine('') }}
+                  className={`rounded-lg border px-2 py-2.5 text-sm transition ${
+                    cuisine === c && !customCuisine
+                      ? 'border-red-400 bg-red-500/15 text-red-100'
+                      : 'border-white/10 bg-black/30 text-white/70 hover:border-white/30'
+                  }`}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
             <input
               type="text"
-              inputMode="numeric"
-              autoComplete="postal-code"
-              value={zip}
-              onChange={(e) => setZip(e.target.value)}
-              disabled={useExact}
-              placeholder="Zip code"
-              className="w-full rounded-xl border border-white/15 bg-black/40 px-4 py-3 text-white outline-none placeholder:text-white/35 focus:border-red-400 disabled:opacity-40"
+              value={customCuisine}
+              onChange={(e) => setCustomCuisine(e.target.value)}
+              placeholder="…or type a custom cuisine (e.g. Ethiopian)"
+              className="mt-2 w-full rounded-xl border border-white/15 bg-black/40 px-4 py-3 text-sm text-white outline-none placeholder:text-white/35 focus:border-red-400"
             />
-            <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white/85 hover:border-white/30">
-              <input
-                type="checkbox"
-                checked={useExact}
-                onChange={(e) => toggleExact(e.target.checked)}
-                className="h-5 w-5 accent-red-500"
-              />
-              Use my exact location
-            </label>
           </div>
-          {useExact && (
-            <p className="mt-2 text-xs text-white/55">
-              {geoStatus === 'locating' && 'Asking your browser for location…'}
-              {geoStatus === 'ok' && coords && `Got it — ${coords.lat.toFixed(3)}, ${coords.lng.toFixed(3)}`}
-              {geoStatus === 'denied' && 'Permission denied — toggle off or change browser settings.'}
-              {geoStatus === 'error' && 'Could not get location — try the zip code instead.'}
+
+          <div>
+            <label className="font-display text-[10px] tracking-[0.3em] text-red-300">
+              ▌ WHERE
+            </label>
+            <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+              <input
+                type="text"
+                inputMode="numeric"
+                autoComplete="postal-code"
+                value={zip}
+                onChange={(e) => setZip(e.target.value)}
+                disabled={useExact}
+                placeholder="Zip code"
+                className="w-full rounded-xl border border-white/15 bg-black/40 px-4 py-3 text-white outline-none placeholder:text-white/35 focus:border-red-400 disabled:opacity-40"
+              />
+              <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white/85 hover:border-white/30">
+                <input
+                  type="checkbox"
+                  checked={useExact}
+                  onChange={(e) => toggleExact(e.target.checked)}
+                  className="h-5 w-5 accent-red-500"
+                />
+                Use my exact location
+              </label>
+            </div>
+            {useExact && (
+              <p className="mt-2 text-xs text-white/55">
+                {geoStatus === 'locating' && 'Asking your browser for location…'}
+                {geoStatus === 'ok' && coords &&
+                  `Got it — ${coords.lat.toFixed(3)}, ${coords.lon.toFixed(3)}`}
+                {geoStatus === 'denied' && 'Permission denied — toggle off or change browser settings.'}
+                {geoStatus === 'error' && 'Could not get location — try the zip code instead.'}
+              </p>
+            )}
+          </div>
+
+          {searchError && (
+            <p className="rounded-xl border border-red-400/40 bg-red-500/10 p-3 text-sm text-red-200">
+              ▲ {searchError}
             </p>
           )}
-        </div>
 
-        {searchError && (
-          <p className="rounded-xl border border-red-400/40 bg-red-500/10 p-3 text-sm text-red-200">
-            ▲ {searchError}
-          </p>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <button
+              type="submit"
+              disabled={searching}
+              className="flex-1 rounded-xl bg-red-500 px-6 py-3 font-display text-base tracking-[0.25em] text-white transition hover:bg-red-400 disabled:opacity-50"
+            >
+              {searching ? 'SEARCHING…' : '🔍 SEARCH'}
+            </button>
+            <button
+              type="button"
+              onClick={randomize}
+              className="rounded-xl border-2 border-yellow-400 bg-black px-6 py-3 font-display text-base tracking-[0.25em] text-yellow-300 transition hover:bg-yellow-400/10"
+            >
+              🎲 PICK FOR ME
+            </button>
+          </div>
+        </form>
+
+        {/* Randomizer result */}
+        {pick && (
+          <div className="rounded-2xl border-2 border-yellow-400/60 bg-gradient-to-br from-yellow-500/15 via-orange-500/5 to-transparent p-5 text-center">
+            <p className="font-display text-[10px] tracking-[0.3em] text-yellow-300">
+              ▌ TONIGHT YOU&apos;RE GOING TO…
+            </p>
+            <p className="mt-2 font-display text-2xl tracking-wide text-white sm:text-3xl">
+              {pick.name}
+            </p>
+            {pickKind === 'rating' && (
+              <p className="mt-1 text-sm text-yellow-200/85">
+                ★ {(pick as Rating).stars}/10 — your past pick
+                {(pick as Rating).cuisine ? ` · ${(pick as Rating).cuisine}` : ''}
+              </p>
+            )}
+            {pickKind === 'result' && (
+              <p className="mt-1 text-sm text-white/75">
+                {(pick as RestaurantResult).cuisine ?? 'Restaurant'}
+                {(pick as RestaurantResult).address
+                  ? ` · ${(pick as RestaurantResult).address}`
+                  : ''}
+              </p>
+            )}
+            <div className="mt-4 flex flex-wrap justify-center gap-2">
+              {pickKind === 'result' && (
+                <>
+                  <a
+                    href={(pick as RestaurantResult).mapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-lg bg-yellow-400 px-4 py-2 font-display text-xs tracking-[0.2em] text-black hover:bg-yellow-300"
+                  >
+                    → MAPS
+                  </a>
+                  <button
+                    type="button"
+                    onClick={ratePickedResult}
+                    className="rounded-lg border border-white/30 px-4 py-2 font-display text-xs tracking-[0.2em] text-white hover:bg-white/10"
+                  >
+                    + RATE IT
+                  </button>
+                </>
+              )}
+              <button
+                type="button"
+                onClick={randomize}
+                className="rounded-lg border border-white/30 px-4 py-2 font-display text-xs tracking-[0.2em] text-white hover:bg-white/10"
+              >
+                🎲 AGAIN
+              </button>
+              <button
+                type="button"
+                onClick={dismissPick}
+                className="rounded-lg border border-white/15 px-4 py-2 font-display text-xs tracking-[0.2em] text-white/60 hover:bg-white/5"
+              >
+                DISMISS
+              </button>
+            </div>
+          </div>
         )}
 
-        <button
-          type="submit"
-          className="w-full rounded-xl bg-red-500 px-6 py-3 font-display text-base tracking-[0.25em] text-white transition hover:bg-red-400"
-        >
-          🍴 OPEN IN GOOGLE MAPS
-        </button>
-      </form>
+        {/* Cuisine search results */}
+        {results.length > 0 && (
+          <div className="mt-3 space-y-2">
+            <p className="text-xs text-white/55">
+              {results.length} {results.length === 1 ? 'spot' : 'spots'} nearby — via OpenStreetMap
+            </p>
+            <ul className="grid gap-2 sm:grid-cols-2">
+              {results.map((r) => (
+                <li
+                  key={r.id}
+                  className="rounded-xl border border-white/10 bg-white/[0.03] p-3"
+                >
+                  <p className="font-display text-base text-white">{r.name}</p>
+                  {r.cuisine && (
+                    <p className="text-xs uppercase tracking-widest text-red-300/80">
+                      {r.cuisine}
+                    </p>
+                  )}
+                  {r.address && (
+                    <p className="mt-1 text-xs text-white/55">{r.address}</p>
+                  )}
+                  <div className="mt-2 flex gap-2">
+                    <a
+                      href={r.mapsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-md border border-white/15 px-3 py-1.5 text-xs text-white/80 hover:border-red-400 hover:text-red-200"
+                    >
+                      ↗ Maps
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => pickFromNameResults(r)}
+                      className="rounded-md border border-red-400/60 bg-red-500/10 px-3 py-1.5 text-xs text-red-100 hover:bg-red-500/20"
+                    >
+                      + Rate this
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </section>
 
       {/* ─── Ratings */}
-      <div className="space-y-3">
-        <h3 className="font-display text-xl tracking-wide">
-          Places I&apos;ve been
-        </h3>
-        <p className="text-xs text-white/55">
-          Saved locally on this device. Up to 10 stars. Tap a star to set.
-        </p>
+      <section className="space-y-3">
+        <div>
+          <h3 className="font-display text-xl tracking-wide">
+            Places I&apos;ve been
+          </h3>
+          <p className="text-xs text-white/55">
+            Saved locally on this device. Up to 10 stars. Tap a star to set.
+          </p>
+        </div>
 
+        {/* Quick add: search by name */}
         <form
+          onSubmit={doNameSearch}
+          className="rounded-2xl border border-white/10 bg-black/20 p-3"
+        >
+          <label className="font-display text-[10px] tracking-[0.3em] text-red-300">
+            ▌ FIND A PLACE BY NAME
+          </label>
+          <div className="mt-2 flex gap-2">
+            <input
+              type="text"
+              value={nameQuery}
+              onChange={(e) => setNameQuery(e.target.value)}
+              placeholder='e.g. "McDonalds", "Chipotle"'
+              className="flex-1 rounded-lg border border-white/15 bg-black/40 px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/35 focus:border-red-400"
+            />
+            <button
+              type="submit"
+              disabled={nameSearching}
+              className="rounded-lg border border-red-400/60 px-4 py-2.5 font-display text-sm tracking-[0.2em] text-red-200 hover:bg-red-500/10 disabled:opacity-50"
+            >
+              {nameSearching ? '…' : 'FIND'}
+            </button>
+          </div>
+          {nameError && (
+            <p className="mt-2 text-xs text-red-200/85">▲ {nameError}</p>
+          )}
+          {nameResults.length > 0 && (
+            <ul className="mt-3 space-y-1.5">
+              {nameResults.map((r) => (
+                <li
+                  key={r.id}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-black/40 p-2.5"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm text-white">{r.name}</p>
+                    <p className="truncate text-xs text-white/55">
+                      {[r.cuisine, r.address].filter(Boolean).join(' · ') || 'Restaurant'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => pickFromNameResults(r)}
+                    aria-label={`Add ${r.name}`}
+                    className="shrink-0 rounded-md border border-red-400/60 bg-red-500/10 px-3 py-1.5 text-xs text-red-100 hover:bg-red-500/20"
+                  >
+                    ✓ THIS ONE
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </form>
+
+        {/* Manual rating form */}
+        <form
+          id="rating-form"
           onSubmit={addRating}
           className="space-y-2 rounded-2xl border border-white/10 bg-black/30 p-3"
         >
+          <p className="font-display text-[10px] tracking-[0.3em] text-red-300">
+            ▌ OR ADD MANUALLY
+          </p>
           <input
             type="text"
             value={newName}
@@ -285,7 +602,7 @@ export default function RestaurantFinder() {
 
         {sortedRatings.length === 0 ? (
           <p className="rounded-xl border border-dashed border-white/15 p-6 text-center text-sm text-white/45">
-            No ratings yet. Add a spot above.
+            No ratings yet. Search for a spot above, or add one manually.
           </p>
         ) : (
           <ul className="space-y-2">
@@ -324,7 +641,7 @@ export default function RestaurantFinder() {
             ))}
           </ul>
         )}
-      </div>
+      </section>
     </div>
   )
 }

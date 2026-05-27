@@ -13,9 +13,10 @@ const COMMON_INGREDIENTS = [
   'Chicken', 'Beef', 'Pork', 'Fish', 'Bacon', 'Mushroom',
 ]
 
-const MAX_INGREDIENTS = 6 // intersection gets thin fast above this
+const MAX_INGREDIENTS = 8 // we rank by match-count now, so more is fine
 
 type MealLite = { idMeal: string; strMeal: string; strMealThumb: string }
+type RankedMeal = MealLite & { matched: string[]; matchCount: number }
 type MealFull = MealLite & {
   strInstructions?: string | null
   strSource?: string | null
@@ -73,7 +74,8 @@ export default function IngredientFinder() {
   const [customExtras, setCustomExtras] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [results, setResults] = useState<MealLite[] | null>(null)
+  const [results, setResults] = useState<RankedMeal[] | null>(null)
+  const [totalSearched, setTotalSearched] = useState(0)
   const [expanded, setExpanded] = useState<Record<string, MealFull | 'loading' | null>>({})
 
   const total = selected.size + customExtras.length
@@ -120,27 +122,38 @@ export default function IngredientFinder() {
       return
     }
     if (all.length > MAX_INGREDIENTS) {
-      setError(`Try ${MAX_INGREDIENTS} or fewer — too many ingredients = no matches`)
+      setError(`Try ${MAX_INGREDIENTS} or fewer at a time`)
       return
     }
     setLoading(true)
+    setTotalSearched(all.length)
     try {
+      // Fetch matching meals for each ingredient, then RANK by how many
+      // selected ingredients each meal contains. (Was strict-intersection,
+      // which returned almost nothing once you picked >2 ingredients since
+      // TheMealDB has a small catalog.)
       const lists = await Promise.all(all.map((n) => fetchMealsByIngredient(n)))
-      // Intersect by idMeal — meals that contain ALL selected ingredients
-      const byId = new Map<string, MealLite>()
-      const firstList = lists[0]
-      if (!firstList || firstList.length === 0) {
-        setResults([])
-        return
-      }
-      for (const m of firstList) byId.set(m.idMeal, m)
-      for (let i = 1; i < lists.length; i++) {
-        const ids = new Set(lists[i].map((m) => m.idMeal))
-        for (const id of byId.keys()) {
-          if (!ids.has(id)) byId.delete(id)
+      const ranked = new Map<string, RankedMeal>()
+      lists.forEach((list, i) => {
+        const ingredientName = all[i]
+        for (const m of list) {
+          const existing = ranked.get(m.idMeal)
+          if (existing) {
+            if (!existing.matched.includes(ingredientName)) {
+              existing.matched.push(ingredientName)
+              existing.matchCount = existing.matched.length
+            }
+          } else {
+            ranked.set(m.idMeal, { ...m, matched: [ingredientName], matchCount: 1 })
+          }
         }
-      }
-      setResults([...byId.values()].slice(0, 12))
+      })
+      const sorted = [...ranked.values()].sort((a, b) => {
+        // Most matches first, ties broken by name for stability
+        if (b.matchCount !== a.matchCount) return b.matchCount - a.matchCount
+        return a.strMeal.localeCompare(b.strMeal)
+      })
+      setResults(sorted.slice(0, 18))
     } finally {
       setLoading(false)
     }
@@ -262,7 +275,7 @@ export default function IngredientFinder() {
         <div className="space-y-3">
           {results.length === 0 ? (
             <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-center text-sm text-white/65">
-              No recipes match all those ingredients. Try fewer.
+              No recipes match any of those ingredients in TheMealDB.
               <a
                 href={`https://www.google.com/search?q=recipes+with+${encodeURIComponent(
                   [...selected, ...customExtras].join(' ')
@@ -276,18 +289,28 @@ export default function IngredientFinder() {
             </div>
           ) : (
             <>
-              <p className="text-xs text-white/55">
-                {results.length} recipe{results.length === 1 ? '' : 's'} match — via TheMealDB.
-              </p>
+              <div className="flex flex-wrap items-end justify-between gap-2">
+                <p className="text-xs text-white/55">
+                  {results.length} recipe{results.length === 1 ? '' : 's'} ranked by ingredient match — via TheMealDB.
+                </p>
+                {results[0]?.matchCount < totalSearched && (
+                  <p className="text-[11px] text-amber-300/80">
+                    No recipe has ALL {totalSearched} — showing best matches.
+                  </p>
+                )}
+              </div>
               <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {results.map((meal) => {
                   const ex = expanded[meal.idMeal]
                   const isLoading = ex === 'loading'
                   const isOpen = ex && ex !== 'loading'
+                  const perfect = meal.matchCount === totalSearched
                   return (
                     <li
                       key={meal.idMeal}
-                      className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]"
+                      className={`overflow-hidden rounded-2xl border bg-white/[0.03] ${
+                        perfect ? 'border-emerald-400/50' : 'border-white/10'
+                      }`}
                     >
                       <button
                         type="button"
@@ -302,14 +325,28 @@ export default function IngredientFinder() {
                             loading="lazy"
                             className="h-full w-full object-cover opacity-90"
                           />
+                          <span
+                            className={`absolute right-2 top-2 rounded border px-2 py-0.5 font-display text-[10px] tracking-[0.2em] ${
+                              perfect
+                                ? 'border-emerald-400/60 bg-emerald-500/15 text-emerald-200'
+                                : 'border-red-400/50 bg-black/70 text-red-200'
+                            }`}
+                          >
+                            {meal.matchCount}/{totalSearched}
+                          </span>
                         </div>
-                        <div className="flex items-center justify-between gap-2 p-3">
-                          <span className="font-display text-sm tracking-wide text-white">
-                            {meal.strMeal}
-                          </span>
-                          <span className="font-display text-[10px] tracking-[0.25em] text-red-300">
-                            {isOpen ? 'HIDE' : isLoading ? '…' : 'VIEW'}
-                          </span>
+                        <div className="p-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-display text-sm tracking-wide text-white">
+                              {meal.strMeal}
+                            </span>
+                            <span className="font-display text-[10px] tracking-[0.25em] text-red-300">
+                              {isOpen ? 'HIDE' : isLoading ? '…' : 'VIEW'}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-[11px] leading-snug text-white/55">
+                            Has: {meal.matched.join(', ')}
+                          </p>
                         </div>
                       </button>
 
