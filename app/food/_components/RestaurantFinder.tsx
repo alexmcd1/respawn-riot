@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { RATINGS_EVENT, RATINGS_KEY } from '../_lib/backup'
 
 const CUISINES = [
   'Pizza', 'Sushi', 'Burgers', 'Tacos', 'Chinese', 'Thai',
@@ -27,12 +28,10 @@ type RestaurantResult = {
   mapsUrl: string
 }
 
-const LS_KEY = 'respawn.food.ratings.v1'
-
 function loadRatings(): Rating[] {
   if (typeof window === 'undefined') return []
   try {
-    const raw = localStorage.getItem(LS_KEY)
+    const raw = localStorage.getItem(RATINGS_KEY)
     if (!raw) return []
     const parsed = JSON.parse(raw)
     return Array.isArray(parsed) ? (parsed as Rating[]) : []
@@ -43,7 +42,9 @@ function loadRatings(): Rating[] {
 
 function saveRatings(ratings: Rating[]) {
   try {
-    localStorage.setItem(LS_KEY, JSON.stringify(ratings))
+    localStorage.setItem(RATINGS_KEY, JSON.stringify(ratings))
+    // Tell other listeners (Backup panel, etc.) the ratings changed
+    window.dispatchEvent(new CustomEvent(RATINGS_EVENT))
   } catch {
     // localStorage full or disabled — silently fail
   }
@@ -84,8 +85,12 @@ export default function RestaurantFinder() {
   const [newNote, setNewNote] = useState('')
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setRatings(loadRatings())
+    // Hydrate from localStorage on mount and refresh whenever something
+    // else mutates ratings (e.g. an Import via the Backup panel).
+    const refresh = () => setRatings(loadRatings())
+    refresh()
+    window.addEventListener(RATINGS_EVENT, refresh)
+    return () => window.removeEventListener(RATINGS_EVENT, refresh)
   }, [])
 
   function persist(next: Rating[]) {

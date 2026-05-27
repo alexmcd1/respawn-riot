@@ -3,6 +3,7 @@ import RecipeParser from "./_components/RecipeParser";
 import RestaurantFinder from "./_components/RestaurantFinder";
 import IngredientFinder from "./_components/IngredientFinder";
 import MyRecipes from "./_components/MyRecipes";
+import BackupPanel from "./_components/BackupPanel";
 
 export const metadata: Metadata = {
   title: "Food — Respawn Riot",
@@ -149,6 +150,13 @@ export default function FoodPage() {
             </p>
           </div>
           <MyRecipes />
+
+          {/* Backup & Restore — sits at the bottom of the page, just
+              above the footer. Single panel covers BOTH recipes +
+              ratings in one file. */}
+          <div className="mt-10">
+            <BackupPanel />
+          </div>
         </div>
       </section>
 
