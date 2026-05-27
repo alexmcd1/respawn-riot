@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { scaleIngredient } from '../_lib/scale'
+import { transformIngredient, type System } from '../_lib/units'
 
 type ParsedRecipe = {
   name?: string
@@ -23,6 +23,7 @@ export default function RecipeParser() {
   const [error, setError] = useState('')
   const [recipe, setRecipe] = useState<ParsedRecipe | null>(null)
   const [scale, setScale] = useState(1)
+  const [system, setSystem] = useState<System>('as-written')
 
   async function loadFromUrl(e: React.FormEvent) {
     e.preventDefault()
@@ -68,8 +69,8 @@ export default function RecipeParser() {
 
   const scaledIngredients = useMemo(() => {
     if (!recipe) return []
-    return recipe.ingredients.map((line) => scaleIngredient(line, scale))
-  }, [recipe, scale])
+    return recipe.ingredients.map((line) => transformIngredient(line, scale, system))
+  }, [recipe, scale, system])
 
   return (
     <div className="space-y-4">
@@ -191,31 +192,63 @@ export default function RecipeParser() {
             </a>
           )}
 
-          {/* Scale picker — big touch targets for mobile */}
-          <div className="mt-5 rounded-xl border border-white/10 bg-black/40 p-3">
-            <p className="font-display text-[10px] tracking-[0.3em] text-red-300">
-              ▌ SCALE
-              {recipe.yield && (
-                <span className="ml-2 text-white/40">
-                  base: {recipe.yield}
-                </span>
-              )}
-            </p>
-            <div className="mt-2 grid grid-cols-4 gap-2">
-              {[1, 2, 3, 4].map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => setScale(n)}
-                  className={`rounded-lg border py-3 font-display text-lg tracking-widest transition ${
-                    scale === n
-                      ? 'border-red-400 bg-red-500/20 text-red-100'
-                      : 'border-white/15 bg-black/30 text-white/70 hover:border-white/30'
-                  }`}
-                >
-                  {n}×
-                </button>
-              ))}
+          {/* Scale + Units pickers — big touch targets for mobile */}
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-xl border border-white/10 bg-black/40 p-3">
+              <p className="font-display text-[10px] tracking-[0.3em] text-red-300">
+                ▌ SCALE
+                {recipe.yield && (
+                  <span className="ml-2 text-white/40">
+                    base: {recipe.yield}
+                  </span>
+                )}
+              </p>
+              <div className="mt-2 grid grid-cols-4 gap-2">
+                {[1, 2, 3, 4].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setScale(n)}
+                    className={`rounded-lg border py-3 font-display text-lg tracking-widest transition ${
+                      scale === n
+                        ? 'border-red-400 bg-red-500/20 text-red-100'
+                        : 'border-white/15 bg-black/30 text-white/70 hover:border-white/30'
+                    }`}
+                  >
+                    {n}×
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-white/10 bg-black/40 p-3">
+              <p className="font-display text-[10px] tracking-[0.3em] text-red-300">
+                ▌ UNITS
+              </p>
+              <div className="mt-2 grid grid-cols-3 gap-2">
+                {[
+                  { v: 'as-written' as System, label: 'AS-IS' },
+                  { v: 'metric' as System,     label: 'g · ml' },
+                  { v: 'imperial' as System,   label: 'oz · cup' },
+                ].map((opt) => (
+                  <button
+                    key={opt.v}
+                    type="button"
+                    onClick={() => setSystem(opt.v)}
+                    aria-pressed={system === opt.v}
+                    className={`rounded-lg border py-3 font-display text-xs tracking-widest transition ${
+                      system === opt.v
+                        ? 'border-red-400 bg-red-500/20 text-red-100'
+                        : 'border-white/15 bg-black/30 text-white/70 hover:border-white/30'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-[10px] text-white/40">
+                Lines without a unit (e.g. &quot;3 eggs&quot;) stay as-is.
+              </p>
             </div>
           </div>
 
