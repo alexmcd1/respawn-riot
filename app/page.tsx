@@ -58,6 +58,15 @@ const sections = [
     border: "hover:border-red-400/60",
     chip: "text-red-300",
   },
+  {
+    href: "/math.html",
+    tag: "Math",
+    title: "Flashcards · Grades 5–8",
+    body: "Practice problems by grade, with calculator, scratch paper, and a streak tracker for the gamification.",
+    accent: "from-emerald-500/20 to-transparent",
+    border: "hover:border-emerald-400/60",
+    chip: "text-emerald-300",
+  },
 ] as const;
 
 export default function Home() {
@@ -200,11 +209,12 @@ export default function Home() {
             PICK YOUR SCENE.
           </h2>
 
-          <div className="mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+          <div className="mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {sections.map((s) => (
               <Link
                 key={s.href}
                 href={s.href}
+                prefetch={s.href.endsWith('.html') ? false : undefined}
                 className={`group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-6 transition ${s.border} hover:bg-white/[0.06]`}
               >
                 <div
