@@ -23,6 +23,7 @@ const links: NavLink[] = [
   { href: '/orlando',       label: 'Orlando',  text: 'text-orange-300',    glow: 'hover:border-orange-400 hover:text-orange-300 shadow-orange-500/40', num: '06' },
   { href: '/quest-list',    label: 'Quests',   text: 'text-violet-300',    glow: 'hover:border-violet-400 hover:text-violet-300 shadow-violet-500/40', num: '07' },
   { href: '/food',          label: 'Food',     text: 'text-red-300',       glow: 'hover:border-red-400 hover:text-red-300 shadow-red-500/40',          num: '08' },
+  { href: '/math.html',     label: 'Math',     text: 'text-emerald-300',   glow: 'hover:border-emerald-400 hover:text-emerald-300 shadow-emerald-500/40', num: '09' },
 ]
 
 const tickerItems = [
@@ -32,7 +33,8 @@ const tickerItems = [
   '◢ RC — RESPAWN CREATURES DEVLOG',
   '☼ ORLANDO LIVE WEATHER + PARK NEWS',
   '⚔ QUESTLIST BY KID_GHOST',
-  '🍴 NEW — FOOD CHANNEL: PARSE · EAT OUT · FRIDGE',
+  '🍴 FOOD CHANNEL: RECIPES · EAT OUT · IN THE HOUSE',
+  '➕ NEW — MATH FLASHCARDS · GRADES 5–8',
   '⚡ JOIN THE RIOT',
 ]
 
@@ -83,10 +85,14 @@ export default function NavBar() {
           <nav className="hidden items-center gap-1.5 lg:flex">
             {links.map((l) => {
               const active = isActive(l.href)
+              // Static asset targets (e.g. /math.html) aren't Next.js routes,
+              // so skip the prefetch attempt (would 404).
+              const isStatic = l.href.endsWith('.html')
               return (
                 <Link
                   key={l.href}
                   href={l.href}
+                  prefetch={isStatic ? false : undefined}
                   className={[
                     'neon-btn group relative inline-flex items-center gap-2 rounded-md border bg-black/40 px-3 py-2 font-display text-[15px] tracking-[0.18em] uppercase shadow-[0_0_0_0_currentColor]',
                     'border-white/15',
@@ -129,10 +135,12 @@ export default function NavBar() {
           <nav className="relative grid grid-cols-2 gap-2 border-t border-fuchsia-500/30 px-4 pb-4 pt-3 lg:hidden">
             {links.map((l) => {
               const active = isActive(l.href)
+              const isStatic = l.href.endsWith('.html')
               return (
                 <Link
                   key={l.href}
                   href={l.href}
+                  prefetch={isStatic ? false : undefined}
                   onClick={() => setOpen(false)}
                   className={[
                     'neon-btn flex items-center justify-between rounded-md border bg-black/40 px-3 py-2 font-display text-[15px] tracking-[0.2em] uppercase',
