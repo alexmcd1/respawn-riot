@@ -1,7 +1,16 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy-init so the build's page-data collection phase (which runs
+// without runtime env vars) doesn't crash with 'Missing API key'.
+// Resend's constructor throws if the key is falsy at construction time.
+let _resend: Resend | null = null;
+function resend(): Resend {
+  if (!_resend) {
+    _resend = new Resend(process.env.RESEND_API_KEY);
+  }
+  return _resend;
+}
 
 // Cache the audience ID at the module level so we don't list/create on every request.
 let cachedAudienceId: string | null = null;
@@ -9,14 +18,14 @@ let cachedAudienceId: string | null = null;
 async function getAudienceId(): Promise<string | null> {
   if (cachedAudienceId) return cachedAudienceId;
 
-  const list = await resend.audiences.list();
+  const list = await resend().audiences.list();
   const first = list.data?.data?.[0];
   if (first?.id) {
     cachedAudienceId = first.id;
     return first.id;
   }
 
-  const created = await resend.audiences.create({ name: "Riot" });
+  const created = await resend().audiences.create({ name: "Riot" });
   if (created.data?.id) {
     cachedAudienceId = created.data.id;
     return created.data.id;
@@ -80,7 +89,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = await resend.contacts.create({
+    const result = await resend().contacts.create({
       email,
       audienceId,
       unsubscribed: false,
