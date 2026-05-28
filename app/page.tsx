@@ -59,7 +59,7 @@ const sections = [
     chip: "text-red-300",
   },
   {
-    href: "/math.html",
+    href: "/math",
     tag: "Math",
     title: "Flashcards · Grades 5–8",
     body: "Practice problems by grade, with calculator, scratch paper, and a streak tracker for the gamification.",
