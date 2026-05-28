@@ -145,18 +145,31 @@
   .option.correct { background: #d4edda; border-color: #28a745; color: #155724; }
   .option.wrong { background: #f8d7da; border-color: #dc3545; color: #721c24; }
   .option:disabled { cursor: not-allowed; }
-  .numeric-input-row { display: flex; gap: 8px; align-items: stretch; }
+  .numeric-input-row { display: flex; gap: 8px; align-items: stretch; min-width: 0; }
   .numeric-input {
-    flex: 1; padding: 14px 18px; border: 2px solid #ecf0f1; border-radius: 12px;
+    flex: 1; min-width: 0;
+    padding: 14px 18px; border: 2px solid #ecf0f1; border-radius: 12px;
     font-size: 18px; font-family: "Consolas", monospace;
   }
   .numeric-input:focus { outline: none; border-color: #667eea; }
   .submit-btn {
+    flex-shrink: 0;
     padding: 14px 24px; background: #667eea; color: white; border: none;
     border-radius: 12px; font-size: 16px; cursor: pointer; font-weight: 600; font-family: inherit;
   }
   .submit-btn:hover { background: #5568d3; }
   .input-hint { font-size: 12px; color: #7f8c8d; margin-top: 4px; }
+  /* Mobile: tighter padding so we don't lose horizontal real estate,
+     smaller submit button so it stays on-screen on narrow iPhones. */
+  @media (max-width: 600px) {
+    body { padding: 12px; }
+    .submit-btn { padding: 14px 16px; font-size: 14px; }
+    .numeric-input { padding: 14px 14px; font-size: 16px; }
+  }
+  @media (max-width: 380px) {
+    .numeric-input-row { flex-direction: column; }
+    .submit-btn { width: 100%; }
+  }
   .feedback { padding: 16px; border-radius: 12px; font-size: 15px; line-height: 1.5; display: none; }
   .feedback.show { display: block; }
   .feedback.right { background: #d4edda; color: #155724; border-left: 4px solid #28a745; }
@@ -831,7 +844,7 @@ function renderAnswerArea(q) {
   } else {
     area.innerHTML = `
       <div class="numeric-input-row">
-        <input type="text" class="numeric-input" id="numInput" placeholder="Type your answer..." autocomplete="off" spellcheck="false">
+        <input type="text" class="numeric-input" id="numInput" placeholder="Type your answer..." autocomplete="off" spellcheck="false" inputmode="decimal" autocapitalize="off">
         <button class="submit-btn" onclick="submitNumeric()">Submit</button>
       </div>
       <div class="input-hint">${q.isFraction ? "Type as a fraction (e.g. 3/4) or decimal (0.75)." : "Type a number. Decimals OK."}</div>`;
@@ -960,7 +973,13 @@ function updateCalc() {
 function calcPress(k) {
   if (k==="C") { calcDisp="0"; calcPrev=""; calcOp=null; calcPrevValue=null; }
   else if (/[0-9]/.test(k)) { if (calcDisp==="0"||calcJustEvald) { calcDisp=k; calcJustEvald=false; } else calcDisp+=k; }
-  else if (k===".") { if (!calcDisp.includes(".")) calcDisp+="."; }
+  else if (k===".") {
+    // After =/operator, calcJustEvald is true — start a fresh "0." so
+    // the next digit appends to a decimal instead of replacing the
+    // whole display (the .15 × 88 bug).
+    if (calcJustEvald) { calcDisp = "0."; calcJustEvald = false; }
+    else if (!calcDisp.includes(".")) calcDisp += ".";
+  }
   else if (k==="±") { calcDisp = String(-parseFloat(calcDisp)); }
   else if (k==="%") { calcDisp = String(parseFloat(calcDisp)/100); }
   else if (["+","−","×","÷"].includes(k)) {
