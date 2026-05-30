@@ -4,8 +4,8 @@ import { useState } from 'react'
 import SaveRecipeButton from './SaveRecipeButton'
 
 // Top 30 most-common ingredients across home cooking, grouped so the
-// picker reads at a glance. Strings are display names; we lowercase +
-// underscore-ify when querying TheMealDB's filter endpoint.
+// picker reads at a glance. These names get sent to the server route
+// which forwards to Spoonacular (primary) or TheMealDB (fallback).
 const INGREDIENT_CATEGORIES: { label: string; emoji: string; items: string[] }[] = [
   {
     label: 'Pantry',
@@ -37,58 +37,34 @@ const INGREDIENT_CATEGORIES: { label: string; emoji: string; items: string[] }[]
 const MAX_INCLUDE = 10
 const MAX_EXCLUDE = 6
 
-type MealLite = { idMeal: string; strMeal: string; strMealThumb: string }
-type RankedMeal = MealLite & { matched: string[]; matchCount: number }
-type MealFull = MealLite & {
-  strInstructions?: string | null
-  strSource?: string | null
-  strYoutube?: string | null
-  strArea?: string | null
-  strCategory?: string | null
-  // strIngredient1..20 + strMeasure1..20
-  [key: string]: string | null | undefined
+// Server returns ids prefixed with "s/" (Spoonacular) or "m/" (TheMealDB).
+type RecipeResult = {
+  id: string
+  title: string
+  image?: string
+  matched?: string[]
+  matchCount?: number
+  source: 'spoonacular' | 'mealdb'
+  sourceUrl?: string
+  summary?: string
+  usedIngredientCount?: number
+  missedIngredientCount?: number
 }
 
-function toSlug(name: string): string {
-  return name.trim().toLowerCase().replace(/\s+/g, '_')
+type RecipeDetails = {
+  id: string
+  title: string
+  image?: string
+  ingredients: string[]
+  instructions: string[]
+  sourceUrl?: string
+  videoUrl?: string
+  area?: string
+  category?: string
+  source: 'spoonacular' | 'mealdb'
 }
 
-async function fetchMealsByIngredient(name: string): Promise<MealLite[]> {
-  const slug = toSlug(name)
-  const url = `https://www.themealdb.com/api/json/v1/1/filter.php?i=${encodeURIComponent(slug)}`
-  try {
-    const res = await fetch(url)
-    if (!res.ok) return []
-    const data = await res.json()
-    return Array.isArray(data?.meals) ? (data.meals as MealLite[]) : []
-  } catch {
-    return []
-  }
-}
-
-async function fetchMealById(id: string): Promise<MealFull | null> {
-  try {
-    const res = await fetch(`https://www.themealdb.com/api/json/v1/1/lookup.php?i=${id}`)
-    if (!res.ok) return null
-    const data = await res.json()
-    const meal = Array.isArray(data?.meals) ? (data.meals[0] as MealFull) : null
-    return meal ?? null
-  } catch {
-    return null
-  }
-}
-
-// Pull "1 cup" + "flour" pairs from the goofy strIngredient1..20 / strMeasure1..20 shape
-function extractIngredients(meal: MealFull): string[] {
-  const out: string[] = []
-  for (let i = 1; i <= 20; i++) {
-    const name = (meal[`strIngredient${i}`] ?? '').toString().trim()
-    const measure = (meal[`strMeasure${i}`] ?? '').toString().trim()
-    if (!name) continue
-    out.push(measure ? `${measure} ${name}` : name)
-  }
-  return out
-}
+type SearchSource = 'spoonacular' | 'mealdb' | 'mealdb-fallback' | null
 
 export default function IngredientFinder() {
   // INCLUDE list (what you have on hand)
@@ -103,10 +79,13 @@ export default function IngredientFinder() {
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [results, setResults] = useState<RankedMeal[] | null>(null)
+  const [results, setResults] = useState<RecipeResult[] | null>(null)
   const [totalSearched, setTotalSearched] = useState(0)
   const [totalExcluded, setTotalExcluded] = useState(0)
-  const [expanded, setExpanded] = useState<Record<string, MealFull | 'loading' | null>>({})
+  const [searchSource, setSearchSource] = useState<SearchSource>(null)
+  const [expanded, setExpanded] = useState<
+    Record<string, RecipeDetails | 'loading' | null>
+  >({})
 
   const totalInclude = selected.size + customExtras.length
   const totalExclude = excluded.size + excludeExtras.length
@@ -179,6 +158,7 @@ export default function IngredientFinder() {
     setResults(null)
     setExpanded({})
     setError('')
+    setSearchSource(null)
   }
 
   async function findRecipes() {
@@ -202,58 +182,69 @@ export default function IngredientFinder() {
     setTotalSearched(include.length)
     setTotalExcluded(exclude.length)
     try {
-      // Fetch in parallel: include lists for ranking + exclude lists for filtering
-      const [includeLists, excludeLists] = await Promise.all([
-        Promise.all(include.map((n) => fetchMealsByIngredient(n))),
-        Promise.all(exclude.map((n) => fetchMealsByIngredient(n))),
-      ])
-
-      // Rank by match count across include lists
-      const ranked = new Map<string, RankedMeal>()
-      includeLists.forEach((list, i) => {
-        const ingredientName = include[i]
-        for (const m of list) {
-          const existing = ranked.get(m.idMeal)
-          if (existing) {
-            if (!existing.matched.includes(ingredientName)) {
-              existing.matched.push(ingredientName)
-              existing.matchCount = existing.matched.length
-            }
-          } else {
-            ranked.set(m.idMeal, { ...m, matched: [ingredientName], matchCount: 1 })
-          }
-        }
+      const res = await fetch('/api/find-recipes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ include, exclude, limit: 18 }),
       })
-
-      // Build exclude set of meal IDs to filter out
-      const blockedIds = new Set<string>()
-      for (const list of excludeLists) {
-        for (const m of list) blockedIds.add(m.idMeal)
+      const data = await res.json().catch(() => ({} as Record<string, unknown>))
+      if (!res.ok || data.ok !== true) {
+        setError(typeof data.error === 'string' ? data.error : 'Search failed')
+        setResults([])
+        setSearchSource(null)
+        return
       }
-      for (const id of blockedIds) ranked.delete(id)
-
-      const sorted = [...ranked.values()].sort((a, b) => {
-        if (b.matchCount !== a.matchCount) return b.matchCount - a.matchCount
-        return a.strMeal.localeCompare(b.strMeal)
-      })
-      setResults(sorted.slice(0, 18))
+      setResults(Array.isArray(data.results) ? (data.results as RecipeResult[]) : [])
+      setSearchSource((data.source as SearchSource) ?? null)
+    } catch {
+      setError('Network error — try again')
+      setResults([])
+      setSearchSource(null)
     } finally {
       setLoading(false)
     }
   }
 
-  async function expandResult(meal: MealLite) {
+  async function expandResult(meal: RecipeResult) {
     setExpanded((prev) => {
       // Collapse if already open
-      if (prev[meal.idMeal] && prev[meal.idMeal] !== 'loading') {
+      if (prev[meal.id] && prev[meal.id] !== 'loading') {
         const next = { ...prev }
-        next[meal.idMeal] = null
+        next[meal.id] = null
         return next
       }
-      return { ...prev, [meal.idMeal]: 'loading' }
+      return { ...prev, [meal.id]: 'loading' }
     })
-    const full = await fetchMealById(meal.idMeal)
-    setExpanded((prev) => ({ ...prev, [meal.idMeal]: full }))
+    try {
+      const res = await fetch('/api/recipe-details', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: meal.id }),
+      })
+      const data = await res.json().catch(() => ({} as Record<string, unknown>))
+      if (!res.ok || data.ok !== true) {
+        setExpanded((prev) => ({ ...prev, [meal.id]: null }))
+        return
+      }
+      setExpanded((prev) => ({ ...prev, [meal.id]: data.recipe as RecipeDetails }))
+    } catch {
+      setExpanded((prev) => ({ ...prev, [meal.id]: null }))
+    }
+  }
+
+  // Build a stable sourceUrl for SaveRecipeButton dedup. Prefer the
+  // real recipe URL when Spoonacular has one (so re-saving from the
+  // same blog post upserts cleanly); otherwise use a provider:id pseudo-URL.
+  function saveSourceUrl(d: RecipeDetails): string {
+    if (d.sourceUrl) return d.sourceUrl
+    return `${d.source}:${d.id.replace(/^[sm]\//, '')}`
+  }
+
+  // Pick the right SaveRecipeButton source type. Spoonacular with a real
+  // sourceUrl is treated as a "url" source for dedup; otherwise mealdb.
+  function saveSourceType(d: RecipeDetails): 'url' | 'mealdb' {
+    if (d.source === 'spoonacular' && d.sourceUrl) return 'url'
+    return 'mealdb'
   }
 
   return (
@@ -360,7 +351,6 @@ export default function IngredientFinder() {
         <p className="mt-0.5 text-[11px] text-white/45">
           Recipes containing any of these get filtered OUT. Good for allergens or things you don&apos;t want.
         </p>
-        {/* Quick-pick from same common list */}
         <div className="mt-2.5 flex flex-wrap gap-1">
           {INGREDIENT_CATEGORIES.flatMap((c) => c.items).map((name) => {
             const blocked = excluded.has(name)
@@ -467,18 +457,19 @@ export default function IngredientFinder() {
                 <p className="text-xs text-white/55">
                   {results.length} recipe{results.length === 1 ? '' : 's'} ranked by match
                   {totalExcluded > 0 && ` · ${totalExcluded} avoided`}
-                  {' — via TheMealDB'}
+                  {searchSource === 'spoonacular' && ' — via Spoonacular'}
+                  {searchSource === 'mealdb' && ' — via TheMealDB'}
+                  {searchSource === 'mealdb-fallback' && ' — via TheMealDB (fallback)'}
                 </p>
-                {results[0]?.matchCount < totalSearched && (
+                {results[0]?.matchCount !== undefined && results[0].matchCount < totalSearched && (
                   <p className="text-[11px] text-amber-300/80">
                     No recipe has ALL {totalSearched} — showing best matches.
                   </p>
                 )}
               </div>
 
-              {/* Sparse-result Google link — shown when we got SOME results
-                  but not great coverage (TheMealDB has ~300 recipes total) */}
-              {results.length < 4 && (
+              {/* Sparse-result Google link — shown when fallback returned few results */}
+              {searchSource !== 'spoonacular' && results.length < 4 && (
                 <a
                   href={`https://www.google.com/search?q=recipes+with+${encodeURIComponent(
                     [...selected, ...customExtras].join(' ')
@@ -492,13 +483,14 @@ export default function IngredientFinder() {
               )}
               <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {results.map((meal) => {
-                  const ex = expanded[meal.idMeal]
+                  const ex = expanded[meal.id]
                   const isLoading = ex === 'loading'
                   const isOpen = ex && ex !== 'loading'
-                  const perfect = meal.matchCount === totalSearched
+                  const matchCount = meal.matchCount ?? 0
+                  const perfect = matchCount === totalSearched && matchCount > 0
                   return (
                     <li
-                      key={meal.idMeal}
+                      key={meal.id}
                       className={`overflow-hidden rounded-2xl border bg-white/[0.03] ${
                         perfect ? 'border-emerald-400/50' : 'border-white/10'
                       }`}
@@ -508,68 +500,85 @@ export default function IngredientFinder() {
                         onClick={() => expandResult(meal)}
                         className="block w-full text-left"
                       >
-                        <div className="relative aspect-video w-full overflow-hidden bg-black">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={meal.strMealThumb}
-                            alt={meal.strMeal}
-                            loading="lazy"
-                            className="h-full w-full object-cover opacity-90"
-                          />
-                          <span
-                            className={`absolute right-2 top-2 rounded border px-2 py-0.5 font-display text-[10px] tracking-[0.2em] ${
-                              perfect
-                                ? 'border-emerald-400/60 bg-emerald-500/15 text-emerald-200'
-                                : 'border-red-400/50 bg-black/70 text-red-200'
-                            }`}
-                          >
-                            {meal.matchCount}/{totalSearched}
-                          </span>
-                        </div>
+                        {meal.image && (
+                          <div className="relative aspect-video w-full overflow-hidden bg-black">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={meal.image}
+                              alt={meal.title}
+                              loading="lazy"
+                              className="h-full w-full object-cover opacity-90"
+                            />
+                            <span
+                              className={`absolute right-2 top-2 rounded border px-2 py-0.5 font-display text-[10px] tracking-[0.2em] ${
+                                perfect
+                                  ? 'border-emerald-400/60 bg-emerald-500/15 text-emerald-200'
+                                  : 'border-red-400/50 bg-black/70 text-red-200'
+                              }`}
+                            >
+                              {matchCount}/{totalSearched}
+                            </span>
+                          </div>
+                        )}
                         <div className="p-3">
                           <div className="flex items-center justify-between gap-2">
                             <span className="font-display text-sm tracking-wide text-white">
-                              {meal.strMeal}
+                              {meal.title}
                             </span>
                             <span className="font-display text-[10px] tracking-[0.25em] text-red-300">
                               {isOpen ? 'HIDE' : isLoading ? '…' : 'VIEW'}
                             </span>
                           </div>
-                          <p className="mt-1 text-[11px] leading-snug text-white/55">
-                            Has: {meal.matched.join(', ')}
-                          </p>
+                          {meal.matched && meal.matched.length > 0 && (
+                            <p className="mt-1 text-[11px] leading-snug text-white/55">
+                              Has: {meal.matched.join(', ')}
+                            </p>
+                          )}
                         </div>
                       </button>
 
                       {isOpen && (
                         <div className="border-t border-white/10 bg-black/30 p-3">
-                          {(ex.strCategory || ex.strArea) && (
+                          {(ex.category || ex.area) && (
                             <p className="mb-2 text-xs uppercase tracking-widest text-red-300/80">
-                              {[ex.strArea, ex.strCategory].filter(Boolean).join(' · ')}
+                              {[ex.area, ex.category].filter(Boolean).join(' · ')}
                             </p>
                           )}
                           <p className="font-display text-[10px] tracking-[0.3em] text-red-300">
                             INGREDIENTS
                           </p>
-                          <ul className="mt-1 space-y-1 text-sm text-white/85">
-                            {extractIngredients(ex).map((line, i) => (
-                              <li key={i}>· {line}</li>
-                            ))}
-                          </ul>
-                          {ex.strInstructions && (
+                          {ex.ingredients.length === 0 ? (
+                            <p className="mt-1 text-sm italic text-white/55">
+                              {"Ingredient list wasn't included — open the source link."}
+                            </p>
+                          ) : (
+                            <ul className="mt-1 space-y-1 text-sm text-white/85">
+                              {ex.ingredients.map((line, i) => (
+                                <li key={i}>· {line}</li>
+                              ))}
+                            </ul>
+                          )}
+                          {ex.instructions.length > 0 && (
                             <>
                               <p className="mt-3 font-display text-[10px] tracking-[0.3em] text-red-300">
                                 STEPS
                               </p>
-                              <p className="mt-1 whitespace-pre-line text-sm leading-6 text-white/80">
-                                {ex.strInstructions}
-                              </p>
+                              <ol className="mt-1 space-y-1 text-sm leading-6 text-white/85">
+                                {ex.instructions.map((step, i) => (
+                                  <li key={i} className="flex gap-2">
+                                    <span className="shrink-0 font-display text-red-300">
+                                      {String(i + 1).padStart(2, '0')}
+                                    </span>
+                                    <span>{step}</span>
+                                  </li>
+                                ))}
+                              </ol>
                             </>
                           )}
                           <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                            {ex.strSource && (
+                            {ex.sourceUrl && (
                               <a
-                                href={ex.strSource}
+                                href={ex.sourceUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="rounded-md border border-white/15 px-3 py-1.5 text-white/80 hover:border-red-400 hover:text-red-200"
@@ -577,9 +586,9 @@ export default function IngredientFinder() {
                                 Source ↗
                               </a>
                             )}
-                            {ex.strYoutube && (
+                            {ex.videoUrl && (
                               <a
-                                href={ex.strYoutube}
+                                href={ex.videoUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="rounded-md border border-white/15 px-3 py-1.5 text-white/80 hover:border-red-400 hover:text-red-200"
@@ -592,19 +601,12 @@ export default function IngredientFinder() {
                           {/* Save to My Recipes */}
                           <div className="mt-3">
                             <SaveRecipeButton
-                              name={ex.strMeal}
-                              source="mealdb"
-                              sourceUrl={`mealdb:${ex.idMeal}`}
-                              image={ex.strMealThumb}
-                              ingredients={extractIngredients(ex)}
-                              instructions={
-                                ex.strInstructions
-                                  ? ex.strInstructions
-                                      .split(/\r?\n+/)
-                                      .map((s) => s.trim())
-                                      .filter(Boolean)
-                                  : []
-                              }
+                              name={ex.title}
+                              source={saveSourceType(ex)}
+                              sourceUrl={saveSourceUrl(ex)}
+                              image={ex.image}
+                              ingredients={ex.ingredients}
+                              instructions={ex.instructions}
                             />
                           </div>
                         </div>
