@@ -1,170 +1,54 @@
 import type { Metadata } from "next";
-import RecipeParser from "./_components/RecipeParser";
-import RestaurantFinder from "./_components/RestaurantFinder";
-import IngredientFinder from "./_components/IngredientFinder";
-import MyRecipes from "./_components/MyRecipes";
-import BackupPanel from "./_components/BackupPanel";
+import { Suspense } from "react";
+import FoodApp from "./_components/FoodApp";
 
 export const metadata: Metadata = {
   title: "Food — Respawn Riot",
   description:
-    "Parse a recipe from a URL or paste it in, scale ingredients, find restaurants, and discover recipes from what's in your fridge.",
+    "Parse a recipe, scale ingredients, find restaurants, cook from what's in your fridge, and keep a running shopping list — all in one mini-app.",
 };
 
 export default function FoodPage() {
   return (
     <main className="bg-black text-white">
-      {/* Hero */}
+      {/* Hero — compact so the tabs land just below the fold on mobile */}
       <section className="relative overflow-hidden border-b border-red-500/30 scanlines">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(239,68,68,0.25),transparent_55%)]" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_right,rgba(251,146,60,0.18),transparent_55%)]" />
         <div className="pointer-events-none absolute inset-x-0 top-0 h-2 stripe-band" />
 
-        <div className="relative mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-14">
+        <div className="relative mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-10">
           <p className="font-display text-xs tracking-[0.3em] text-red-400">
             ▌ CHANNEL 08
           </p>
-          <h1 className="mt-3 font-display text-4xl tracking-[0.04em] sm:text-6xl">
+          <h1 className="mt-2 font-display text-3xl tracking-[0.04em] sm:text-5xl">
             FOOD <span className="text-red-400">{"//"}</span> COOK OR GO OUT
           </h1>
-          <p className="mt-3 max-w-2xl text-sm text-white/75 sm:text-base">
-            {"Paste a recipe, scale it 1–4×, find a restaurant nearby, or cook from what's in the house."}
+          <p className="mt-2 max-w-2xl text-sm text-white/75 sm:text-base">
+            Parse a recipe, scale it, find a restaurant, cook from what&apos;s
+            in the house, or build a shopping list — pick a tab.
           </p>
-
-          {/* Section anchor nav — mobile-friendly */}
-          <nav
-            aria-label="Sections"
-            className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-4"
-          >
-            <a
-              href="#recipes"
-              className="rounded-lg border border-red-400/40 bg-black/40 px-2 py-2.5 text-center font-display text-[11px] tracking-[0.2em] text-red-200 hover:bg-red-500/10 sm:text-xs"
-            >
-              📋 RECIPES
-            </a>
-            <a
-              href="#eat-out"
-              className="rounded-lg border border-red-400/40 bg-black/40 px-2 py-2.5 text-center font-display text-[11px] tracking-[0.2em] text-red-200 hover:bg-red-500/10 sm:text-xs"
-            >
-              🍴 EAT OUT
-            </a>
-            <a
-              href="#in-the-house"
-              className="rounded-lg border border-red-400/40 bg-black/40 px-2 py-2.5 text-center font-display text-[11px] tracking-[0.2em] text-red-200 hover:bg-red-500/10 sm:text-xs"
-            >
-              🏠 IN THE HOUSE
-            </a>
-            <a
-              href="#my-recipes"
-              className="rounded-lg border border-red-400/40 bg-black/40 px-2 py-2.5 text-center font-display text-[11px] tracking-[0.2em] text-red-200 hover:bg-red-500/10 sm:text-xs"
-            >
-              ★ MY RECIPES
-            </a>
-          </nav>
         </div>
       </section>
 
-      {/* Section 1: Recipe parser */}
-      <section
-        id="recipes"
-        className="scroll-mt-24 border-b border-white/10 px-4 py-10 sm:px-6 sm:py-14"
-      >
-        <div className="mx-auto max-w-3xl">
-          <div className="mb-5">
-            <p className="font-display text-[11px] tracking-[0.3em] text-red-400">
-              ▌ RECIPES
-            </p>
-            <h2 className="mt-2 font-display text-2xl tracking-wide sm:text-3xl">
-              Bring a recipe in. Scale it.
-            </h2>
-            <p className="mt-2 text-sm text-white/65">
-              Drop a URL from a recipe site, or paste raw text. We split out
-              ingredients + steps and let you scale 1–4×.
-            </p>
-          </div>
-          <RecipeParser />
-        </div>
-      </section>
-
-      {/* Section 2: Restaurants */}
-      <section
-        id="eat-out"
-        className="scroll-mt-24 border-b border-white/10 bg-zinc-950 px-4 py-10 sm:px-6 sm:py-14"
-      >
-        <div className="mx-auto max-w-3xl">
-          <div className="mb-5">
-            <p className="font-display text-[11px] tracking-[0.3em] text-red-400">
-              ▌ WHY DON&apos;T YOU EAT OUT?
-            </p>
-            <h2 className="mt-2 font-display text-2xl tracking-wide sm:text-3xl">
-              {"Cooking's too much work today."}
-            </h2>
-            <p className="mt-2 text-sm text-white/65">
-              Pick a cuisine, drop a zip (or use your exact location), open it
-              in Google Maps. Save the places you went with a 10-star rating.
-            </p>
-          </div>
-          <RestaurantFinder />
-        </div>
-      </section>
-
-      {/* Section 3: In the House */}
-      <section
-        id="in-the-house"
-        className="scroll-mt-24 px-4 py-10 sm:px-6 sm:py-14"
-      >
-        <div className="mx-auto max-w-3xl">
-          <div className="mb-5">
-            <p className="font-display text-[11px] tracking-[0.3em] text-red-400">
-              ▌ WHAT&apos;S IN THE HOUSE?
-            </p>
-            <h2 className="mt-2 font-display text-2xl tracking-wide sm:text-3xl">
-              Cook from what you have.
-            </h2>
-            <p className="mt-2 text-sm text-white/65">
-              Tap what&apos;s in your kitchen, mark anything to avoid, hit Find.
-              Ranked by best match — perfect-match recipes get a green border.
-            </p>
-          </div>
-          <IngredientFinder />
-        </div>
-      </section>
-
-      {/* Section 4: My Recipes */}
-      <section
-        id="my-recipes"
-        className="scroll-mt-24 border-t border-white/10 bg-zinc-950 px-4 py-10 sm:px-6 sm:py-14"
-      >
-        <div className="mx-auto max-w-3xl">
-          <div className="mb-5">
-            <p className="font-display text-[11px] tracking-[0.3em] text-red-400">
-              ▌ MY RECIPES
-            </p>
-            <h2 className="mt-2 font-display text-2xl tracking-wide sm:text-3xl">
-              Your saved favorites.
-            </h2>
-            <p className="mt-2 text-sm text-white/65">
-              Anything you save from the sections above lives here. Rate them,
-              tag them, search by name or ingredient, scale + convert units on
-              the fly.
-            </p>
-          </div>
-          <MyRecipes />
-
-          {/* Backup & Restore — sits at the bottom of the page, just
-              above the footer. Single panel covers BOTH recipes +
-              ratings in one file. */}
-          <div className="mt-10">
-            <BackupPanel />
-          </div>
-        </div>
-      </section>
+      {/* Tabbed mini-app. Wrapped in Suspense because useSearchParams
+          inside FoodApp requires it during static rendering. */}
+      <Suspense fallback={<TabsFallback />}>
+        <FoodApp />
+      </Suspense>
 
       <footer className="border-t border-white/10 px-6 py-8 text-center text-xs text-white/45">
-        Recipe parsing reads schema.org/Recipe JSON-LD. Restaurant search uses
-        OpenStreetMap. Recipe results via TheMealDB. Ratings + saved recipes
-        stay in your browser&apos;s local storage.
+        Restaurants via Google Places (OpenStreetMap fallback). Recipe search
+        via Spoonacular (TheMealDB fallback). Recipe parsing reads
+        schema.org/Recipe JSON-LD. Saved recipes, ratings, and the shopping
+        list stay in your browser&apos;s local storage.
       </footer>
     </main>
+  );
+}
+
+function TabsFallback() {
+  return (
+    <div className="h-16 border-b border-white/10 bg-black/85" aria-hidden />
   );
 }
