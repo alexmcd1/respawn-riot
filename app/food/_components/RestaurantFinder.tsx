@@ -95,6 +95,8 @@ export default function RestaurantFinder() {
   const [searching, setSearching] = useState(false)
   const [searchError, setSearchError] = useState('')
   const [fallbackMapsUrl, setFallbackMapsUrl] = useState<string | null>(null)
+  const [searchSource, setSearchSource] =
+    useState<'google' | 'osm' | 'osm-fallback' | null>(null)
 
   // ─── Randomizer pick
   const [pick, setPick] = useState<RestaurantResult | Rating | null>(null)
@@ -195,8 +197,14 @@ export default function RestaurantFinder() {
       if (!data.ok) {
         setSearchError(typeof data.error === 'string' ? data.error : 'Search failed')
         setResults([])
+        setSearchSource(null)
       } else {
         setResults(data.results ?? [])
+        setSearchSource(
+          data.source === 'google' || data.source === 'osm' || data.source === 'osm-fallback'
+            ? data.source
+            : null
+        )
         if (typeof data.fallbackMapsUrl === 'string') {
           setFallbackMapsUrl(data.fallbackMapsUrl)
         }
@@ -527,7 +535,15 @@ export default function RestaurantFinder() {
           <div className="mt-3 space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-xs text-white/55">
-                {results.length} {results.length === 1 ? 'spot' : 'spots'} within {radiusMiles} mi — via OpenStreetMap
+                {results.length} {results.length === 1 ? 'spot' : 'spots'} within {radiusMiles} mi —{' '}
+                {searchSource === 'google' && (
+                  <span className="text-emerald-300/85">via Google</span>
+                )}
+                {searchSource === 'osm' && 'via OpenStreetMap'}
+                {searchSource === 'osm-fallback' && (
+                  <span className="text-yellow-300/85">via OpenStreetMap (Google unavailable)</span>
+                )}
+                {!searchSource && 'via OpenStreetMap'}
               </p>
               {fallbackMapsUrl && (
                 <a
