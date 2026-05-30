@@ -16,25 +16,22 @@ type NavLink = {
 const links: NavLink[] = [
   { href: '/',              label: 'Home',     text: 'text-white',         glow: 'hover:border-white hover:text-white shadow-white/40',                num: '00' },
   { href: '/anime',         label: 'Anime',    text: 'text-fuchsia-300',   glow: 'hover:border-fuchsia-400 hover:text-fuchsia-300 shadow-fuchsia-500/40', num: '01' },
-  { href: '/pop-punk',      label: 'Pop Punk', text: 'text-pink-300',      glow: 'hover:border-pink-400 hover:text-pink-300 shadow-pink-500/40',       num: '02' },
-  { href: '/gaming',        label: 'Gaming',   text: 'text-cyan-300',      glow: 'hover:border-cyan-400 hover:text-cyan-300 shadow-cyan-500/40',       num: '03' },
-  { href: '/game',          label: 'RC',       text: 'text-lime-300',      glow: 'hover:border-lime-400 hover:text-lime-300 shadow-lime-500/40',       num: '04' },
-  { href: '/trading-cards', label: 'TDC',      text: 'text-amber-300',     glow: 'hover:border-amber-400 hover:text-amber-300 shadow-amber-500/40',    num: '05' },
-  { href: '/orlando',       label: 'Orlando',  text: 'text-orange-300',    glow: 'hover:border-orange-400 hover:text-orange-300 shadow-orange-500/40', num: '06' },
-  { href: '/quest-list',    label: 'Quests',   text: 'text-violet-300',    glow: 'hover:border-violet-400 hover:text-violet-300 shadow-violet-500/40', num: '07' },
-  { href: '/food',          label: 'Food',     text: 'text-red-300',       glow: 'hover:border-red-400 hover:text-red-300 shadow-red-500/40',          num: '08' },
-  { href: '/math',          label: 'Math',     text: 'text-emerald-300',   glow: 'hover:border-emerald-400 hover:text-emerald-300 shadow-emerald-500/40', num: '09' },
+  { href: '/music',         label: 'Music',    text: 'text-pink-300',      glow: 'hover:border-pink-400 hover:text-pink-300 shadow-pink-500/40',       num: '02' },
+  { href: '/games',         label: 'Games',    text: 'text-cyan-300',      glow: 'hover:border-cyan-400 hover:text-cyan-300 shadow-cyan-500/40',       num: '03' },
+  { href: '/orlando',       label: 'Orlando',  text: 'text-orange-300',    glow: 'hover:border-orange-400 hover:text-orange-300 shadow-orange-500/40', num: '04' },
+  { href: '/quest-list',    label: 'Quests',   text: 'text-violet-300',    glow: 'hover:border-violet-400 hover:text-violet-300 shadow-violet-500/40', num: '05' },
+  { href: '/food',          label: 'Food',     text: 'text-red-300',       glow: 'hover:border-red-400 hover:text-red-300 shadow-red-500/40',          num: '06' },
+  { href: '/math',          label: 'Math',     text: 'text-emerald-300',   glow: 'hover:border-emerald-400 hover:text-emerald-300 shadow-emerald-500/40', num: '07' },
 ]
 
 const tickerItems = [
-  '★ NEW DROPS — STARS BRAWL · PC BUILDER · JJK FIGHT',
+  '★ NEW — GAMES HUB · ALL FIVE TITLES IN ONE PLACE',
+  '🎵 NEW — MUSIC: POP PUNK + LIVE TOUR DATES',
   '✶ SPRING 2026 ANIME RANKED',
-  '☠ POP PUNK HEADLINES',
-  '◢ RC — RESPAWN CREATURES DEVLOG',
+  '🍴 FOOD: RECIPES · EAT OUT · IN HOUSE · SHOPPING',
   '☼ ORLANDO LIVE WEATHER + PARK NEWS',
   '⚔ QUESTLIST BY KID_GHOST',
-  '🍴 FOOD CHANNEL: RECIPES · EAT OUT · IN THE HOUSE',
-  '➕ NEW — MATH FLASHCARDS · GRADES 5–8',
+  '➕ MATH FLASHCARDS · GRADES 5–8',
   '⚡ JOIN THE RIOT',
 ]
 
