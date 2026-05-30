@@ -62,7 +62,17 @@ async function ticketmasterSearch(
   limit: number
 ): Promise<ConcertResult[] | null> {
   const key = process.env.TICKETMASTER_API_KEY;
-  if (!key) return null;
+  if (!key) {
+    // Log explicitly so a missing/misnamed env var is visible in Vercel
+    // logs (otherwise the route just silently falls back to Bandsintown
+    // with no breadcrumb).
+    console.warn(
+      "[concerts] TICKETMASTER_API_KEY is missing — env var not set, " +
+      "wrong name, or set on a different environment than this deploy. " +
+      `(NODE_ENV=${process.env.NODE_ENV}, VERCEL_ENV=${process.env.VERCEL_ENV ?? "n/a"})`
+    );
+    return null;
+  }
 
   const params = new URLSearchParams({
     apikey: key,
