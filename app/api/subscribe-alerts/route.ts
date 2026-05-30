@@ -60,6 +60,16 @@ function siteOrigin(): string {
   return "https://respawnriot.io";
 }
 
+// Sender. Defaults to Resend's sandbox (works without domain verification
+// but only delivers to the Resend account holder's own email). Override
+// with EMAIL_FROM="Respawn Riot <noreply@respawnriot.io>" once the
+// respawnriot.io domain is verified at resend.com/domains.
+function fromAddress(): string {
+  return (
+    process.env.EMAIL_FROM ?? "Respawn Riot <onboarding@resend.dev>"
+  );
+}
+
 export async function POST(request: Request) {
   let body: Body;
   try {
@@ -143,7 +153,7 @@ export async function POST(request: Request) {
         : "nationwide";
       try {
         await resend().emails.send({
-          from: "Respawn Riot <noreply@respawnriot.io>",
+          from: fromAddress(),
           to: email,
           subject: "🎸 You're on the list — concert alerts active",
           html: `

@@ -66,6 +66,13 @@ function siteOrigin(): string {
   return "https://respawnriot.io";
 }
 
+// See subscribe-alerts route — same EMAIL_FROM env var override path.
+function fromAddress(): string {
+  return (
+    process.env.EMAIL_FROM ?? "Respawn Riot <onboarding@resend.dev>"
+  );
+}
+
 async function tmShowsForArtist(
   artist: string,
   apiKey: string
@@ -256,7 +263,7 @@ export async function GET(request: Request) {
       try {
         const { subject, html } = buildDigestEmail(sub.email, sub.unsub_token, matches);
         await resend().emails.send({
-          from: "Respawn Riot <noreply@respawnriot.io>",
+          from: fromAddress(),
           to: sub.email,
           subject,
           html,
