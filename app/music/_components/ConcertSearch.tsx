@@ -12,6 +12,7 @@ import {
   removeFavoriteArtist,
   removeSavedCity,
 } from '../_lib/concertFavorites'
+import AlertsSubscribe from './AlertsSubscribe'
 
 type ConcertResult = {
   id: string
@@ -354,6 +355,9 @@ export default function ConcertSearch() {
           </div>
         )}
       </section>
+
+      {/* ───────── Email alerts (Phase 2 — DB-backed digest) ───────── */}
+      <AlertsSubscribe />
 
       {/* ───────── Search form ───────── */}
       <form onSubmit={onSubmit} className="space-y-4 rounded-2xl border border-white/10 bg-black/20 p-4">
