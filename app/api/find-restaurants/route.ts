@@ -1,21 +1,23 @@
 import { NextResponse } from "next/server";
 
-// Real in-page restaurant search powered by OpenStreetMap.
+// In-page restaurant search. Layered strategy:
 //
-//   1. If `zip` was passed, geocode it via Nominatim → (lat, lon)
-//   2. Query Overpass for restaurants near that point matching the
-//      cuisine OR name (with case-insensitive regex on both `cuisine`
-//      and `name` tags)
-//   3. Normalize to a small shape the client can render
+//   1. PRIMARY: Google Places API (New) text search if GOOGLE_PLACES_API_KEY
+//      is set. Returns the canonical restaurant data (Google ratings,
+//      price level, open/closed, formatted address).
+//   2. FALLBACK: OpenStreetMap via Overpass (free, no key). Used when the
+//      Google key is missing, Google errors, or Google returns 0 results.
+//   3. Zip → coords via Nominatim (same as before, free).
 //
-// Both services are free, no API key. Standard etiquette applies —
-// we cache aggressively and send a real User-Agent.
+// All free-tier APIs send a real User-Agent. Google requires a field mask
+// to control cost — we request only fields we'll actually render.
 
 export const dynamic = "force-dynamic";
 
 const UA = "respawn-riot/1.0 (+https://respawnriot.io)";
 const NOMINATIM = "https://nominatim.openstreetmap.org/search";
 const OVERPASS = "https://overpass-api.de/api/interpreter";
+const GOOGLE_PLACES_TEXT_SEARCH = "https://places.googleapis.com/v1/places:searchText";
 const FOOD_AMENITIES = "restaurant|fast_food|cafe|bar|pub|food_court|ice_cream";
 
 type RestaurantResult = {
@@ -27,9 +29,16 @@ type RestaurantResult = {
   lat: number;
   lon: number;
   mapsUrl: string;
+  // New, optional, Google-only fields (UI shows them when present)
+  rating?: number;        // 1.0–5.0
+  ratingCount?: number;   // number of Google reviews
+  priceLevel?: number;    // 1–4 ($–$$$$)
+  openNow?: boolean | null;
+  source: "google" | "osm";
 };
 
-// Haversine — distance between two lat/lon points in meters
+// ─── Helpers shared by both providers ─────────────────────────────────────
+
 function haversine(a: { lat: number; lon: number }, b: { lat: number; lon: number }): number {
   const R = 6371000;
   const toRad = (d: number) => (d * Math.PI) / 180;
@@ -49,17 +58,8 @@ type Body = {
   lat?: number;
   lon?: number;
   zip?: string;
-  radiusMeters?: number; // default 5000
-  limit?: number;        // default 30
-};
-
-type OverpassElement = {
-  type: "node" | "way" | "relation";
-  id: number;
-  lat?: number;
-  lon?: number;
-  center?: { lat: number; lon: number };
-  tags?: Record<string, string>;
+  radiusMeters?: number;
+  limit?: number;
 };
 
 async function geocodeZip(zip: string): Promise<{ lat: number; lon: number } | null> {
@@ -72,7 +72,7 @@ async function geocodeZip(zip: string): Promise<{ lat: number; lon: number } | n
   try {
     const res = await fetch(`${NOMINATIM}?${params}`, {
       headers: { "User-Agent": UA, Accept: "application/json" },
-      next: { revalidate: 86400 }, // a zip's coords don't change
+      next: { revalidate: 86400 },
     });
     if (!res.ok) return null;
     const data = (await res.json()) as Array<{ lat: string; lon: string }>;
@@ -84,9 +84,143 @@ async function geocodeZip(zip: string): Promise<{ lat: number; lon: number } | n
   }
 }
 
-// Escape user input for use inside an Overpass regex string literal
+// ─── Provider 1: Google Places API (New) ─────────────────────────────────
+
+type GooglePlace = {
+  id: string;
+  displayName?: { text?: string };
+  formattedAddress?: string;
+  location?: { latitude: number; longitude: number };
+  rating?: number;
+  userRatingCount?: number;
+  priceLevel?:
+    | "PRICE_LEVEL_FREE"
+    | "PRICE_LEVEL_INEXPENSIVE"
+    | "PRICE_LEVEL_MODERATE"
+    | "PRICE_LEVEL_EXPENSIVE"
+    | "PRICE_LEVEL_VERY_EXPENSIVE";
+  currentOpeningHours?: { openNow?: boolean };
+  primaryTypeDisplayName?: { text?: string };
+  googleMapsUri?: string;
+};
+
+function priceLevelToNumber(p?: GooglePlace["priceLevel"]): number | undefined {
+  if (!p) return undefined;
+  switch (p) {
+    case "PRICE_LEVEL_FREE": return 0;
+    case "PRICE_LEVEL_INEXPENSIVE": return 1;
+    case "PRICE_LEVEL_MODERATE": return 2;
+    case "PRICE_LEVEL_EXPENSIVE": return 3;
+    case "PRICE_LEVEL_VERY_EXPENSIVE": return 4;
+    default: return undefined;
+  }
+}
+
+async function googlePlacesSearch(
+  query: string,
+  mode: "cuisine" | "name",
+  center: { lat: number; lon: number },
+  radiusMeters: number,
+  limit: number
+): Promise<RestaurantResult[] | null> {
+  const key = process.env.GOOGLE_PLACES_API_KEY;
+  if (!key) return null;
+
+  // For cuisine mode, append "restaurants" so we bias toward eateries even
+  // if the cuisine word is generic (e.g. "Pizza" alone might return shops).
+  // For name mode, the user is searching for a specific place — pass as-is.
+  const textQuery = mode === "cuisine" ? `${query} restaurants` : query;
+
+  // Field mask — Google charges per field. Only request what we render.
+  const fieldMask = [
+    "places.id",
+    "places.displayName",
+    "places.formattedAddress",
+    "places.location",
+    "places.rating",
+    "places.userRatingCount",
+    "places.priceLevel",
+    "places.currentOpeningHours",
+    "places.primaryTypeDisplayName",
+    "places.googleMapsUri",
+  ].join(",");
+
+  try {
+    const res = await fetch(GOOGLE_PLACES_TEXT_SEARCH, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": key,
+        "X-Goog-FieldMask": fieldMask,
+      },
+      body: JSON.stringify({
+        textQuery,
+        maxResultCount: Math.min(20, limit), // Google caps at 20 per call
+        locationBias: {
+          circle: {
+            center: { latitude: center.lat, longitude: center.lon },
+            radius: Math.min(radiusMeters, 50000), // Google caps at 50km
+          },
+        },
+      }),
+      // Don't cache — Google's "open now" + ratings should be fresh per call
+      cache: "no-store",
+    });
+
+    if (!res.ok) {
+      // Log so it surfaces in Vercel logs; return null so caller can fall back
+      console.warn(`[find-restaurants] Google Places HTTP ${res.status}`);
+      return null;
+    }
+
+    const data = (await res.json()) as { places?: GooglePlace[] };
+    const places = Array.isArray(data.places) ? data.places : [];
+    if (places.length === 0) return null; // Trigger fallback
+
+    const out: RestaurantResult[] = [];
+    for (const p of places) {
+      const name = p.displayName?.text;
+      const loc = p.location;
+      if (!name || !loc) continue;
+      out.push({
+        id: `g/${p.id}`,
+        name,
+        cuisine: p.primaryTypeDisplayName?.text
+          ?.replace(/_/g, " ")
+          .replace(/\b\w/g, (m) => m.toUpperCase()),
+        address: p.formattedAddress,
+        distanceMeters: haversine(center, { lat: loc.latitude, lon: loc.longitude }),
+        lat: loc.latitude,
+        lon: loc.longitude,
+        mapsUrl: p.googleMapsUri ??
+          `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${name} ${p.formattedAddress ?? ""}`.trim())}`,
+        rating: typeof p.rating === "number" ? p.rating : undefined,
+        ratingCount: typeof p.userRatingCount === "number" ? p.userRatingCount : undefined,
+        priceLevel: priceLevelToNumber(p.priceLevel),
+        openNow: p.currentOpeningHours?.openNow ?? null,
+        source: "google",
+      });
+    }
+    out.sort((a, b) => (a.distanceMeters ?? 0) - (b.distanceMeters ?? 0));
+    return out.slice(0, limit);
+  } catch (err) {
+    console.warn("[find-restaurants] Google Places fetch failed:", err);
+    return null;
+  }
+}
+
+// ─── Provider 2: OpenStreetMap (Overpass) — fallback ─────────────────────
+
+type OverpassElement = {
+  type: "node" | "way" | "relation";
+  id: number;
+  lat?: number;
+  lon?: number;
+  center?: { lat: number; lon: number };
+  tags?: Record<string, string>;
+};
+
 function escapeForOverpass(s: string): string {
-  // Strip anything that could break out of the quoted regex; keep word chars + spaces
   return s.replace(/["\\\n\r]/g, "").trim();
 }
 
@@ -99,10 +233,6 @@ async function queryOverpass(
 ): Promise<OverpassElement[]> {
   const safe = escapeForOverpass(query);
   if (!safe) return [];
-
-  // For cuisine mode, match either the cuisine tag OR the name (so "Pizza"
-  // finds both [cuisine=pizza] and "Joe's Pizza"). For name mode, only match
-  // the name tag.
   const filters =
     mode === "cuisine"
       ? `
@@ -112,9 +242,7 @@ async function queryOverpass(
       : `
     nwr["amenity"~"${FOOD_AMENITIES}"]["name"~"${safe}",i](around:${radius},${lat},${lon});
       `.trim();
-
   const ql = `[out:json][timeout:25];(${filters});out tags center 60;`;
-
   try {
     const res = await fetch(OVERPASS, {
       method: "POST",
@@ -146,14 +274,13 @@ function formatAddress(tags: Record<string, string>): string | undefined {
 
 function formatCuisine(c: string | undefined): string | undefined {
   if (!c) return undefined;
-  // OSM cuisines are often semicolon-separated, snake_case
   return c
     .split(";")[0]
     .replace(/_/g, " ")
     .replace(/\b\w/g, (m) => m.toUpperCase());
 }
 
-function dedupeAndNormalize(
+function osmResultsFromElements(
   elements: OverpassElement[],
   center: { lat: number; lon: number },
   limit: number
@@ -167,28 +294,27 @@ function dedupeAndNormalize(
     const lat = e.lat ?? e.center?.lat;
     const lon = e.lon ?? e.center?.lon;
     if (typeof lat !== "number" || typeof lon !== "number") continue;
-    // De-dupe by name + coarse coord (avoid showing the same chain twice)
     const key = `${name.toLowerCase()}|${lat.toFixed(3)}|${lon.toFixed(3)}`;
     if (seen.has(key)) continue;
     seen.add(key);
     const address = formatAddress(tags);
     out.push({
-      id: `${e.type}/${e.id}`,
+      id: `osm/${e.type}/${e.id}`,
       name,
       cuisine: formatCuisine(tags.cuisine),
       address,
       distanceMeters: haversine(center, { lat, lon }),
       lat,
       lon,
-      mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-        `${name} ${address ?? ""}`.trim()
-      )}`,
+      mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${name} ${address ?? ""}`.trim())}`,
+      source: "osm",
     });
   }
-  // Sort by distance, then trim to limit
   out.sort((a, b) => (a.distanceMeters ?? 0) - (b.distanceMeters ?? 0));
   return out.slice(0, limit);
 }
+
+// ─── Route handler ────────────────────────────────────────────────────────
 
 export async function POST(request: Request) {
   let body: Body;
@@ -204,7 +330,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Missing query" }, { status: 400 });
   }
 
-  // Resolve location
   let lat = typeof body.lat === "number" ? body.lat : undefined;
   let lon = typeof body.lon === "number" ? body.lon : undefined;
   if (lat === undefined || lon === undefined) {
@@ -217,10 +342,7 @@ export async function POST(request: Request) {
     }
     const geo = await geocodeZip(zip);
     if (!geo) {
-      return NextResponse.json({
-        ok: false,
-        error: "Couldn't find that zip code",
-      });
+      return NextResponse.json({ ok: false, error: "Couldn't find that zip code" });
     }
     lat = geo.lat;
     lon = geo.lon;
@@ -228,20 +350,25 @@ export async function POST(request: Request) {
 
   const radius = Math.min(Math.max(body.radiusMeters ?? 5000, 500), 30000);
   const limit = Math.min(Math.max(body.limit ?? 30, 5), 60);
+  const center = { lat, lon };
 
-  const elements = await queryOverpass(lat, lon, radius, mode, query);
-  const results = dedupeAndNormalize(elements, { lat, lon }, limit);
+  // Try Google Places first — returns null on missing key, error, or zero results
+  let results = await googlePlacesSearch(query, mode, center, radius, limit);
+  let source: "google" | "osm" | "osm-fallback" = "google";
+
+  if (!results || results.length === 0) {
+    source = results === null ? "osm-fallback" : "osm";
+    const elements = await queryOverpass(lat, lon, radius, mode, query);
+    results = osmResultsFromElements(elements, center, limit);
+  }
 
   return NextResponse.json({
     ok: true,
-    center: { lat, lon },
+    source, // "google" | "osm" | "osm-fallback"
+    center,
     radiusMeters: radius,
     count: results.length,
     results,
-    // Fallback so the UI can offer "see all on Google Maps" when OSM
-    // coverage is thin
-    fallbackMapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-      `${query} near ${lat.toFixed(4)},${lon.toFixed(4)}`
-    )}`,
+    fallbackMapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${query} near ${lat.toFixed(4)},${lon.toFixed(4)}`)}`,
   });
 }

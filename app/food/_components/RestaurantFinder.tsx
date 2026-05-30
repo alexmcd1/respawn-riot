@@ -27,6 +27,12 @@ type RestaurantResult = {
   lat: number
   lon: number
   mapsUrl: string
+  // Google Places extras — UI shows them when present
+  rating?: number          // 1.0–5.0
+  ratingCount?: number     // # of Google reviews
+  priceLevel?: number      // 0–4
+  openNow?: boolean | null
+  source?: 'google' | 'osm'
 }
 
 const RADIUS_OPTIONS: { label: string; miles: number }[] = [
@@ -550,8 +556,38 @@ export default function RestaurantFinder() {
                         </span>
                       )}
                     </div>
+                    {/* Google-only meta row: rating · price · open status */}
+                    {(typeof r.rating === 'number' || typeof r.priceLevel === 'number' || r.openNow != null) && (
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
+                        {typeof r.rating === 'number' && (
+                          <span className="rounded-md bg-yellow-500/15 px-1.5 py-0.5 text-yellow-200">
+                            ★ {r.rating.toFixed(1)}
+                            {typeof r.ratingCount === 'number' && (
+                              <span className="ml-1 text-yellow-200/60">
+                                ({r.ratingCount > 999 ? `${(r.ratingCount / 1000).toFixed(1)}k` : r.ratingCount})
+                              </span>
+                            )}
+                          </span>
+                        )}
+                        {typeof r.priceLevel === 'number' && r.priceLevel > 0 && (
+                          <span className="rounded-md bg-emerald-500/15 px-1.5 py-0.5 text-emerald-200">
+                            {'$'.repeat(r.priceLevel)}
+                          </span>
+                        )}
+                        {r.openNow === true && (
+                          <span className="rounded-md bg-emerald-500/15 px-1.5 py-0.5 text-emerald-200">
+                            ● Open now
+                          </span>
+                        )}
+                        {r.openNow === false && (
+                          <span className="rounded-md bg-white/10 px-1.5 py-0.5 text-white/60">
+                            ● Closed
+                          </span>
+                        )}
+                      </div>
+                    )}
                     {r.cuisine && (
-                      <p className="text-xs uppercase tracking-widest text-red-300/80">
+                      <p className="mt-1 text-xs uppercase tracking-widest text-red-300/80">
                         {r.cuisine}
                       </p>
                     )}
