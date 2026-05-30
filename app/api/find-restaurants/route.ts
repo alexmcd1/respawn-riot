@@ -168,13 +168,21 @@ async function googlePlacesSearch(
     });
 
     if (!res.ok) {
-      // Log so it surfaces in Vercel logs; return null so caller can fall back
-      console.warn(`[find-restaurants] Google Places HTTP ${res.status}`);
+      // Read the body so we can see Google's error message — usually
+      // tells us exactly what's wrong (API not enabled, billing missing,
+      // key restricted, etc).
+      const errText = await res.text().catch(() => "<no body>");
+      console.warn(
+        `[find-restaurants] Google Places HTTP ${res.status} — body: ${errText.slice(0, 500)}`
+      );
       return null;
     }
 
     const data = (await res.json()) as { places?: GooglePlace[] };
     const places = Array.isArray(data.places) ? data.places : [];
+    console.log(
+      `[find-restaurants] Google Places OK — query="${textQuery}" returned ${places.length} places`
+    );
     if (places.length === 0) return null; // Trigger fallback
 
     const out: RestaurantResult[] = [];
