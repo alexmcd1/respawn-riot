@@ -108,7 +108,7 @@ export default function Home() {
 
             {/* Subline */}
             <p className="mt-6 font-display text-sm tracking-[0.3em] text-white/80 sm:text-base">
-              ANIME · POP PUNK · GAMING · CREATOR DROPS
+              ANIME · MUSIC · GAMES · CREATOR DROPS
             </p>
             <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-white/65 sm:text-base md:mx-0">
               {"A loud, glitchy hub for the things we love loudest — and the games we'd rather be playing (or building)."}
@@ -129,18 +129,18 @@ export default function Home() {
                 ◢ PLAY RC
               </Link>
               <Link
-                href="/trading-cards"
-                className="neon-btn rounded-md border-2 border-amber-400 bg-black px-6 py-3 font-display text-base tracking-[0.25em] text-amber-300 hover:bg-amber-400/10"
+                href="/games"
+                className="neon-btn rounded-md border-2 border-cyan-400 bg-black px-6 py-3 font-display text-base tracking-[0.25em] text-cyan-300 hover:bg-cyan-400/10"
               >
-                ✦ OPEN A TDC PACK
+                ◢ ENTER THE ARCADE
               </Link>
             </div>
 
             {/* Stat strip */}
             <div className="mt-10 grid grid-cols-2 gap-2 sm:grid-cols-4">
               {[
-                { k: 'CHANNELS', v: '06' },
-                { k: 'GAMES', v: '02' },
+                { k: 'CHANNELS', v: '07' },
+                { k: 'GAMES', v: '05' },
                 { k: 'DEVLOGS', v: '∞' },
                 { k: 'SLEEP', v: 'NONE' },
               ].map((s) => (
