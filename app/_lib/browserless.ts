@@ -24,19 +24,26 @@ function baseUrl(): string {
 /**
  * Run a Puppeteer function in Browserless's hosted Chrome.
  *
- * @param code - The function source as a string. Must be `module.exports
- *   = async ({ page, context }) => { ... }`. Should return data (the
- *   wrapper appends type: 'application/json' for you).
+ * @param code - The function source as a string. Browserless v2 expects
+ *   ES module syntax: `export default async ({ page, context }) => {...}`.
+ *   The function should return { data, type } or just data.
  * @param context - Plain-object data passed as `context` to the function.
  *   Must be JSON-serializable.
- * @param timeoutMs - How long to wait for the function before giving up.
- *   Default 60s — Browserless free tier caps at ~30s/request, paid plans
- *   are more generous.
+ * @param opts.timeoutMs - How long to wait. Default 60s.
+ * @param opts.stealth - Apply puppeteer-extra-plugin-stealth to mask the
+ *   automation tells Akamai/Cloudflare bot detection looks for. Required
+ *   for many travel + commerce sites. Free on Browserless.
+ * @param opts.humanlike - Add mouse-movement + scroll simulation to look
+ *   more like a real visitor. Pairs with stealth for stronger bots.
  */
 export async function browserlessFunction<TInput extends object, TOutput>(
   code: string,
   context: TInput,
-  timeoutMs = 60_000
+  opts: {
+    timeoutMs?: number;
+    stealth?: boolean;
+    humanlike?: boolean;
+  } = {}
 ): Promise<TOutput> {
   const token = process.env.BROWSERLESS_TOKEN;
   if (!token) {
@@ -44,12 +51,16 @@ export async function browserlessFunction<TInput extends object, TOutput>(
       "BROWSERLESS_TOKEN is not set — add it to Vercel env vars (Production + Preview)"
     );
   }
+  const timeoutMs = opts.timeoutMs ?? 60_000;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const res = await fetch(`${baseUrl()}/function?token=${token}`, {
+    const qs = new URLSearchParams({ token });
+    if (opts.stealth) qs.set("stealth", "true");
+    if (opts.humanlike) qs.set("humanlike", "true");
+    const res = await fetch(`${baseUrl()}/function?${qs}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ code, context }),
