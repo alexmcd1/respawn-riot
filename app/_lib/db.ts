@@ -102,6 +102,66 @@ export async function ensureSchema(): Promise<void> {
     )
   `;
 
+  // ── Disney resort deal watcher tables.
+  //
+  // disney_watches: one row per (subscriber, configured watch). A user
+  //   can have multiple watches for different trip windows.
+  // disney_last_prices: most-recent observed price per (watch, resort)
+  //   so the cron can detect deltas instead of re-emailing the same
+  //   price every run.
+  // disney_sent_alerts: dedup table keyed by an arbitrary alert string
+  //   so RSS posts and price drops never get sent twice.
+  // disney_healthcheck: timeseries of API success — if disney_check
+  //   stops returning offers, the cron writes a row so we can spot
+  //   the silent failure.
+  await db`
+    CREATE TABLE IF NOT EXISTS disney_watches (
+      id            SERIAL PRIMARY KEY,
+      subscriber_id INT NOT NULL REFERENCES subscribers(id) ON DELETE CASCADE,
+      name          TEXT,
+      check_in      DATE NOT NULL,
+      check_out     DATE NOT NULL,
+      adults        INT NOT NULL DEFAULT 2,
+      children      INT NOT NULL DEFAULT 0,
+      resort_ids    TEXT[] NOT NULL DEFAULT '{}'::TEXT[],
+      max_price     INT,
+      fl_resident   BOOLEAN NOT NULL DEFAULT TRUE,
+      postal_code   TEXT DEFAULT '32601',
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+  await db`
+    CREATE INDEX IF NOT EXISTS disney_watches_subscriber_idx
+      ON disney_watches (subscriber_id)
+  `;
+  await db`
+    CREATE TABLE IF NOT EXISTS disney_last_prices (
+      watch_id      INT NOT NULL REFERENCES disney_watches(id) ON DELETE CASCADE,
+      resort_id     TEXT NOT NULL,
+      last_price    INT NOT NULL,
+      last_offer_id TEXT,
+      last_seen     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (watch_id, resort_id)
+    )
+  `;
+  await db`
+    CREATE TABLE IF NOT EXISTS disney_sent_alerts (
+      subscriber_id INT NOT NULL REFERENCES subscribers(id) ON DELETE CASCADE,
+      alert_key     TEXT NOT NULL,
+      sent_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (subscriber_id, alert_key)
+    )
+  `;
+  await db`
+    CREATE TABLE IF NOT EXISTS disney_healthcheck (
+      id               SERIAL PRIMARY KEY,
+      checked_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      api_ok           BOOLEAN NOT NULL,
+      resorts_returned INT,
+      error_msg        TEXT
+    )
+  `;
+
   // Each CREATE TABLE IF NOT EXISTS is its own statement — Neon's HTTP
   // driver doesn't multiplex DDL like a regular Postgres connection.
   await db`
