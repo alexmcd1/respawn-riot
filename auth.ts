@@ -117,4 +117,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     signIn: "/sign-in",
     verifyRequest: "/sign-in/check-email",
   },
+  // Force structured error logging so future failures aren't opaque
+  // "Server error" pages. Surfaces the actual cause in Vercel logs.
+  logger: {
+    error(error) {
+      console.error("[auth][error]", error?.name ?? "Error", error?.message ?? String(error), error?.stack ?? "");
+    },
+    warn(code) {
+      console.warn("[auth][warn]", code);
+    },
+  },
 });
