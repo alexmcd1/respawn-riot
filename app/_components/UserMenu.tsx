@@ -58,21 +58,34 @@ export default function UserMenu({ compact = false }: { compact?: boolean }) {
   const email = session.user.email
   const initial = email[0]?.toUpperCase() ?? '?'
 
+  // Show first 8 chars of the email's local part on small screens —
+  // long enough to recognize ("alexmcd1"), short enough not to wrap.
+  const username = email.split('@')[0]
+  const shortName = username.length > 8 ? `${username.slice(0, 8)}…` : username
+
   return (
     <div ref={menuRef} className="relative">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        aria-label="Account menu"
+        aria-label={`Account menu — signed in as ${email}`}
         aria-expanded={open}
-        className="flex items-center gap-2 rounded-full border border-fuchsia-400/40 bg-black/40 py-1 pl-1 pr-3 transition hover:border-fuchsia-400 hover:shadow-[0_0_12px_rgba(217,70,239,0.5)]"
+        title={`Signed in as ${email}`}
+        className="flex items-center gap-2 rounded-full border-2 border-emerald-400/70 bg-emerald-500/10 py-1 pl-1 pr-3 shadow-[0_0_12px_-2px_rgba(52,211,153,0.6)] transition hover:border-emerald-400 hover:shadow-[0_0_16px_-2px_rgba(52,211,153,0.8)]"
       >
-        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-fuchsia-500 to-pink-500 font-display text-sm text-black">
+        {/* Avatar with status dot — green ring + corner dot make the
+            "signed in" state unmistakable, even on mobile where the
+            text label is short. */}
+        <span className="relative flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-fuchsia-500 to-pink-500 font-display text-sm text-black">
           {initial}
+          <span
+            aria-hidden="true"
+            className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-black"
+          />
         </span>
         {!compact && (
-          <span className="hidden font-display text-xs tracking-widest text-white/85 sm:inline">
-            {email.split('@')[0]}
+          <span className="font-display text-xs tracking-widest text-emerald-200">
+            <span className="text-emerald-400">●</span> {shortName}
           </span>
         )}
       </button>
