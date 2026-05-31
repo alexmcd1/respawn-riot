@@ -1,14 +1,17 @@
 'use client'
 
-// Universal Orlando deals panel — static catalog + RSS deal feed.
+// Universal Orlando deals panel with live rate lookup via Browserless.
 //
-// Why no live rates? Universal's hotel-booking API is fronted by
-// Akamai bot protection that blocks server-side replay. (Disney's
-// equivalent isn't, which is why /disney/availability works.) We
-// surface the catalog with booking deeplinks instead, and rely on
-// MouseSavers/AllEars/Inside Universal RSS for "new offer dropped"
-// alerts.
+// Universal's booking API blocks server-side requests with Akamai bot
+// detection. We use a hosted real-Chrome instance (Browserless) to
+// visit universalorlando.com and make the rate call from inside the
+// real page context, bypassing the bot wall. Slower (3-8s round trip)
+// but reliable.
+//
+// Falls back gracefully: if Browserless is unconfigured or errors,
+// the catalog + RSS deals + booking deeplinks still render.
 
+import { useState } from 'react'
 import {
   UNIVERSAL_ALL_OFFERS_URL,
   UNIVERSAL_FL_RESIDENT_URL,
@@ -27,6 +30,14 @@ type ParkDealItem = {
   parks: 'disney' | 'universal' | 'both' | 'other'
 }
 
+type LiveOffer = {
+  hotelCode: string
+  name: string
+  tier: UniversalTier
+  fromPrice: number
+  url?: string
+}
+
 const TIER_TONE: Record<UniversalTier, string> = {
   Value: 'border-emerald-400/50 bg-emerald-500/10 text-emerald-200',
   'Prime Value': 'border-amber-400/50 bg-amber-500/10 text-amber-200',
@@ -39,27 +50,65 @@ export default function UniversalDealsPanel({
 }: {
   recentDeals: ParkDealItem[]
 }) {
+  // Live-rate search state
+  const [checkIn, setCheckIn] = useState('')
+  const [checkOut, setCheckOut] = useState('')
+  const [adults, setAdults] = useState(2)
+  const [children, setChildren] = useState(0)
+  const [flResident, setFlResident] = useState(true)
+
+  const [liveOffers, setLiveOffers] = useState<LiveOffer[] | null>(null)
+  const [searching, setSearching] = useState(false)
+  const [searchError, setSearchError] = useState('')
+  const [fetchedMs, setFetchedMs] = useState<number | null>(null)
+
+  async function doSearch(e: React.FormEvent) {
+    e.preventDefault()
+    setSearchError('')
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(checkIn) || !/^\d{4}-\d{2}-\d{2}$/.test(checkOut)) {
+      setSearchError('Pick check-in and check-out dates first.')
+      return
+    }
+    if (checkIn >= checkOut) {
+      setSearchError('Check-out must be after check-in.')
+      return
+    }
+    setSearching(true)
+    try {
+      const res = await fetch('/api/universal/availability', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          checkIn,
+          checkOut,
+          adults,
+          children,
+          promoCode: flResident ? 'FLO' : undefined,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!data.ok) {
+        setSearchError(typeof data.error === 'string' ? data.error : 'Search failed')
+        setLiveOffers(null)
+      } else {
+        setLiveOffers(data.offers ?? [])
+        setFetchedMs(typeof data.fetchedInMs === 'number' ? data.fetchedInMs : null)
+      }
+    } catch {
+      setSearchError('Network error — try again.')
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  // Build a quick lookup of live prices by hotel code so the catalog
+  // section can show "from $X/night" badges alongside each hotel.
+  const livePriceByCode = new Map<string, number>(
+    (liveOffers ?? []).map((o) => [o.hotelCode, o.fromPrice])
+  )
+
   return (
     <div className="space-y-6">
-      {/* Heads-up explaining the rate situation honestly */}
-      <div className="rounded-2xl border border-pink-400/30 bg-pink-500/5 p-4 text-sm">
-        <p className="font-display text-[10px] tracking-[0.3em] text-pink-300">
-          ▌ HOW THIS TAB WORKS
-        </p>
-        <p className="mt-2 text-white/85">
-          Universal&apos;s booking system blocks server-side rate lookups (their
-          anti-bot is more aggressive than Disney&apos;s). So instead of live
-          prices, this tab shows the full on-site catalog with deeplinks +
-          a feed of new Universal deal posts as soon as MouseSavers,
-          AllEars, or Inside Universal publish them.
-        </p>
-        <p className="mt-2 text-white/65">
-          Click any hotel to open Universal&apos;s booking page in a new tab —
-          the FL Resident discount option (promo code <strong className="text-pink-200">FLO</strong>)
-          is visible at the top of every page on universalorlando.com.
-        </p>
-      </div>
-
       {/* Quick links to canonical Universal pages */}
       <div className="flex flex-wrap gap-2">
         <a
@@ -88,6 +137,166 @@ export default function UniversalDealsPanel({
         </a>
       </div>
 
+      {/* Live rate search */}
+      <form onSubmit={doSearch} className="space-y-4 rounded-2xl border border-white/10 bg-black/20 p-4">
+        <div>
+          <p className="font-display text-[10px] tracking-[0.3em] text-pink-300">
+            ▌ LIVE RATE CHECK
+          </p>
+          <p className="mt-1 text-xs text-white/55">
+            Routes through a hosted browser to bypass Universal&apos;s bot
+            wall — takes 5–10 seconds.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div>
+            <label htmlFor="u-in" className="font-display text-[10px] tracking-[0.3em] text-pink-300">
+              ▌ CHECK-IN
+            </label>
+            <input
+              id="u-in"
+              type="date"
+              value={checkIn}
+              onChange={(e) => setCheckIn(e.target.value)}
+              className="mt-2 w-full rounded-xl border border-white/15 bg-black/40 px-3 py-2.5 text-sm text-white outline-none focus:border-pink-400 [color-scheme:dark]"
+            />
+          </div>
+          <div>
+            <label htmlFor="u-out" className="font-display text-[10px] tracking-[0.3em] text-pink-300">
+              ▌ CHECK-OUT
+            </label>
+            <input
+              id="u-out"
+              type="date"
+              value={checkOut}
+              min={checkIn || undefined}
+              onChange={(e) => setCheckOut(e.target.value)}
+              className="mt-2 w-full rounded-xl border border-white/15 bg-black/40 px-3 py-2.5 text-sm text-white outline-none focus:border-pink-400 [color-scheme:dark]"
+            />
+          </div>
+          <div>
+            <label htmlFor="u-ad" className="font-display text-[10px] tracking-[0.3em] text-pink-300">
+              ▌ ADULTS
+            </label>
+            <input
+              id="u-ad"
+              type="number"
+              min={1}
+              max={10}
+              value={adults}
+              onChange={(e) => setAdults(Math.max(1, Math.min(10, parseInt(e.target.value, 10) || 2)))}
+              className="mt-2 w-full rounded-xl border border-white/15 bg-black/40 px-3 py-2.5 text-sm text-white outline-none focus:border-pink-400"
+            />
+          </div>
+          <div>
+            <label htmlFor="u-ch" className="font-display text-[10px] tracking-[0.3em] text-pink-300">
+              ▌ CHILDREN
+            </label>
+            <input
+              id="u-ch"
+              type="number"
+              min={0}
+              max={10}
+              value={children}
+              onChange={(e) => setChildren(Math.max(0, Math.min(10, parseInt(e.target.value, 10) || 0)))}
+              className="mt-2 w-full rounded-xl border border-white/15 bg-black/40 px-3 py-2.5 text-sm text-white outline-none focus:border-pink-400"
+            />
+          </div>
+        </div>
+
+        <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-pink-400/40 bg-pink-500/5 px-4 py-3 text-sm text-pink-100 hover:border-pink-400">
+          <input
+            type="checkbox"
+            checked={flResident}
+            onChange={(e) => setFlResident(e.target.checked)}
+            className="h-5 w-5 accent-pink-500"
+          />
+          <span>
+            ✦ Florida Resident rates
+            <span className="ml-2 text-[11px] text-white/50">
+              (promo <strong className="text-pink-200">FLO</strong> — no Universal login needed)
+            </span>
+          </span>
+        </label>
+
+        {searchError && (
+          <p className="rounded-xl border border-red-400/40 bg-red-500/10 p-3 text-sm text-red-200">
+            ▲ {searchError}
+          </p>
+        )}
+
+        <button
+          type="submit"
+          disabled={searching}
+          className="w-full rounded-xl bg-pink-500 px-6 py-3 font-display text-base tracking-[0.25em] text-black hover:bg-pink-400 disabled:opacity-50"
+        >
+          {searching ? 'CHECKING UNIVERSAL… (5-10s)' : '🔍 PREVIEW RATES'}
+        </button>
+      </form>
+
+      {/* Live results */}
+      {liveOffers && (
+        <div className="rounded-2xl border border-pink-400/30 bg-pink-500/5 p-4">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <p className="font-display text-[10px] tracking-[0.3em] text-pink-300">
+              ▌ LIVE RATES{flResident ? ' · FLORIDA RESIDENT' : ''}
+            </p>
+            <p className="text-[11px] text-emerald-300/85">
+              ✓ via Browserless · {fetchedMs ? `${(fetchedMs / 1000).toFixed(1)}s` : 'fresh'}
+            </p>
+          </div>
+          {liveOffers.length === 0 ? (
+            <p className="mt-3 text-sm text-white/65">
+              No rates returned for these dates. Try widening the range or
+              dropping the FL Resident filter.
+            </p>
+          ) : (
+            <ul className="mt-3 space-y-2">
+              {liveOffers.map((o) => {
+                const meta = UNIVERSAL_HOTELS.find((h) => h.code === o.hotelCode)
+                return (
+                  <li
+                    key={o.hotelCode}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/30 p-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate font-display text-base text-white">
+                        {o.name.replace(/^(Universal'?s?|Loews) /, '')}
+                      </p>
+                      <p className="text-[10px] uppercase tracking-widest text-pink-300/80">
+                        {o.tier}
+                      </p>
+                      {meta?.tierBlurb && o.tier === 'Premier' && (
+                        <p className="mt-0.5 text-[11px] text-emerald-300/85">
+                          ✓ Free Unlimited Express Pass
+                        </p>
+                      )}
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="font-display text-2xl leading-none text-white">
+                        ${Math.round(o.fromPrice)}
+                        <span className="ml-0.5 text-xs text-white/55">/nt</span>
+                      </p>
+                      {o.url && (
+                        <a
+                          href={o.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-1 inline-block rounded-md border border-pink-400/60 bg-pink-500/10 px-2 py-1 text-[10px] uppercase tracking-widest text-pink-100 hover:bg-pink-500/20"
+                        >
+                          ↗ Book
+                        </a>
+                      )}
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </div>
+      )}
+
       {/* Recent Universal-tagged deal posts */}
       {recentDeals.length > 0 && (
         <section>
@@ -114,7 +323,7 @@ export default function UniversalDealsPanel({
                       </span>
                     )}
                   </p>
-                  <p className="mt-1 text-sm leading-snug text-white group-hover:text-pink-100">
+                  <p className="mt-1 text-sm leading-snug text-white">
                     {d.title} ↗
                   </p>
                 </a>
@@ -124,7 +333,8 @@ export default function UniversalDealsPanel({
         </section>
       )}
 
-      {/* Catalog of on-site hotels, grouped by tier */}
+      {/* Static catalog — always visible as reference, "from $X" badges
+          appear once a live search runs. */}
       <section>
         <h4 className="mb-3 font-display text-[11px] tracking-[0.3em] text-pink-300">
           ▌ ON-SITE HOTELS ({UNIVERSAL_HOTELS.length})
@@ -142,7 +352,11 @@ export default function UniversalDealsPanel({
                 </h5>
                 <ul className="mt-2 grid gap-2 sm:grid-cols-2">
                   {list.map((h) => (
-                    <HotelCard key={h.code} hotel={h} />
+                    <HotelCard
+                      key={h.code}
+                      hotel={h}
+                      livePrice={livePriceByCode.get(h.code)}
+                    />
                   ))}
                 </ul>
                 {list[0].tierBlurb && (
@@ -159,12 +373,19 @@ export default function UniversalDealsPanel({
   )
 }
 
-function HotelCard({ hotel }: { hotel: UniversalHotel }) {
+function HotelCard({ hotel, livePrice }: { hotel: UniversalHotel; livePrice?: number }) {
   return (
     <li className="rounded-xl border border-white/10 bg-white/[0.03] p-3 transition hover:border-pink-400/40">
-      <p className="font-display text-base text-white">
-        {hotel.name.replace(/^(Universal'?s?|Loews) /, '')}
-      </p>
+      <div className="flex items-start justify-between gap-2">
+        <p className="font-display text-base text-white">
+          {hotel.name.replace(/^(Universal'?s?|Loews) /, '')}
+        </p>
+        {livePrice != null && (
+          <span className="shrink-0 rounded-md bg-emerald-500/15 px-2 py-0.5 font-display text-[11px] tracking-widest text-emerald-200">
+            ${Math.round(livePrice)}/nt
+          </span>
+        )}
+      </div>
       {hotel.blurb && (
         <p className="mt-1 text-xs text-white/65">{hotel.blurb}</p>
       )}
