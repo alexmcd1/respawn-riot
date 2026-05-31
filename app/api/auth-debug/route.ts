@@ -25,6 +25,27 @@ export async function GET() {
     authImportError = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
   }
 
+  // Connection probe: try the SAME pg Pool config Auth.js's pg adapter
+  // uses, and run a trivial query. If this fails, the adapter has no
+  // chance of working — and the error message tells us why.
+  let dbProbe: { ok: boolean; error?: string; userCount?: number } = { ok: false };
+  try {
+    const { Pool } = await import("pg");
+    const pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: { rejectUnauthorized: false },
+      max: 1,
+    });
+    const r = await pool.query<{ c: string }>("SELECT COUNT(*)::text AS c FROM users");
+    dbProbe = { ok: true, userCount: parseInt(r.rows[0]?.c ?? "0", 10) };
+    await pool.end();
+  } catch (err) {
+    dbProbe = {
+      ok: false,
+      error: err instanceof Error ? `${err.name}: ${err.message}` : String(err),
+    };
+  }
+
   return NextResponse.json({
     nodeEnv: process.env.NODE_ENV ?? null,
     vercelEnv: process.env.VERCEL_ENV ?? null,
@@ -41,5 +62,6 @@ export async function GET() {
       TICKETMASTER_API_KEY: has("TICKETMASTER_API_KEY"),
     },
     authImportError,
+    dbProbe,
   });
 }

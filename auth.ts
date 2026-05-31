@@ -34,6 +34,11 @@ declare module "next-auth" {
 // query, so it's safe at module top-level.
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+  // Neon serves SSL but pg's strict default cert validation rejects
+  // their CA in some Vercel environments. rejectUnauthorized=false
+  // accepts any cert from the host (still encrypted, just not chain-
+  // verified — safe for managed Postgres like Neon).
+  ssl: { rejectUnauthorized: false },
   // Neon recommends max=1 for serverless to avoid connection bloat
   max: 1,
 });
@@ -52,8 +57,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       // Override the default Auth.js HTML so the email matches our brand.
       // identifier = the email being signed in, url = the magic link
       sendVerificationRequest: async ({ identifier, url, provider }) => {
+        console.log(`[auth] sendVerificationRequest START for ${identifier}`);
         const { host } = new URL(url);
-        const res = await fetch("https://api.resend.com/emails", {
+        let res: Response;
+        try {
+          res = await fetch("https://api.resend.com/emails", {
           method: "POST",
           headers: {
             Authorization: `Bearer ${provider.apiKey}`,
@@ -88,11 +96,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             text: `Sign in to Respawn Riot: ${url}\n\nThis link works once and expires in 24 hours.`,
           }),
         });
+        } catch (err) {
+          console.error("[auth] Resend fetch threw:", err);
+          throw err;
+        }
         if (!res.ok) {
           const body = await res.text().catch(() => "<no body>");
           console.warn(`[auth] Resend send failed ${res.status} — ${body.slice(0, 200)}`);
-          throw new Error(`Resend failed: ${res.status}`);
+          throw new Error(`Resend failed: ${res.status} — ${body.slice(0, 200)}`);
         }
+        console.log(`[auth] sendVerificationRequest DONE for ${identifier}`);
       },
     }),
   ],
