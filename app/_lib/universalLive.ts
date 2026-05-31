@@ -35,12 +35,24 @@ export type UniversalLiveOffer = {
   url?: string;
 };
 
-// What Browserless returns from our function (mirrors the structure of
-// Universal's HTTP response, plus the status code so we can detect
-// errors without throwing).
+// What Browserless returns from our function. Includes diagnostics so
+// we can see why fetches fail (page state, goto errors, etc).
+type FetchResult =
+  | { ok: true; status: number; body: string }
+  | { ok: false; error: string; errorName: string | null };
+
+type PageState = {
+  url: string;
+  title: string;
+  cookieCount: number;
+  bodyLen: number;
+  bodyHead: string;
+};
+
 type BrowserlessResult = {
-  status: number;
-  body: string;
+  fetchResult: FetchResult;
+  pageState: PageState;
+  gotoErr: string | null;
 };
 
 type RawPricedHotel = {
@@ -84,21 +96,37 @@ export default async function ({ page, context }) {
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36'
   );
 
-  // Visit the hotel listing — establishes Akamai session
-  await page.goto('https://www.universalorlando.com/hotels/en/us/listing', {
-    waitUntil: 'domcontentloaded',
-    timeout: 30000,
-  });
+  // Step 1: try to land on the hotel listing. If Akamai serves a
+  // challenge page, page.goto may "succeed" but land somewhere else.
+  let gotoErr = null;
+  try {
+    await page.goto('https://www.universalorlando.com/hotels/en/us/listing', {
+      waitUntil: 'domcontentloaded',
+      timeout: 30000,
+    });
+  } catch (e) {
+    gotoErr = String(e && e.message || e);
+  }
 
   // Give Akamai's JS challenges a chance to run
-  await new Promise((r) => setTimeout(r, 2500));
+  await new Promise((r) => setTimeout(r, 3500));
+
+  // Capture diagnostic info about where we actually landed
+  const pageState = await page.evaluate(() => ({
+    url: window.location.href,
+    title: document.title,
+    cookieCount: (document.cookie || '').split(';').filter(Boolean).length,
+    bodyLen: document.body ? document.body.innerText.length : 0,
+    bodyHead: document.body ? document.body.innerText.slice(0, 300) : '',
+  }));
 
   // Build the age_counts shape Universal expects
   const ageCounts = [{ age_group: 'adult', count: adults }];
   if (children > 0) ageCounts.push({ age_group: 'child', count: children });
 
-  // Make the rate fetch from within the real browser's page context
-  const result = await page.evaluate(async (args) => {
+  // Make the rate fetch from within the real browser's page context.
+  // Catch + return errors instead of throwing so we can diagnose.
+  const fetchResult = await page.evaluate(async (args) => {
     const instanceId =
       (typeof crypto !== 'undefined' && crypto.randomUUID && crypto.randomUUID()) ||
       ('xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
@@ -113,32 +141,41 @@ export default async function ({ page, context }) {
     };
     if (args.promoCode) body.promo_code = args.promoCode;
 
-    const res = await fetch(
-      'https://api.universalparks.com/resort-areas/UOR/hotel-stay-search-request/priced-hotels',
-      {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          accept: 'application/json, text/plain, */*',
-          'content-type': 'application/json',
-          'cache-control': 'NO-STORE,max-age=0',
-          pragma: 'NO-CACHE',
-          'x-ibm-client-id': 'e7c945ba-eeec-4384-b03d-601650677987',
-          'x-instance-id': instanceId,
-          'x-source-id': '1003002',
-          'x-uniwebservice-apikey': 'WebApp',
-          'x-uniwebservice-appversion': 'upr-web-hotels-1.0',
-          'x-uniwebservice-device': 'Chrome',
-          'x-uniwebservice-platform': 'Web',
-        },
-        body: JSON.stringify(body),
-      }
-    );
-    const text = await res.text();
-    return { status: res.status, body: text };
+    try {
+      const res = await fetch(
+        'https://api.universalparks.com/resort-areas/UOR/hotel-stay-search-request/priced-hotels',
+        {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            accept: 'application/json, text/plain, */*',
+            'content-type': 'application/json',
+            'x-ibm-client-id': 'e7c945ba-eeec-4384-b03d-601650677987',
+            'x-instance-id': instanceId,
+            'x-source-id': '1003002',
+            'x-uniwebservice-apikey': 'WebApp',
+            'x-uniwebservice-appversion': 'upr-web-hotels-1.0',
+            'x-uniwebservice-device': 'Chrome',
+            'x-uniwebservice-platform': 'Web',
+          },
+          body: JSON.stringify(body),
+        }
+      );
+      const text = await res.text();
+      return { ok: true, status: res.status, body: text };
+    } catch (err) {
+      return {
+        ok: false,
+        error: String(err && err.message || err),
+        errorName: err && err.name ? err.name : null,
+      };
+    }
   }, { ageCounts, checkIn, checkOut, promoCode });
 
-  return { data: result, type: 'application/json' };
+  return {
+    data: { fetchResult, pageState, gotoErr },
+    type: 'application/json',
+  };
 }
 `;
 
@@ -156,13 +193,23 @@ export async function fetchUniversalLiveRates(
     }
   );
 
-  if (result.status !== 200) {
+  // Surface diagnostic info via the error message when something
+  // goes wrong — makes Vercel logs immediately useful.
+  if (!result.fetchResult.ok) {
+    const ps = result.pageState;
     throw new Error(
-      `Universal priced-hotels via Browserless HTTP ${result.status} — ${result.body.slice(0, 300)}`
+      `Universal fetch failed inside browser — ${result.fetchResult.error} | ` +
+      `goto=${result.gotoErr ?? 'ok'} | landed=${ps.url} | title="${ps.title}" | ` +
+      `cookies=${ps.cookieCount} bodyLen=${ps.bodyLen} bodyHead="${ps.bodyHead.replace(/\n/g, ' ').slice(0, 200)}"`
+    );
+  }
+  if (result.fetchResult.status !== 200) {
+    throw new Error(
+      `Universal priced-hotels HTTP ${result.fetchResult.status} — ${result.fetchResult.body.slice(0, 300)}`
     );
   }
 
-  const data = JSON.parse(result.body) as RawPricedHotel[];
+  const data = JSON.parse(result.fetchResult.body) as RawPricedHotel[];
   if (!Array.isArray(data)) {
     throw new Error("Universal returned non-array response");
   }
