@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { fetchManyRss, formatRelative, type Feed } from "../_lib/rss";
+import OrlandoTabs from "./_components/OrlandoTabs";
 
 const DISNEY_FEEDS: Feed[] = [
   { url: "https://wdwnt.com/feed/", source: "WDW News Today" },
@@ -230,93 +232,11 @@ export default async function OrlandoPage() {
 
   const alerts = alertsData?.features ?? [];
 
-  return (
-    <main className="bg-black text-white">
-      {/* Hero */}
-      <section className="relative overflow-hidden border-b border-orange-500/40 scanlines">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(251,146,60,0.30),transparent_55%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_right,rgba(244,114,182,0.20),transparent_55%)]" />
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-2 stripe-band" />
-
-        <div className="relative mx-auto max-w-7xl px-6 py-12 sm:py-16">
-          <p className="font-display text-sm tracking-[0.3em] text-orange-300">
-            ▌ CHANNEL 06
-          </p>
-          <h1 className="mt-3 font-display text-5xl tracking-[0.04em] sm:text-7xl">
-            ORLANDO <span className="text-orange-400">{"//"}</span> PARKS &amp; ROADS
-          </h1>
-          <p className="mt-4 max-w-2xl text-white/75">
-            {"Live weather + NWS alerts, what's moving at Disney and Universal, and how messy I-75 and the Turnpike are right now."}
-          </p>
-
-          {/* Live weather strip — or Kid Ghost fallback if NWS is down */}
-          {tempF === null && !today ? (
-            <div className="mt-8 grid items-center gap-5 rounded-2xl border border-fuchsia-500/40 bg-gradient-to-br from-fuchsia-500/15 to-transparent p-5 sm:grid-cols-[120px_1fr]">
-              <div className="relative mx-auto h-28 w-28 overflow-hidden rounded-xl border border-fuchsia-500/40 bg-black sm:mx-0">
-                <Image
-                  src="/mascot/battery.jpg"
-                  alt="The Kid Ghost — battery at 4%"
-                  fill
-                  sizes="120px"
-                  className="object-cover"
-                />
-              </div>
-              <div>
-                <p className="font-display text-xs tracking-[0.3em] text-fuchsia-300">
-                  ▌ SIGNAL LOST
-                </p>
-                <p className="mt-2 font-display text-2xl tracking-wide">
-                  {"NWS isn't talking right now."}
-                </p>
-                <p className="mt-2 text-sm text-white/70">
-                  {"can't reach api.weather.gov. it'll cycle back next page load. —kg"}
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="mt-8 grid gap-4 rounded-2xl border border-orange-400/30 bg-gradient-to-br from-orange-500/15 via-fuchsia-500/10 to-transparent p-5 sm:grid-cols-4">
-              <div>
-                <p className="font-display text-xs tracking-[0.3em] text-orange-300">
-                  NOW IN ORLANDO
-                </p>
-                <p className="mt-1 font-display text-5xl tracking-tight">
-                  {tempF !== null ? `${tempF}°F` : "—"}
-                </p>
-                <p className="mt-1 text-sm text-white/75">
-                  {obs?.textDescription ?? "Conditions unavailable"}
-                </p>
-              </div>
-              <div className="grid grid-cols-2 gap-2 sm:col-span-2 sm:grid-cols-3">
-                <div className="rounded-lg border border-white/10 bg-black/40 p-3">
-                  <p className="text-[10px] uppercase tracking-[0.25em] text-orange-300">Humidity</p>
-                  <p className="mt-1 font-display text-xl">
-                    {humidity !== null ? `${humidity}%` : "—"}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-white/10 bg-black/40 p-3">
-                  <p className="text-[10px] uppercase tracking-[0.25em] text-orange-300">Wind</p>
-                  <p className="mt-1 font-display text-xl">
-                    {windMph !== null ? `${windMph} mph` : "—"}
-                  </p>
-                </div>
-                <div className="col-span-2 rounded-lg border border-white/10 bg-black/40 p-3 sm:col-span-1">
-                  <p className="text-[10px] uppercase tracking-[0.25em] text-orange-300">Today</p>
-                  <p className="mt-1 truncate font-display text-base">
-                    {today ? `${today.temperature}°${today.temperatureUnit} · ${today.shortForecast}` : "—"}
-                  </p>
-                </div>
-              </div>
-              <div className="text-xs text-white/55 sm:text-right">
-                <p className="font-display tracking-[0.2em] text-white/70">SOURCE</p>
-                <p className="mt-1">National Weather Service (NWS)</p>
-                <p className="mt-1">KMCO • MLB grid 26,68</p>
-                <p className="mt-1">Updates every 10 min</p>
-              </div>
-            </div>
-          )}
-        </div>
-      </section>
-
+  // News content (alerts + forecast + Disney/Universal news + traffic) is
+  // wrapped in a fragment and passed to the client tabbed shell. The
+  // Disney Deals tab renders its own client-only panel.
+  const newsContent = (
+    <>
       {/* Active alerts */}
       {alerts.length > 0 && (
         <section className="border-b border-white/10 bg-zinc-950 px-6 py-10">
@@ -553,6 +473,102 @@ export default async function OrlandoPage() {
           </div>
         </div>
       </section>
+    </>
+  );
+
+  return (
+    <main className="bg-black text-white">
+      {/* Hero */}
+      <section className="relative overflow-hidden border-b border-orange-500/40 scanlines">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(251,146,60,0.30),transparent_55%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_right,rgba(244,114,182,0.20),transparent_55%)]" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-2 stripe-band" />
+
+        <div className="relative mx-auto max-w-7xl px-6 py-12 sm:py-16">
+          <p className="font-display text-sm tracking-[0.3em] text-orange-300">
+            ▌ CHANNEL 06
+          </p>
+          <h1 className="mt-3 font-display text-5xl tracking-[0.04em] sm:text-7xl">
+            ORLANDO <span className="text-orange-400">{"//"}</span> PARKS &amp; ROADS
+          </h1>
+          <p className="mt-4 max-w-2xl text-white/75">
+            {"Live weather + NWS alerts, what's moving at Disney and Universal, and how messy I-75 and the Turnpike are right now."}
+          </p>
+
+          {/* Live weather strip — or Kid Ghost fallback if NWS is down */}
+          {tempF === null && !today ? (
+            <div className="mt-8 grid items-center gap-5 rounded-2xl border border-fuchsia-500/40 bg-gradient-to-br from-fuchsia-500/15 to-transparent p-5 sm:grid-cols-[120px_1fr]">
+              <div className="relative mx-auto h-28 w-28 overflow-hidden rounded-xl border border-fuchsia-500/40 bg-black sm:mx-0">
+                <Image
+                  src="/mascot/battery.jpg"
+                  alt="The Kid Ghost — battery at 4%"
+                  fill
+                  sizes="120px"
+                  className="object-cover"
+                />
+              </div>
+              <div>
+                <p className="font-display text-xs tracking-[0.3em] text-fuchsia-300">
+                  ▌ SIGNAL LOST
+                </p>
+                <p className="mt-2 font-display text-2xl tracking-wide">
+                  {"NWS isn't talking right now."}
+                </p>
+                <p className="mt-2 text-sm text-white/70">
+                  {"can't reach api.weather.gov. it'll cycle back next page load. —kg"}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-8 grid gap-4 rounded-2xl border border-orange-400/30 bg-gradient-to-br from-orange-500/15 via-fuchsia-500/10 to-transparent p-5 sm:grid-cols-4">
+              <div>
+                <p className="font-display text-xs tracking-[0.3em] text-orange-300">
+                  NOW IN ORLANDO
+                </p>
+                <p className="mt-1 font-display text-5xl tracking-tight">
+                  {tempF !== null ? `${tempF}°F` : "—"}
+                </p>
+                <p className="mt-1 text-sm text-white/75">
+                  {obs?.textDescription ?? "Conditions unavailable"}
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-2 sm:col-span-2 sm:grid-cols-3">
+                <div className="rounded-lg border border-white/10 bg-black/40 p-3">
+                  <p className="text-[10px] uppercase tracking-[0.25em] text-orange-300">Humidity</p>
+                  <p className="mt-1 font-display text-xl">
+                    {humidity !== null ? `${humidity}%` : "—"}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-white/10 bg-black/40 p-3">
+                  <p className="text-[10px] uppercase tracking-[0.25em] text-orange-300">Wind</p>
+                  <p className="mt-1 font-display text-xl">
+                    {windMph !== null ? `${windMph} mph` : "—"}
+                  </p>
+                </div>
+                <div className="col-span-2 rounded-lg border border-white/10 bg-black/40 p-3 sm:col-span-1">
+                  <p className="text-[10px] uppercase tracking-[0.25em] text-orange-300">Today</p>
+                  <p className="mt-1 truncate font-display text-base">
+                    {today ? `${today.temperature}°${today.temperatureUnit} · ${today.shortForecast}` : "—"}
+                  </p>
+                </div>
+              </div>
+              <div className="text-xs text-white/55 sm:text-right">
+                <p className="font-display tracking-[0.2em] text-white/70">SOURCE</p>
+                <p className="mt-1">National Weather Service (NWS)</p>
+                <p className="mt-1">KMCO • MLB grid 26,68</p>
+                <p className="mt-1">Updates every 10 min</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Tabbed shell — News (the JSX we built above) + Disney Deals.
+          Suspense boundary required because OrlandoTabs calls
+          useSearchParams() for ?tab=... URL sync. */}
+      <Suspense fallback={newsContent}>
+        <OrlandoTabs newsContent={newsContent} />
+      </Suspense>
 
       <footer className="border-t border-white/10 px-6 py-8 text-center text-xs text-white/45">
         Weather + alerts via the National Weather Service. Theme park and traffic
