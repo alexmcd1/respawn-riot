@@ -3,6 +3,9 @@ import { Geist, Geist_Mono, Bebas_Neue } from "next/font/google";
 import "./globals.css";
 import NavBar from "./_components/NavBar";
 import BackToTop from "./_components/BackToTop";
+import AuthProvider from "./_components/AuthProvider";
+import SignInModal from "./_components/SignInModal";
+import SyncController from "./_components/SyncController";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -37,9 +40,15 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} ${bebas.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-black text-white">
-        <NavBar />
-        <div className="flex-1">{children}</div>
-        <BackToTop />
+        <AuthProvider>
+          <NavBar />
+          <div className="flex-1">{children}</div>
+          <BackToTop />
+          <SignInModal />
+          {/* SyncController is invisible — watches session + drives
+              localStorage ↔ /api/sync/<kind> sync per registered store */}
+          <SyncController />
+        </AuthProvider>
       </body>
     </html>
   );

@@ -4,6 +4,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
+import UserMenu from './UserMenu'
 
 type NavLink = {
   href: string
@@ -111,12 +112,10 @@ export default function NavBar() {
 
           {/* CTA + mobile button */}
           <div className="flex items-center gap-2">
-            <Link
-              href="/#join"
-              className="hidden rounded-md bg-gradient-to-r from-fuchsia-500 to-pink-500 px-4 py-2 font-display text-sm tracking-[0.2em] text-black transition hover:scale-[1.03] hover:shadow-[0_0_20px_rgba(255,46,179,0.6)] sm:inline-block"
-            >
-              JOIN THE RIOT
-            </Link>
+            {/* User account: SIGN IN button when logged out, avatar menu
+                when logged in. Replaces the old "JOIN THE RIOT" CTA —
+                newsletter signup now lives in the site footer. */}
+            <UserMenu />
             <button
               aria-label="Toggle menu"
               className="rounded-md border border-white/20 px-3 py-2 font-display text-sm tracking-[0.2em] text-white/80 lg:hidden"
@@ -154,12 +153,14 @@ export default function NavBar() {
                 </Link>
               )
             })}
+            {/* Mobile drawer footer: link to newsletter signup so the
+                signup path remains discoverable from any page. */}
             <Link
               href="/#join"
               onClick={() => setOpen(false)}
-              className="col-span-2 rounded-md bg-gradient-to-r from-fuchsia-500 to-pink-500 px-4 py-3 text-center font-display text-sm tracking-[0.25em] text-black"
+              className="col-span-2 rounded-md border border-white/15 bg-black/40 px-4 py-3 text-center font-display text-xs tracking-[0.25em] text-white/70 hover:border-fuchsia-400/60 hover:text-fuchsia-200"
             >
-              JOIN THE RIOT
+              ✉ NEWSLETTER
             </Link>
           </nav>
         )}

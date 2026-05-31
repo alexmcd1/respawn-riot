@@ -30,9 +30,78 @@ export function sql(): SqlClient {
 
 // Idempotent table creation. Runs the first time any route needs the
 // DB; cached after that for the rest of the function's warm lifetime.
+//
+// NOTE: Auth.js v5 (@auth/pg-adapter) needs its own four tables
+// (users, accounts, sessions, verification_token). We create them
+// here too so the very first sign-in attempt doesn't fail with
+// "relation does not exist". Column names use Auth.js's quoted-
+// camelCase spelling (e.g. "userId") because the adapter references
+// them with double quotes.
 export async function ensureSchema(): Promise<void> {
   if (_schemaReady) return;
   const db = sql();
+
+  // ── Auth.js tables (must come before subscribers references below) ──
+  await db`
+    CREATE TABLE IF NOT EXISTS users (
+      id            SERIAL PRIMARY KEY,
+      name          VARCHAR(255),
+      email         VARCHAR(255),
+      "emailVerified" TIMESTAMPTZ,
+      image         TEXT
+    )
+  `;
+  await db`
+    CREATE UNIQUE INDEX IF NOT EXISTS users_email_unique
+      ON users (email)
+  `;
+  await db`
+    CREATE TABLE IF NOT EXISTS accounts (
+      id                  SERIAL PRIMARY KEY,
+      "userId"            INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      type                VARCHAR(255) NOT NULL,
+      provider            VARCHAR(255) NOT NULL,
+      "providerAccountId" VARCHAR(255) NOT NULL,
+      refresh_token       TEXT,
+      access_token        TEXT,
+      expires_at          BIGINT,
+      id_token            TEXT,
+      scope               TEXT,
+      session_state       TEXT,
+      token_type          TEXT
+    )
+  `;
+  await db`
+    CREATE TABLE IF NOT EXISTS sessions (
+      id             SERIAL PRIMARY KEY,
+      "userId"       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      expires        TIMESTAMPTZ NOT NULL,
+      "sessionToken" VARCHAR(255) NOT NULL
+    )
+  `;
+  await db`
+    CREATE TABLE IF NOT EXISTS verification_token (
+      identifier TEXT NOT NULL,
+      expires    TIMESTAMPTZ NOT NULL,
+      token      TEXT NOT NULL,
+      PRIMARY KEY (identifier, token)
+    )
+  `;
+
+  // ── user_data: the cross-device sync table.
+  //    One row per (user_id, kind) — the value is a JSONB blob the UI
+  //    layer interprets. Six kinds for now: recipes, restaurants,
+  //    shopping, quests, music-artists, music-cities.
+  await db`
+    CREATE TABLE IF NOT EXISTS user_data (
+      "userId"   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      kind       TEXT NOT NULL,
+      value      JSONB NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY ("userId", kind)
+    )
+  `;
+
   // Each CREATE TABLE IF NOT EXISTS is its own statement — Neon's HTTP
   // driver doesn't multiplex DDL like a regular Postgres connection.
   await db`
