@@ -2,7 +2,12 @@ import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { ensureSchema, sql } from "../../../_lib/db";
 import { fetchAvailability } from "../../../_lib/disney";
-import { fetchManyRss, type Feed } from "../../../_lib/rss";
+import {
+  fetchParkDeals,
+  disneyDeals,
+  universalDeals,
+  type ParkDeal,
+} from "../../../_lib/parkDeals";
 
 // Daily Disney deal cron. Three jobs in one route (Vercel Hobby cap is
 // 2 cron slots; concerts already uses one):
@@ -28,21 +33,9 @@ import { fetchManyRss, type Feed } from "../../../_lib/rss";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300; // 5 min — plenty for current scale
 
-// ─── RSS sources to scan for Disney deal posts ────────────────────────────
-
-const DEAL_FEEDS: Feed[] = [
-  { url: "https://www.mousesavers.com/feed/", source: "MouseSavers" },
-  { url: "https://www.disneytouristblog.com/feed/", source: "Disney Tourist Blog" },
-  { url: "https://allears.net/feed/", source: "AllEars" },
-  { url: "https://wdwnt.com/feed/", source: "WDW News Today" },
-];
-
-// Keyword filter for what counts as a "deal" post. We're permissive
-// because the cost of a false-positive is low (one email mentioning a
-// non-deal post is fine), and false-negatives mean missing the thing
-// the user actually wants.
-const DEAL_KEYWORDS =
-  /\b(deal|discount|sale|save|saving|offer|promo|promotion|special|bounce.?back|free dining|free.?night|florida resident|fl resident|annual passholder|ap discount|cast member discount|military discount|dvc discount|book.?early|early.?booking|teacher|nurse)\b/i;
+// RSS feed list + keyword filter + park-tagging logic all live in
+// app/_lib/parkDeals.ts so the cron and the Orlando page agree on
+// what counts as a deal.
 
 // ─── Email helpers (mirror the concerts cron pattern) ─────────────────────
 
@@ -252,21 +245,26 @@ export async function GET(request: Request) {
   console.log(`[cron/disney] healthcheck ok=${healthOk} resorts=${healthCount} err=${healthErr ?? "none"}`);
 
   // ── 2. RSS DEAL FEEDS ─────────────────────────────────────────────────
+  // fetchParkDeals returns both Disney and Universal deal posts tagged
+  // by park. For now this cron only emails subscribers with Disney
+  // watches, so we narrow to disneyDeals() (which also includes posts
+  // tagged "both" Disney + Universal — relevant to either audience).
+  let parkRss: ParkDeal[] = [];
   let rssDeals: RssDeal[] = [];
   try {
-    const items = await fetchManyRss(DEAL_FEEDS, { perFeedMax: 15, totalMax: 60 });
-    rssDeals = items
-      .filter((i) => DEAL_KEYWORDS.test(i.title))
-      .map((i) => ({
-        source: i.source,
-        title: i.title,
-        link: i.link,
-        pubDate: i.pubDate,
-      }));
+    parkRss = await fetchParkDeals();
+    rssDeals = disneyDeals(parkRss).map((i) => ({
+      source: i.source,
+      title: i.title,
+      link: i.link,
+      pubDate: i.pubDate,
+    }));
   } catch (err) {
     console.warn("[cron/disney] RSS fetch failed:", err);
   }
-  console.log(`[cron/disney] RSS deal posts found: ${rssDeals.length}`);
+  console.log(
+    `[cron/disney] RSS deal posts — total=${parkRss.length} disney+both=${rssDeals.length} universal+both=${universalDeals(parkRss).length}`
+  );
 
   // ── 3. SUBSCRIBERS LOOP ───────────────────────────────────────────────
   // Pull every subscriber with at least one Disney watch.

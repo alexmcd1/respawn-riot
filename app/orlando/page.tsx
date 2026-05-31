@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { fetchManyRss, formatRelative, type Feed } from "../_lib/rss";
+import { fetchParkDeals } from "../_lib/parkDeals";
 import OrlandoTabs from "./_components/OrlandoTabs";
 
 const DISNEY_FEEDS: Feed[] = [
@@ -184,7 +185,7 @@ const trafficHeadlines = [
 ];
 
 export default async function OrlandoPage() {
-  const [observation, forecastData, alertsData, disneyRaw, universalRaw] = await Promise.all([
+  const [observation, forecastData, alertsData, disneyRaw, universalRaw, parkDeals] = await Promise.all([
     fetchJson<{ properties: Observation }>(
       "https://api.weather.gov/stations/KMCO/observations/latest"
     ),
@@ -196,6 +197,8 @@ export default async function OrlandoPage() {
     ),
     fetchManyRss(DISNEY_FEEDS, { perFeedMax: 8, totalMax: 18, fallbacks: DISNEY_FALLBACKS, minBeforeFallback: 4 }),
     fetchManyRss(UNIVERSAL_FEEDS, { perFeedMax: 8, totalMax: 18, fallbacks: UNIVERSAL_FALLBACKS, minBeforeFallback: 4 }),
+    // Aggregated cross-park deal posts for the Park Deals tab overview
+    fetchParkDeals().catch(() => []),
   ]);
 
   // Filter mixed-coverage feeds. Items from sources that ONLY cover the
@@ -563,11 +566,11 @@ export default async function OrlandoPage() {
         </div>
       </section>
 
-      {/* Tabbed shell — News (the JSX we built above) + Disney Deals.
+      {/* Tabbed shell — News + Park Deals (Disney + Universal).
           Suspense boundary required because OrlandoTabs calls
           useSearchParams() for ?tab=... URL sync. */}
       <Suspense fallback={newsContent}>
-        <OrlandoTabs newsContent={newsContent} />
+        <OrlandoTabs newsContent={newsContent} parkDeals={parkDeals} />
       </Suspense>
 
       <footer className="border-t border-white/10 px-6 py-8 text-center text-xs text-white/45">
