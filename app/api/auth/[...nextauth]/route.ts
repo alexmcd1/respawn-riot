@@ -7,12 +7,13 @@
 // successful run, so the overhead is one extra cheap query per cold
 // start, then nothing.
 
+import type { NextRequest } from "next/server";
 import { handlers } from "../../../../auth";
 import { ensureSchema } from "../../../_lib/db";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   try {
     await ensureSchema();
   } catch (err) {
@@ -21,7 +22,7 @@ export async function GET(req: Request) {
   return handlers.GET(req);
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
     await ensureSchema();
   } catch (err) {
