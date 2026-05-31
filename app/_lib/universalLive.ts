@@ -64,6 +64,9 @@ const TIER_ORDER: Record<UniversalTier, number> = {
 // The Puppeteer function shipped to Browserless. Written as a string
 // because Browserless serializes + re-evaluates it server-side.
 //
+// Browserless v2 expects ES module syntax (`export default async ...`).
+// The older `module.exports = ...` returns "module is not defined".
+//
 // Important details:
 //   - We navigate to the listing page first so Akamai gets to set
 //     cookies and run any JS challenges.
@@ -73,7 +76,7 @@ const TIER_ORDER: Record<UniversalTier, number> = {
 //     server seems to accept any UUID-shaped value as long as the
 //     session + Akamai cookies are valid.
 const FN_SOURCE = `
-module.exports = async ({ page, context }) => {
+export default async function ({ page, context }) {
   const { checkIn, checkOut, adults, children, promoCode } = context;
 
   // Realistic UA — matches Browserless's Chrome version
@@ -135,8 +138,8 @@ module.exports = async ({ page, context }) => {
     return { status: res.status, body: text };
   }, { ageCounts, checkIn, checkOut, promoCode });
 
-  return result;
-};
+  return { data: result, type: 'application/json' };
+}
 `;
 
 export async function fetchUniversalLiveRates(
