@@ -4,6 +4,10 @@
     {
       "path": "/api/cron/check-favorites",
       "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/cron/disney-daily",
+      "schedule": "30 13 * * *"
     }
   ]
 }
