@@ -55,6 +55,7 @@ export default function DisneyDealsPanel() {
     checkOut: '',
     adults: 2,
     children: 0,
+    childAges: [],
     flResident: true,
     postalCode: '32601',
     maxPrice: null,
@@ -93,8 +94,25 @@ export default function DisneyDealsPanel() {
   // ─── Setters that auto-persist
   function updateWatch(patch: Partial<DisneyWatch>) {
     const next = { ...watch, ...patch }
+    // Keep childAges aligned with the children count — when a user
+    // bumps the count up, append default ages; when they drop it down,
+    // truncate. Default age = 8 (handles both pre-teens and "any age").
+    if (patch.children != null && patch.children !== watch.children) {
+      const cur = next.childAges
+      if (next.children > cur.length) {
+        next.childAges = [...cur, ...new Array(next.children - cur.length).fill(8)]
+      } else if (next.children < cur.length) {
+        next.childAges = cur.slice(0, next.children)
+      }
+    }
     setWatchState(next)
     saveWatch(next)
+  }
+
+  function setChildAge(index: number, age: number) {
+    const next = [...watch.childAges]
+    next[index] = Math.max(0, Math.min(17, Math.floor(age)))
+    updateWatch({ childAges: next })
   }
 
   function toggleResort(id: string) {
@@ -150,6 +168,7 @@ export default function DisneyDealsPanel() {
           checkOut: watch.checkOut,
           adults: watch.adults,
           children: watch.children,
+          childAges: watch.childAges,
           flResident: watch.flResident,
           postalCode: watch.postalCode,
         }),
@@ -322,6 +341,34 @@ export default function DisneyDealsPanel() {
             />
           </div>
         </div>
+
+        {/* Child ages — required by Disney's API whenever children > 0.
+            Without these, the booking endpoint 400s with FIELD_VALIDATION_ERRORS. */}
+        {watch.children > 0 && (
+          <div>
+            <label className="font-display text-[10px] tracking-[0.3em] text-orange-300">
+              ▌ CHILD AGES <span className="text-white/40">(0–17)</span>
+            </label>
+            <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-5">
+              {Array.from({ length: watch.children }, (_, i) => (
+                <div key={i} className="flex flex-col items-center">
+                  <span className="font-mono text-[10px] text-white/45">#{i + 1}</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={17}
+                    value={watch.childAges[i] ?? 8}
+                    onChange={(e) => setChildAge(i, parseInt(e.target.value, 10) || 0)}
+                    className="mt-1 w-full rounded-lg border border-white/15 bg-black/40 px-2 py-1.5 text-center text-sm text-white outline-none focus:border-orange-400"
+                  />
+                </div>
+              ))}
+            </div>
+            <p className="mt-2 text-[11px] text-white/45">
+              Disney prices kids 3–9 differently from adults. Ages 18+ count as adults — bump the adult count instead.
+            </p>
+          </div>
+        )}
 
         {/* FL resident + postal */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">

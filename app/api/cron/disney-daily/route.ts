@@ -69,6 +69,7 @@ type WatchRow = {
   check_out: string;
   adults: number;
   children: number;
+  child_ages: number[];
   resort_ids: string[];
   max_price: number | null;
   fl_resident: boolean;
@@ -281,7 +282,7 @@ export async function GET(request: Request) {
   for (const sub of subs) {
     const watches = (await db`
       SELECT id, subscriber_id, name, check_in::text AS check_in, check_out::text AS check_out,
-             adults, children, resort_ids, max_price, fl_resident, postal_code
+             adults, children, child_ages, resort_ids, max_price, fl_resident, postal_code
       FROM disney_watches WHERE subscriber_id = ${sub.id}
     `) as WatchRow[];
     if (watches.length === 0) continue;
@@ -303,6 +304,8 @@ export async function GET(request: Request) {
           checkOut: w.check_out,
           adults: w.adults,
           children: w.children,
+          // Required by Disney's API when children > 0 (FIELD_VALIDATION_ERRORS otherwise)
+          childAges: Array.isArray(w.child_ages) ? w.child_ages : [],
           flResident: w.fl_resident,
           postalCode: w.postal_code ?? "32601",
         });

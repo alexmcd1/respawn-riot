@@ -20,6 +20,7 @@ type WatchInput = {
   checkOut?: string;
   adults?: number;
   children?: number;
+  childAges?: number[];
   resortIds?: string[];
   maxPrice?: number | null;
   flResident?: boolean;
@@ -90,6 +91,16 @@ export async function POST(request: Request) {
 
   const adults = typeof w.adults === "number" ? Math.max(1, Math.min(10, Math.floor(w.adults))) : 2;
   const children = typeof w.children === "number" ? Math.max(0, Math.min(10, Math.floor(w.children))) : 0;
+  // Pad / truncate child ages to match the children count.
+  // Default age = 8 (Disney prices 3-9 as "child"; 8 is a safe middle).
+  const rawAges = Array.isArray(w.childAges)
+    ? w.childAges.filter((n): n is number => typeof n === "number")
+    : [];
+  const childAges: number[] = [];
+  for (let i = 0; i < children; i++) {
+    const a = rawAges[i];
+    childAges.push(typeof a === "number" ? Math.max(0, Math.min(17, Math.floor(a))) : 8);
+  }
   const resortIds = Array.isArray(w.resortIds)
     ? w.resortIds.filter((s): s is string => typeof s === "string").slice(0, 50)
     : [];
@@ -131,12 +142,12 @@ export async function POST(request: Request) {
     await db`DELETE FROM disney_watches WHERE subscriber_id = ${subscriber.id}`;
     const watchRows = (await db`
       INSERT INTO disney_watches (
-        subscriber_id, name, check_in, check_out, adults, children,
+        subscriber_id, name, check_in, check_out, adults, children, child_ages,
         resort_ids, max_price, fl_resident, postal_code
       )
       VALUES (
         ${subscriber.id}, ${watchName || null}, ${w.checkIn!}, ${w.checkOut!},
-        ${adults}, ${children}, ${resortIds}, ${maxPrice},
+        ${adults}, ${children}, ${childAges}, ${resortIds}, ${maxPrice},
         ${flResident}, ${postalCode}
       )
       RETURNING id

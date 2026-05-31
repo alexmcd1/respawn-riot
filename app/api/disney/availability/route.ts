@@ -59,9 +59,16 @@ export async function POST(request: Request) {
     typeof body.children === "number" && body.children >= 0
       ? Math.min(10, Math.floor(body.children))
       : 0;
-  const childAges = Array.isArray(body.childAges)
+  // Disney's API requires nonAdultAges to be the same length as childCount.
+  // If the caller passed fewer ages than children (or none), pad with
+  // age=8 (Disney prices 3-9 as "child"; 8 is a safe middle).
+  const rawAges = Array.isArray(body.childAges)
     ? body.childAges.filter((a): a is number => typeof a === "number" && a >= 0 && a < 18)
     : [];
+  const childAges: number[] = [];
+  for (let i = 0; i < children; i++) {
+    childAges.push(typeof rawAges[i] === "number" ? Math.floor(rawAges[i]) : 8);
+  }
   const flResident = body.flResident === true;
   const postalCode =
     typeof body.postalCode === "string" && /^\d{5}$/.test(body.postalCode)

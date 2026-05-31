@@ -14,6 +14,7 @@ export type DisneyWatch = {
   checkOut: string;         // yyyy-mm-dd
   adults: number;
   children: number;
+  childAges: number[];      // age per child (0-17); length must match children
   flResident: boolean;
   postalCode: string;
   maxPrice: number | null;  // alert threshold; null = any price
@@ -26,6 +27,7 @@ const DEFAULT_WATCH: DisneyWatch = {
   checkOut: "",
   adults: 2,
   children: 0,
+  childAges: [],
   flResident: true,
   postalCode: "32601",
   maxPrice: null,
@@ -43,6 +45,9 @@ export function loadWatch(): DisneyWatch {
       ...parsed,
       resortIds: Array.isArray(parsed.resortIds)
         ? parsed.resortIds.filter((s): s is string => typeof s === "string")
+        : [],
+      childAges: Array.isArray(parsed.childAges)
+        ? parsed.childAges.filter((n): n is number => typeof n === "number" && n >= 0 && n < 18)
         : [],
     };
   } catch {

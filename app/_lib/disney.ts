@@ -187,6 +187,14 @@ export async function fetchAvailability(req: AvailabilityRequest): Promise<{
   const affiliations: string[] = ["STD_GST"];
   if (req.flResident) affiliations.push("FL_RESIDENT");
 
+  // Disney's API expects nonAdultAges as a list of PartyMixAgeResource
+  // objects ({age: N}), not raw integers. Sending [5, 11] returns:
+  //   "JSON parse error: Cannot construct instance of `PartyMixAgeResource`
+  //    ... no int/Int-argument constructor/factory method to deserialize
+  //    from Number value (5)"
+  // The wrapper objects make Jackson happy.
+  const nonAdultAges = (req.childAges ?? []).map((age) => ({ age }));
+
   const body = {
     storeId: "wdw",
     checkInDate: req.checkIn,
@@ -194,7 +202,7 @@ export async function fetchAvailability(req: AvailabilityRequest): Promise<{
     partyMix: {
       adultCount: Math.max(1, Math.min(10, req.adults)),
       childCount: Math.max(0, Math.min(10, req.children)),
-      nonAdultAges: req.childAges ?? [],
+      nonAdultAges,
     },
     accessible: false,
     region: "us",
@@ -212,7 +220,7 @@ export async function fetchAvailability(req: AvailabilityRequest): Promise<{
   if (!res.ok) {
     const text = await res.text().catch(() => "<no body>");
     throw new Error(
-      `Disney /resort-availability HTTP ${res.status} — ${text.slice(0, 200)}`
+      `Disney /resort-availability HTTP ${res.status} — ${text.slice(0, 800)}`
     );
   }
   const data = (await res.json()) as RawAvailability;

@@ -123,12 +123,19 @@ export async function ensureSchema(): Promise<void> {
       check_out     DATE NOT NULL,
       adults        INT NOT NULL DEFAULT 2,
       children      INT NOT NULL DEFAULT 0,
+      child_ages    INT[] NOT NULL DEFAULT '{}'::INT[],
       resort_ids    TEXT[] NOT NULL DEFAULT '{}'::TEXT[],
       max_price     INT,
       fl_resident   BOOLEAN NOT NULL DEFAULT TRUE,
       postal_code   TEXT DEFAULT '32601',
       created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
+  `;
+  // Backfill column for installations that ran ensureSchema before
+  // child_ages existed. IF NOT EXISTS makes this idempotent.
+  await db`
+    ALTER TABLE disney_watches
+      ADD COLUMN IF NOT EXISTS child_ages INT[] NOT NULL DEFAULT '{}'::INT[]
   `;
   await db`
     CREATE INDEX IF NOT EXISTS disney_watches_subscriber_idx
