@@ -192,10 +192,10 @@ export async function fetchUniversalLiveRates(
       promoCode: req.promoCode,
     },
     // Akamai detected un-stealthed Chrome and returned its "Access
-    // Denied" challenge page. Stealth masks the automation flags;
-    // humanlike adds mouse/scroll noise so behavior fingerprints look
-    // human. Both are free on Browserless v2.
-    { stealth: true, humanlike: true }
+    // Denied" challenge page. Stealth masks the automation flags
+    // puppeteer adds (navigator.webdriver, missing plugins, etc.)
+    // — free on Browserless v2.
+    { stealth: true }
   );
 
   // Surface diagnostic info via the error message when something
