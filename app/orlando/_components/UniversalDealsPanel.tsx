@@ -1,17 +1,22 @@
 'use client'
 
-// Universal Orlando deals panel with live rate lookup via Browserless.
+// Universal Orlando deals panel — static catalog + RSS deal feed +
+// booking deeplinks.
 //
-// Universal's booking API blocks server-side requests with Akamai bot
-// detection. We use a hosted real-Chrome instance (Browserless) to
-// visit universalorlando.com and make the rate call from inside the
-// real page context, bypassing the bot wall. Slower (3-8s round trip)
-// but reliable.
-//
-// Falls back gracefully: if Browserless is unconfigured or errors,
-// the catalog + RSS deals + booking deeplinks still render.
+// Live-rate lookup attempted via Browserless.io (see app/_lib/
+// universalLive.ts + /api/universal/availability) was blocked by
+// Akamai's IP-level fingerprinting even with stealth mode. The
+// backend code is left in place behind the feature flag below so
+// that if the user ever upgrades to Browserless's residential
+// proxy add-on (or switches to a residential-proxy service like
+// ScrapingBee), flipping LIVE_RATES_ENABLED to true re-enables it
+// without rebuilding the route. Set NEXT_PUBLIC_UNIVERSAL_LIVE_RATES=1
+// at build time to enable.
 
 import { useState } from 'react'
+
+const LIVE_RATES_ENABLED =
+  process.env.NEXT_PUBLIC_UNIVERSAL_LIVE_RATES === '1'
 import {
   UNIVERSAL_ALL_OFFERS_URL,
   UNIVERSAL_FL_RESIDENT_URL,
@@ -137,7 +142,11 @@ export default function UniversalDealsPanel({
         </a>
       </div>
 
-      {/* Live rate search */}
+      {/* Live rate search — disabled by default because Akamai's
+          IP-level bot detection blocks Browserless's data-center pool.
+          Flip NEXT_PUBLIC_UNIVERSAL_LIVE_RATES=1 once you have a
+          residential-proxy upgrade and it'll work end-to-end. */}
+      {LIVE_RATES_ENABLED && (
       <form onSubmit={doSearch} className="space-y-4 rounded-2xl border border-white/10 bg-black/20 p-4">
         <div>
           <p className="font-display text-[10px] tracking-[0.3em] text-pink-300">
@@ -234,9 +243,30 @@ export default function UniversalDealsPanel({
           {searching ? 'CHECKING UNIVERSAL… (5-10s)' : '🔍 PREVIEW RATES'}
         </button>
       </form>
+      )}
+
+      {/* Honest explainer (shown only when live rates are disabled) */}
+      {!LIVE_RATES_ENABLED && (
+        <div className="rounded-2xl border border-pink-400/30 bg-pink-500/5 p-4 text-sm">
+          <p className="font-display text-[10px] tracking-[0.3em] text-pink-300">
+            ▌ ABOUT UNIVERSAL RATES
+          </p>
+          <p className="mt-2 text-white/85">
+            Universal&apos;s booking system is fronted by Akamai bot
+            detection that blocks server-side rate lookups even through
+            a headless browser. Use the <strong className="text-pink-200">BOOK BY DATE ↗</strong> link
+            above to check current prices directly on universalorlando.com
+            (the FL Resident toggle, promo code <strong className="text-pink-200">FLO</strong>, is on every page).
+          </p>
+          <p className="mt-2 text-white/65">
+            We do catch new Universal FL Resident promo announcements
+            within hours of them landing via the deal feed below.
+          </p>
+        </div>
+      )}
 
       {/* Live results */}
-      {liveOffers && (
+      {LIVE_RATES_ENABLED && liveOffers && (
         <div className="rounded-2xl border border-pink-400/30 bg-pink-500/5 p-4">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <p className="font-display text-[10px] tracking-[0.3em] text-pink-300">
