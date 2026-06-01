@@ -70,6 +70,21 @@ const TIER_ORDER: Record<UniversalTier, number> = {
   Premier: 3,
 };
 
+// TEMP — verify Scrapfly's js mechanism with a literal expression.
+// If THIS doesn't return "hello scrapfly", the js param is broken on
+// the current tier. Cheap (~1 credit, no ASP, no render_js).
+// REMOVE this function + its callers once we've answered the question.
+export async function _diagnoseScrapflyJs(): Promise<string> {
+  const r = await scrapfly({
+    url: "https://httpbin.dev/anything",
+    method: "GET",
+    renderJs: true,
+    js: `"hello scrapfly"`,
+    timeoutMs: 30_000,
+  });
+  return `jsEvaluationResult=${JSON.stringify(r.jsEvaluationResult)} | scenarioResult=${JSON.stringify(r.jsScenarioResult)} | status=${r.status} | cost=${r.cost}`;
+}
+
 export async function fetchUniversalLiveRates(
   req: UniversalLiveRequest
 ): Promise<UniversalLiveOffer[]> {
