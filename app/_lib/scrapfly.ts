@@ -51,26 +51,39 @@ export async function scrapfly(opts: ScrapflyOptions): Promise<ScrapflyResult> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-  // Scrapfly accepts POST with a JSON body where the URL + options live.
-  // Cleaner than building a 2KB URL with the body URL-encoded into a
-  // query param, and supports more option types.
-  const payload: Record<string, unknown> = {
-    url: opts.url,
-    method: opts.method ?? "GET",
-  };
-  if (opts.body != null) payload.body = opts.body;
-  if (opts.headers && Object.keys(opts.headers).length > 0) {
-    payload.headers = opts.headers;
+  // Scrapfly's REST API takes ALL config as query params (url, method,
+  // asp, country, headers[Name]=value, etc). The body of OUR POST to
+  // Scrapfly becomes the body that Scrapfly forwards to the target.
+  // Earlier mistake: putting config in a JSON body — Scrapfly ignored
+  // it and complained "url must not be empty".
+  const qs = new URLSearchParams();
+  qs.set("key", apiKey);
+  qs.set("url", opts.url);
+  qs.set("method", opts.method ?? "GET");
+  if (opts.asp) qs.set("asp", "true");
+  if (opts.country) qs.set("country", opts.country);
+  if (opts.tags && opts.tags.length > 0) {
+    qs.set("tags", opts.tags.join(","));
   }
-  if (opts.asp) payload.asp = true;
-  if (opts.country) payload.country = opts.country;
-  if (opts.tags && opts.tags.length > 0) payload.tags = opts.tags;
+  // Headers go in as headers[Name]=Value; Scrapfly forwards them to
+  // the target. URLSearchParams handles the URL encoding for us.
+  if (opts.headers) {
+    for (const [k, v] of Object.entries(opts.headers)) {
+      qs.set(`headers[${k}]`, v);
+    }
+  }
+
+  // Decide whether to POST a body to Scrapfly (when the target call
+  // has one) or just GET. GET keeps the URL shorter for credit cost.
+  const shouldPostBody = opts.body != null && opts.body.length > 0;
 
   try {
-    const res = await fetch(`${BASE}?key=${encodeURIComponent(apiKey)}`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload),
+    const res = await fetch(`${BASE}?${qs.toString()}`, {
+      method: shouldPostBody ? "POST" : "GET",
+      headers: shouldPostBody
+        ? { "content-type": opts.headers?.["content-type"] ?? "application/json" }
+        : undefined,
+      body: shouldPostBody ? opts.body : undefined,
       signal: controller.signal,
     });
 
