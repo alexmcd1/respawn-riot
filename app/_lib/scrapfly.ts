@@ -25,6 +25,11 @@ export type ScrapflyOptions = {
   country?: string;
   /** Tag the call for analytics (visible in your Scrapfly dashboard). */
   tags?: string[];
+  /** Session ID — when set, Scrapfly pins the same proxy IP across
+   *  calls with the same session value AND persists cookies between
+   *  them. Use this to "warm up" a session (e.g. visit a landing page)
+   *  before hitting an API that expects existing cookies. */
+  session?: string;
   /** Override the timeout (default 60s). */
   timeoutMs?: number;
 };
@@ -65,6 +70,7 @@ export async function scrapfly(opts: ScrapflyOptions): Promise<ScrapflyResult> {
   if (opts.tags && opts.tags.length > 0) {
     qs.set("tags", opts.tags.join(","));
   }
+  if (opts.session) qs.set("session", opts.session);
   // Headers go in as headers[Name]=Value; Scrapfly forwards them to
   // the target. URLSearchParams handles the URL encoding for us.
   if (opts.headers) {

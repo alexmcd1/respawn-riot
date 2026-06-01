@@ -95,10 +95,35 @@ export async function fetchUniversalLiveRates(
   };
   if (req.promoCode) targetBody.promo_code = req.promoCode;
 
-  // Forward the same headers a real browser sends. Scrapfly proxies
-  // these straight through to Universal. Critically, Scrapfly's ASP
-  // adds the right TLS fingerprint + uses a residential IP so Akamai
-  // accepts the call.
+  // Universal's IBM gateway returns 401 unless the caller has session
+  // cookies from a recent visit to the listing page. We use a Scrapfly
+  // `session` ID to:
+  //   1) Pin the same residential IP across both calls (Universal
+  //      checks session-to-IP correlation)
+  //   2) Persist cookies between calls (Akamai's session token sticks)
+  //
+  // Cost: 2 ASP calls (warm-up + API) = ~10 credits per rate fetch.
+  // Free tier (1k credits) → ~100 fetches/mo.
+  const sessionId = `urol-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+  // Step 1: warm-up — visit the hotels listing so Akamai sets cookies
+  // and Universal initialises any session state. We don't care about
+  // the response body — only the side-effect cookies kept on the
+  // Scrapfly session.
+  await scrapfly({
+    url: "https://www.universalorlando.com/hotels/en/us/listing",
+    method: "GET",
+    asp: true,
+    country: "us",
+    session: sessionId,
+    tags: ["universal-rates", "warmup"],
+  }).catch((err) => {
+    // Don't fail the whole flow on warm-up errors — the API call
+    // might still succeed if Akamai is lenient.
+    console.warn("[universalLive] warm-up failed:", err instanceof Error ? err.message : err);
+  });
+
+  // Step 2: the actual rate call, reusing the warmed session.
   const result = await scrapfly({
     url: UNIVERSAL_API,
     method: "POST",
@@ -116,9 +141,10 @@ export async function fetchUniversalLiveRates(
       "x-uniwebservice-device": "Chrome",
       "x-uniwebservice-platform": "Web",
     },
-    asp: true,          // Akamai bypass — costs ~5 credits per call
-    country: "us",      // pin proxy to US since rates are USD
-    tags: ["universal-rates"],
+    asp: true,
+    country: "us",
+    session: sessionId,
+    tags: ["universal-rates", "api"],
   });
 
   if (result.status !== 200) {
