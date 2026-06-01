@@ -89,37 +89,31 @@ export async function fetchUniversalLiveRates(
   };
   if (req.promoCode) targetBody.promo_code = req.promoCode;
 
-  // Previous attempt used Scrapfly's simple `js` param, which runs the
-  // script but doesn't await Promises — our IIFE returned a Promise
-  // and Scrapfly captured the unresolved Promise as null.
-  //
-  // js_scenario is the multi-step version. `execute` actions properly
-  // await async functions. We add an explicit `wait` first to let
-  // Akamai's JS challenges complete after navigation.
-  //
-  // Cost: ~20-25 credits per call. Free tier (1k credits) → ~40 fetches.
-  const executeScript = `async () => {
+  // Previous attempts: Scrapfly's execute action returns null for
+  // async functions (it captures the Promise pre-resolution, not the
+  // resolved value). Workaround: use synchronous XMLHttpRequest inside
+  // the simpler `js` param. Sync XHR is deprecated for user browsers
+  // (blocks the UI thread), but Scrapfly's headless Chrome is a
+  // server-side rendering tool — there's no UI to block.
+  const syncScript = `(() => {
     try {
-      const res = await fetch(${JSON.stringify(UNIVERSAL_API)}, {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          accept: "application/json, text/plain, */*",
-          "content-type": "application/json",
-          "x-ibm-client-id": ${JSON.stringify(IBM_CLIENT_ID)},
-          "x-instance-id": ${JSON.stringify(APP_INSTANCE_ID)},
-          "x-source-id": "1003002",
-          "x-uniwebservice-apikey": "WebApp",
-          "x-uniwebservice-appversion": "upr-web-hotels-1.0",
-          "x-uniwebservice-device": "Chrome",
-          "x-uniwebservice-platform": "Web",
-        },
-        body: ${JSON.stringify(JSON.stringify(targetBody))},
-      });
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", ${JSON.stringify(UNIVERSAL_API)}, false); // false = sync
+      xhr.setRequestHeader("accept", "application/json, text/plain, */*");
+      xhr.setRequestHeader("content-type", "application/json");
+      xhr.setRequestHeader("x-ibm-client-id", ${JSON.stringify(IBM_CLIENT_ID)});
+      xhr.setRequestHeader("x-instance-id", ${JSON.stringify(APP_INSTANCE_ID)});
+      xhr.setRequestHeader("x-source-id", "1003002");
+      xhr.setRequestHeader("x-uniwebservice-apikey", "WebApp");
+      xhr.setRequestHeader("x-uniwebservice-appversion", "upr-web-hotels-1.0");
+      xhr.setRequestHeader("x-uniwebservice-device", "Chrome");
+      xhr.setRequestHeader("x-uniwebservice-platform", "Web");
+      xhr.withCredentials = true;
+      xhr.send(${JSON.stringify(JSON.stringify(targetBody))});
       return JSON.stringify({
         ok: true,
-        status: res.status,
-        body: await res.text(),
+        status: xhr.status,
+        body: xhr.responseText,
       });
     } catch (e) {
       return JSON.stringify({
@@ -127,7 +121,7 @@ export async function fetchUniversalLiveRates(
         error: String(e && e.message || e),
       });
     }
-  }`;
+  })()`;
 
   const result = await scrapfly({
     url: "https://www.universalorlando.com/hotels/en/us/listing",
@@ -135,66 +129,23 @@ export async function fetchUniversalLiveRates(
     asp: true,
     country: "us",
     renderJs: true,
-    jsScenario: [
-      // Scrapfly format: plain integer for wait (ms), plain string
-      // for execute. Nested {timeout: N} / {script: "..."} 400s.
-      { wait: 3000 },
-      { execute: executeScript },
-    ],
-    tags: ["universal-rates", "js-scenario"],
+    js: syncScript,
+    tags: ["universal-rates", "sync-xhr"],
     timeoutMs: 90_000,
   });
 
-  // js_scenario response shape (confirmed from real response):
-  //   { duration, executed, response, steps: [{ action, config, result, success, ...}] }
-  const scenario = result.jsScenarioResult;
-  if (!scenario) {
+  if (!result.jsEvaluationResult || typeof result.jsEvaluationResult !== "string") {
     throw new Error(
-      `Scrapfly returned no js_scenario result — landed status=${result.status}. ` +
-      `First 200 of page body: ${result.body.slice(0, 200)}`
-    );
-  }
-  const steps = scenario.steps as
-    | Array<{ action?: string; result?: unknown; success?: boolean; error?: string }>
-    | undefined;
-  const executeStep = steps?.find((s) => s.action === "execute");
-  if (!executeStep) {
-    throw new Error(
-      `js_scenario had no execute step. Steps: ${JSON.stringify(steps).slice(0, 300)}`
-    );
-  }
-  if (executeStep.success === false) {
-    throw new Error(
-      `js_scenario execute failed: ${executeStep.error ?? JSON.stringify(executeStep).slice(0, 300)}`
-    );
-  }
-  const executeResult = executeStep.result;
-  if (typeof executeResult !== "string") {
-    // Drop the script echo (config.script) so we can actually see the
-    // interesting fields (success, error, result) within the truncation.
-    const trimmed = {
-      action: executeStep.action,
-      success: executeStep.success,
-      error: executeStep.error,
-      result: executeResult,
-      resultType: typeof executeResult,
-      resultIsArray: Array.isArray(executeResult),
-      resultKeys:
-        executeResult && typeof executeResult === "object"
-          ? Object.keys(executeResult as object).join(",")
-          : null,
-    };
-    throw new Error(
-      `execute step returned non-string result: ${JSON.stringify(trimmed).slice(0, 600)}`
+      `Scrapfly js eval returned no string — value=${JSON.stringify(result.jsEvaluationResult)?.slice(0, 200)}, landed status=${result.status}`
     );
   }
 
   let inner: { ok: boolean; status?: number; body?: string; error?: string };
   try {
-    inner = JSON.parse(executeResult);
+    inner = JSON.parse(result.jsEvaluationResult);
   } catch {
     throw new Error(
-      `js_scenario execute returned non-JSON: ${executeResult.slice(0, 200)}`
+      `Scrapfly js eval returned non-JSON: ${result.jsEvaluationResult.slice(0, 200)}`
     );
   }
 
