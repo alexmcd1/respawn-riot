@@ -1,22 +1,21 @@
 'use client'
 
-// Universal Orlando deals panel — static catalog + RSS deal feed +
-// booking deeplinks.
+// Universal Orlando deals panel — live rates (via Scrapfly) +
+// static catalog + RSS deal feed + booking deeplinks.
 //
-// Live-rate lookup attempted via Browserless.io (see app/_lib/
-// universalLive.ts + /api/universal/availability) was blocked by
-// Akamai's IP-level fingerprinting even with stealth mode. The
-// backend code is left in place behind the feature flag below so
-// that if the user ever upgrades to Browserless's residential
-// proxy add-on (or switches to a residential-proxy service like
-// ScrapingBee), flipping LIVE_RATES_ENABLED to true re-enables it
-// without rebuilding the route. Set NEXT_PUBLIC_UNIVERSAL_LIVE_RATES=1
-// at build time to enable.
+// Live rates need Scrapfly because Universal's booking API is
+// Akamai-protected. We tried Browserless first; stealth wasn't
+// enough — Akamai IP-blocks data-center pools. Scrapfly's Anti
+// Scraping Protection (ASP) uses residential proxies, which works.
+// See app/_lib/universalLive.ts.
+//
+// You can disable live rates without a redeploy by setting
+// NEXT_PUBLIC_UNIVERSAL_LIVE_RATES=0 in Vercel env vars.
 
 import { useState } from 'react'
 
 const LIVE_RATES_ENABLED =
-  process.env.NEXT_PUBLIC_UNIVERSAL_LIVE_RATES === '1'
+  process.env.NEXT_PUBLIC_UNIVERSAL_LIVE_RATES !== '0'
 import {
   UNIVERSAL_ALL_OFFERS_URL,
   UNIVERSAL_FL_RESIDENT_URL,
