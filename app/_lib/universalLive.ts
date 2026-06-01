@@ -73,8 +73,8 @@ const TIER_ORDER: Record<UniversalTier, number> = {
 export async function fetchUniversalLiveRates(
   req: UniversalLiveRequest
 ): Promise<UniversalLiveOffer[]> {
-  // Build the same body shape that universalorlando.com sends from
-  // the browser. age_counts always has adults; only includes a child
+  // Build the same body shape universalorlando.com sends from the
+  // browser. age_counts always has adults; only includes a child
   // entry when there are kids on the trip.
   const ageCounts: Array<{ age_group: string; count: number }> = [
     { age_group: "adult", count: Math.max(1, Math.min(10, req.adults)) },
@@ -89,48 +89,96 @@ export async function fetchUniversalLiveRates(
   };
   if (req.promoCode) targetBody.promo_code = req.promoCode;
 
-  // Single Scrapfly call with ASP (Akamai bypass). Forward the FULL
-  // header set a real browser sends — Universal's IBM gateway 401s
-  // when minimal headers are sent, so we replicate the browser
-  // fingerprint as closely as Scrapfly will let us.
-  // Cost: ~5 credits per call. Free tier (1k credits) → ~200/mo.
+  // Direct-replay attempts (with all the right headers + the real
+  // app instance_id) still got 401. Universal/Akamai must be checking
+  // something stateful — session cookies set during the real page
+  // load, plus likely browser fingerprint signals we can't fake
+  // server-side.
+  //
+  // Workaround: ask Scrapfly to actually LOAD the hotels listing in
+  // a real headless browser via residential proxy, let Akamai's JS
+  // challenges complete and cookies set, then run our fetch from
+  // INSIDE the page context (same-origin → all session state intact).
+  //
+  // Cost: ~15-20 credits per call (vs 5 for direct call). Free tier
+  // (1k credits) → ~50 fetches/mo.
+  const browserScript = `(async () => {
+    // Let the SPA settle + Akamai's JS challenges run after navigation
+    await new Promise((r) => setTimeout(r, 2500));
+    try {
+      const res = await fetch(${JSON.stringify(UNIVERSAL_API)}, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          accept: "application/json, text/plain, */*",
+          "content-type": "application/json",
+          "x-ibm-client-id": ${JSON.stringify(IBM_CLIENT_ID)},
+          "x-instance-id": ${JSON.stringify(APP_INSTANCE_ID)},
+          "x-source-id": "1003002",
+          "x-uniwebservice-apikey": "WebApp",
+          "x-uniwebservice-appversion": "upr-web-hotels-1.0",
+          "x-uniwebservice-device": "Chrome",
+          "x-uniwebservice-platform": "Web",
+        },
+        body: ${JSON.stringify(JSON.stringify(targetBody))},
+      });
+      return JSON.stringify({
+        ok: true,
+        status: res.status,
+        body: await res.text(),
+      });
+    } catch (e) {
+      return JSON.stringify({
+        ok: false,
+        error: String(e && e.message || e),
+      });
+    }
+  })()`;
+
   const result = await scrapfly({
-    url: UNIVERSAL_API,
-    method: "POST",
-    body: JSON.stringify(targetBody),
-    headers: {
-      accept: "application/json, text/plain, */*",
-      "accept-language": "en-US,en;q=0.9",
-      "cache-control": "NO-STORE,max-age=0",
-      "content-type": "application/json",
-      origin: "https://www.universalorlando.com",
-      pragma: "NO-CACHE",
-      referer: "https://www.universalorlando.com/",
-      "x-ibm-client-id": IBM_CLIENT_ID,
-      "x-instance-id": APP_INSTANCE_ID,
-      "x-source-id": "1003002",
-      "x-uniwebservice-apikey": "WebApp",
-      "x-uniwebservice-appversion": "upr-web-hotels-1.0",
-      "x-uniwebservice-device": "Chrome",
-      "x-uniwebservice-platform": "Web",
-    },
+    url: "https://www.universalorlando.com/hotels/en/us/listing",
+    method: "GET",
     asp: true,
     country: "us",
-    tags: ["universal-rates"],
+    renderJs: true,
+    js: browserScript,
+    tags: ["universal-rates", "js-scenario"],
+    timeoutMs: 90_000,
   });
 
-  if (result.status !== 200) {
+  if (!result.jsEvaluationResult) {
     throw new Error(
-      `Universal priced-hotels HTTP ${result.status} via Scrapfly — ${result.body.slice(0, 300)}`
+      `Scrapfly returned no JS evaluation result — landed status=${result.status}. ` +
+      `First 200 of page body: ${result.body.slice(0, 200)}`
+    );
+  }
+
+  let inner: { ok: boolean; status?: number; body?: string; error?: string };
+  try {
+    inner = JSON.parse(result.jsEvaluationResult);
+  } catch {
+    throw new Error(
+      `Scrapfly returned non-JSON eval result — ${result.jsEvaluationResult.slice(0, 200)}`
+    );
+  }
+
+  if (!inner.ok) {
+    throw new Error(
+      `Universal fetch failed inside Scrapfly browser — ${inner.error ?? "unknown"}`
+    );
+  }
+  if (inner.status !== 200) {
+    throw new Error(
+      `Universal priced-hotels HTTP ${inner.status} via Scrapfly browser — ${(inner.body ?? "").slice(0, 300)}`
     );
   }
 
   let data: RawPricedHotel[];
   try {
-    data = JSON.parse(result.body) as RawPricedHotel[];
+    data = JSON.parse(inner.body ?? "[]") as RawPricedHotel[];
   } catch {
     throw new Error(
-      `Universal returned non-JSON via Scrapfly — ${result.body.slice(0, 200)}`
+      `Universal returned non-JSON inside Scrapfly browser — ${(inner.body ?? "").slice(0, 200)}`
     );
   }
   if (!Array.isArray(data)) {

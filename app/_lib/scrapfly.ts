@@ -30,7 +30,16 @@ export type ScrapflyOptions = {
    *  them. Use this to "warm up" a session (e.g. visit a landing page)
    *  before hitting an API that expects existing cookies. */
   session?: string;
-  /** Override the timeout (default 60s). */
+  /** Render the page in a real headless browser before reading the
+   *  response. Required when the page is a JS app or you want to run
+   *  custom JS via the `js` parameter. Costs ~5x normal credits. */
+  renderJs?: boolean;
+  /** JavaScript expression evaluated in the page context AFTER load.
+   *  Must be a single async IIFE that returns a serializable value.
+   *  Scrapfly returns it via result.browserData.jsEvaluationResult.
+   *  Requires renderJs=true. */
+  js?: string;
+  /** Override the timeout (default 60s — js_scenario adds 30s usually). */
   timeoutMs?: number;
 };
 
@@ -40,6 +49,10 @@ export type ScrapflyResult = {
   contentType?: string;
   /** Scrapfly metadata — how many credits the call cost, etc. */
   cost: number;
+  /** Return value of the `js` script (if one was passed), as a string.
+   *  Caller is responsible for parsing it back into whatever shape they
+   *  asked the script to return. */
+  jsEvaluationResult?: string;
 };
 
 const BASE = "https://api.scrapfly.io/scrape";
@@ -71,6 +84,12 @@ export async function scrapfly(opts: ScrapflyOptions): Promise<ScrapflyResult> {
     qs.set("tags", opts.tags.join(","));
   }
   if (opts.session) qs.set("session", opts.session);
+  if (opts.renderJs) qs.set("render_js", "true");
+  if (opts.js) {
+    // Scrapfly expects the script base64-encoded so special chars
+    // don't break the URL parser.
+    qs.set("js", Buffer.from(opts.js, "utf8").toString("base64"));
+  }
   // Headers go in as headers[Name]=Value; Scrapfly forwards them to
   // the target. URLSearchParams handles the URL encoding for us.
   if (opts.headers) {
@@ -101,6 +120,9 @@ export async function scrapfly(opts: ScrapflyOptions): Promise<ScrapflyResult> {
         status_code?: number;
         content?: string;
         content_type?: string;
+        browser_data?: {
+          javascript_evaluation_result?: string;
+        };
       };
       context?: { cost?: { total?: number } };
       message?: string;
@@ -149,6 +171,7 @@ export async function scrapfly(opts: ScrapflyOptions): Promise<ScrapflyResult> {
       body: r.content ?? "",
       contentType: r.content_type,
       cost: wrapper.context?.cost?.total ?? 0,
+      jsEvaluationResult: r.browser_data?.javascript_evaluation_result,
     };
   } finally {
     clearTimeout(timer);
