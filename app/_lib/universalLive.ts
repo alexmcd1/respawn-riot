@@ -170,8 +170,22 @@ export async function fetchUniversalLiveRates(
   }
   const executeResult = executeStep.result;
   if (typeof executeResult !== "string") {
+    // Drop the script echo (config.script) so we can actually see the
+    // interesting fields (success, error, result) within the truncation.
+    const trimmed = {
+      action: executeStep.action,
+      success: executeStep.success,
+      error: executeStep.error,
+      result: executeResult,
+      resultType: typeof executeResult,
+      resultIsArray: Array.isArray(executeResult),
+      resultKeys:
+        executeResult && typeof executeResult === "object"
+          ? Object.keys(executeResult as object).join(",")
+          : null,
+    };
     throw new Error(
-      `execute step returned non-string result (type=${typeof executeResult}): ${JSON.stringify(executeStep).slice(0, 400)}`
+      `execute step returned non-string result: ${JSON.stringify(trimmed).slice(0, 600)}`
     );
   }
 
