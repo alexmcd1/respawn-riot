@@ -110,6 +110,13 @@ export async function scrapfly(opts: ScrapflyOptions): Promise<ScrapflyResult> {
       }
       if (wrapper.error_id) parts.push(`id=${wrapper.error_id}`);
       if (wrapper.doc_url) parts.push(`docs=${wrapper.doc_url}`);
+      // ALWAYS include the raw body snippet as a fallback — if Scrapfly
+      // ever puts the actionable detail in an unexpected field, we still
+      // see it.
+      parts.push(`raw=${rawText.slice(0, 400)}`);
+      console.warn(
+        `[scrapfly] error response — status=${res.status} bodyKeys=${Object.keys(wrapper).join(",")} fullBody=${rawText.slice(0, 800)}`
+      );
       throw new Error(`Scrapfly API ${parts.join(" — ")}`);
     }
 
