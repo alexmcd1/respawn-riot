@@ -136,10 +136,10 @@ export async function fetchUniversalLiveRates(
     country: "us",
     renderJs: true,
     jsScenario: [
-      // Give the SPA + Akamai's JS challenges time to settle
-      { wait: { timeout: 3000 } },
-      // Run our async fetch — execute properly awaits
-      { execute: { script: executeScript } },
+      // Scrapfly format: plain integer for wait (ms), plain string
+      // for execute. Nested {timeout: N} / {script: "..."} 400s.
+      { wait: 3000 },
+      { execute: executeScript },
     ],
     tags: ["universal-rates", "js-scenario"],
     timeoutMs: 90_000,
