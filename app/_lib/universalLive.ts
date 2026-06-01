@@ -49,19 +49,15 @@ type RawPricedHotel = {
 // check, which Scrapfly bypasses with residential proxies.
 const IBM_CLIENT_ID = "e7c945ba-eeec-4384-b03d-601650677987";
 
+// FIXED instance_id used by Universal's hotels SPA. Verified by
+// comparing two HAR captures from different browser sessions days
+// apart — same value both times, so it's the app's identifier, not
+// a per-session token. Random UUIDs trigger 401. Using the real value
+// is what Universal's own JS does.
+const APP_INSTANCE_ID = "0f0062d5-1e7c-4920-9886-ba14ff32ed19";
+
 const UNIVERSAL_API =
   "https://api.universalparks.com/resort-areas/UOR/hotel-stay-search-request/priced-hotels";
-
-// Build a UUID without depending on crypto.randomUUID being available
-// in older runtimes. Universal's API accepts any RFC4122-shaped UUID
-// as the instance_id since that's a client-generated value.
-function newInstanceId(): string {
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === "x" ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-}
 
 // Helper for the catalog lookup (name + tier + canonical URL) so the
 // route returns rich data the UI doesn't have to reconstruct.
@@ -77,8 +73,6 @@ const TIER_ORDER: Record<UniversalTier, number> = {
 export async function fetchUniversalLiveRates(
   req: UniversalLiveRequest
 ): Promise<UniversalLiveOffer[]> {
-  const instanceId = newInstanceId();
-
   // Build the same body shape that universalorlando.com sends from
   // the browser. age_counts always has adults; only includes a child
   // entry when there are kids on the trip.
@@ -91,50 +85,29 @@ export async function fetchUniversalLiveRates(
   const targetBody: Record<string, unknown> = {
     travel_groups: [{ age_counts: ageCounts }],
     travel_period: { from: req.checkIn, thru: req.checkOut },
-    instance_id: instanceId,
+    instance_id: APP_INSTANCE_ID,
   };
   if (req.promoCode) targetBody.promo_code = req.promoCode;
 
-  // Universal's IBM gateway returns 401 unless the caller has session
-  // cookies from a recent visit to the listing page. We use a Scrapfly
-  // `session` ID to:
-  //   1) Pin the same residential IP across both calls (Universal
-  //      checks session-to-IP correlation)
-  //   2) Persist cookies between calls (Akamai's session token sticks)
-  //
-  // Cost: 2 ASP calls (warm-up + API) = ~10 credits per rate fetch.
-  // Free tier (1k credits) → ~100 fetches/mo.
-  const sessionId = `urol-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-
-  // Step 1: warm-up — visit the hotels listing so Akamai sets cookies
-  // and Universal initialises any session state. We don't care about
-  // the response body — only the side-effect cookies kept on the
-  // Scrapfly session.
-  await scrapfly({
-    url: "https://www.universalorlando.com/hotels/en/us/listing",
-    method: "GET",
-    asp: true,
-    country: "us",
-    session: sessionId,
-    tags: ["universal-rates", "warmup"],
-  }).catch((err) => {
-    // Don't fail the whole flow on warm-up errors — the API call
-    // might still succeed if Akamai is lenient.
-    console.warn("[universalLive] warm-up failed:", err instanceof Error ? err.message : err);
-  });
-
-  // Step 2: the actual rate call, reusing the warmed session.
+  // Single Scrapfly call with ASP (Akamai bypass). Forward the FULL
+  // header set a real browser sends — Universal's IBM gateway 401s
+  // when minimal headers are sent, so we replicate the browser
+  // fingerprint as closely as Scrapfly will let us.
+  // Cost: ~5 credits per call. Free tier (1k credits) → ~200/mo.
   const result = await scrapfly({
     url: UNIVERSAL_API,
     method: "POST",
     body: JSON.stringify(targetBody),
     headers: {
       accept: "application/json, text/plain, */*",
+      "accept-language": "en-US,en;q=0.9",
+      "cache-control": "NO-STORE,max-age=0",
       "content-type": "application/json",
       origin: "https://www.universalorlando.com",
-      referer: "https://www.universalorlando.com/hotels/en/us/listing",
+      pragma: "NO-CACHE",
+      referer: "https://www.universalorlando.com/",
       "x-ibm-client-id": IBM_CLIENT_ID,
-      "x-instance-id": instanceId,
+      "x-instance-id": APP_INSTANCE_ID,
       "x-source-id": "1003002",
       "x-uniwebservice-apikey": "WebApp",
       "x-uniwebservice-appversion": "upr-web-hotels-1.0",
@@ -143,8 +116,7 @@ export async function fetchUniversalLiveRates(
     },
     asp: true,
     country: "us",
-    session: sessionId,
-    tags: ["universal-rates", "api"],
+    tags: ["universal-rates"],
   });
 
   if (result.status !== 200) {
