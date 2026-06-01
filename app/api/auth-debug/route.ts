@@ -60,6 +60,8 @@ export async function GET() {
       EMAIL_FROM: has("EMAIL_FROM"),
       CRON_SECRET: has("CRON_SECRET"),
       TICKETMASTER_API_KEY: has("TICKETMASTER_API_KEY"),
+      SCRAPFLY_API_KEY: has("SCRAPFLY_API_KEY"),
+      BROWSERLESS_TOKEN: has("BROWSERLESS_TOKEN"),
     },
     authImportError,
     dbProbe,
