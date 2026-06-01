@@ -1,21 +1,19 @@
 'use client'
 
-// Universal Orlando deals panel — live rates (via Scrapfly) +
-// static catalog + RSS deal feed + booking deeplinks.
+// Universal Orlando deals panel — static catalog + RSS deal feed +
+// booking deeplinks. Live rates path exists in code but is gated off
+// by default (Scrapfly free tier can't capture JS return values from
+// the headless browser — see app/_lib/universalLive.ts header notes).
 //
-// Live rates need Scrapfly because Universal's booking API is
-// Akamai-protected. We tried Browserless first; stealth wasn't
-// enough — Akamai IP-blocks data-center pools. Scrapfly's Anti
-// Scraping Protection (ASP) uses residential proxies, which works.
-// See app/_lib/universalLive.ts.
-//
-// You can disable live rates without a redeploy by setting
-// NEXT_PUBLIC_UNIVERSAL_LIVE_RATES=0 in Vercel env vars.
+// To re-enable live rates after upgrading Scrapfly (or finding a
+// different proxy/scraping service), set
+//   NEXT_PUBLIC_UNIVERSAL_LIVE_RATES=1
+// in Vercel env vars. Default is OFF.
 
 import { useState } from 'react'
 
 const LIVE_RATES_ENABLED =
-  process.env.NEXT_PUBLIC_UNIVERSAL_LIVE_RATES !== '0'
+  process.env.NEXT_PUBLIC_UNIVERSAL_LIVE_RATES === '1'
 import {
   UNIVERSAL_ALL_OFFERS_URL,
   UNIVERSAL_FL_RESIDENT_URL,

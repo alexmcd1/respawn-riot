@@ -70,20 +70,21 @@ const TIER_ORDER: Record<UniversalTier, number> = {
   Premier: 3,
 };
 
-// TEMP — verify Scrapfly's js mechanism with a literal expression.
-// If THIS doesn't return "hello scrapfly", the js param is broken on
-// the current tier. Cheap (~1 credit, no ASP, no render_js).
-// REMOVE this function + its callers once we've answered the question.
-export async function _diagnoseScrapflyJs(): Promise<string> {
-  const r = await scrapfly({
-    url: "https://httpbin.dev/anything",
-    method: "GET",
-    renderJs: true,
-    js: `"hello scrapfly"`,
-    timeoutMs: 30_000,
-  });
-  return `jsEvaluationResult=${JSON.stringify(r.jsEvaluationResult)} | scenarioResult=${JSON.stringify(r.jsScenarioResult)} | status=${r.status} | cost=${r.cost}`;
-}
+// Investigation outcome (2026-06): Universal's hotel API is reachable
+// (Scrapfly ASP bypasses Akamai cleanly), but Scrapfly's free tier
+// does NOT capture JS return values from page evaluation. Verified
+// with a literal-string test on a non-Akamai URL — same null/undefined
+// result. Custom return-value capture is a paid feature ($30/mo+).
+//
+// The code below stays in place so that:
+//   - If you ever upgrade Scrapfly, flip NEXT_PUBLIC_UNIVERSAL_LIVE_RATES=1
+//     to re-enable the UI
+//   - Or if Universal's API protections change, the request shape is
+//     ready to test again
+//
+// Until then, the Universal section shows catalog + RSS + booking
+// deeplinks (which honestly covers most of the practical need —
+// MouseSavers catches FL Resident promo announcements within hours).
 
 export async function fetchUniversalLiveRates(
   req: UniversalLiveRequest
