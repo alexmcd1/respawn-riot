@@ -74,7 +74,10 @@ export async function scrapfly(opts: ScrapflyOptions): Promise<ScrapflyResult> {
       signal: controller.signal,
     });
 
-    const wrapper = (await res.json()) as {
+    // Scrapfly returns rich errors at /scrape with code + description +
+    // sometimes a doc link. Surface ALL of it so 400s are debuggable.
+    const rawText = await res.text();
+    let wrapper: {
       result?: {
         status_code?: number;
         content?: string;
@@ -83,12 +86,31 @@ export async function scrapfly(opts: ScrapflyOptions): Promise<ScrapflyResult> {
       context?: { cost?: { total?: number } };
       message?: string;
       code?: string;
+      description?: string;
+      error_id?: string;
+      doc_url?: string;
+      errors?: Array<{ message?: string; code?: string }>;
     };
+    try {
+      wrapper = JSON.parse(rawText);
+    } catch {
+      throw new Error(
+        `Scrapfly API HTTP ${res.status} — non-JSON response: ${rawText.slice(0, 300)}`
+      );
+    }
 
     if (!res.ok) {
-      throw new Error(
-        `Scrapfly API HTTP ${res.status} — ${wrapper.message ?? wrapper.code ?? "<no message>"}`
-      );
+      // Pull every diagnostic field we can find into one error string.
+      const parts: string[] = [`HTTP ${res.status}`];
+      if (wrapper.code) parts.push(`code=${wrapper.code}`);
+      if (wrapper.message) parts.push(`msg="${wrapper.message}"`);
+      if (wrapper.description) parts.push(`desc="${wrapper.description}"`);
+      if (wrapper.errors && wrapper.errors.length > 0) {
+        parts.push(`errors=${JSON.stringify(wrapper.errors)}`);
+      }
+      if (wrapper.error_id) parts.push(`id=${wrapper.error_id}`);
+      if (wrapper.doc_url) parts.push(`docs=${wrapper.doc_url}`);
+      throw new Error(`Scrapfly API ${parts.join(" — ")}`);
     }
 
     const r = wrapper.result;
