@@ -145,7 +145,8 @@ export async function fetchUniversalLiveRates(
     timeoutMs: 90_000,
   });
 
-  // js_scenario response shape: { response: [{ name, result, duration, ... }, ...] }
+  // js_scenario response shape (confirmed from real response):
+  //   { duration, executed, response, steps: [{ action, config, result, success, ...}] }
   const scenario = result.jsScenarioResult;
   if (!scenario) {
     throw new Error(
@@ -153,19 +154,24 @@ export async function fetchUniversalLiveRates(
       `First 200 of page body: ${result.body.slice(0, 200)}`
     );
   }
-  // Find the execute action's return value. Try a few possible shapes
-  // since Scrapfly's docs have shifted across versions.
-  const responses = (scenario.response ?? scenario.responses) as
-    | Array<{ name?: string; result?: unknown }> | undefined;
-  const executeRes = responses?.find((a) => a.name === "execute");
-  const executeResult = executeRes?.result;
-  if (typeof executeResult !== "string") {
-    console.warn(
-      `[universalLive] js_scenario unexpected shape — scenario keys: ${Object.keys(scenario).join(",")} | responses len: ${responses?.length ?? 0} | execute result type: ${typeof executeResult}`
-    );
+  const steps = scenario.steps as
+    | Array<{ action?: string; result?: unknown; success?: boolean; error?: string }>
+    | undefined;
+  const executeStep = steps?.find((s) => s.action === "execute");
+  if (!executeStep) {
     throw new Error(
-      `js_scenario execute returned no string result. Scenario keys: ${Object.keys(scenario).join(",")}. ` +
-      `Full scenario: ${JSON.stringify(scenario).slice(0, 400)}`
+      `js_scenario had no execute step. Steps: ${JSON.stringify(steps).slice(0, 300)}`
+    );
+  }
+  if (executeStep.success === false) {
+    throw new Error(
+      `js_scenario execute failed: ${executeStep.error ?? JSON.stringify(executeStep).slice(0, 300)}`
+    );
+  }
+  const executeResult = executeStep.result;
+  if (typeof executeResult !== "string") {
+    throw new Error(
+      `execute step returned non-string result (type=${typeof executeResult}): ${JSON.stringify(executeStep).slice(0, 400)}`
     );
   }
 
