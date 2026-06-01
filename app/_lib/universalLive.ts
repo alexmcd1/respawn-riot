@@ -89,22 +89,16 @@ export async function fetchUniversalLiveRates(
   };
   if (req.promoCode) targetBody.promo_code = req.promoCode;
 
-  // Direct-replay attempts (with all the right headers + the real
-  // app instance_id) still got 401. Universal/Akamai must be checking
-  // something stateful — session cookies set during the real page
-  // load, plus likely browser fingerprint signals we can't fake
-  // server-side.
+  // Previous attempt used Scrapfly's simple `js` param, which runs the
+  // script but doesn't await Promises — our IIFE returned a Promise
+  // and Scrapfly captured the unresolved Promise as null.
   //
-  // Workaround: ask Scrapfly to actually LOAD the hotels listing in
-  // a real headless browser via residential proxy, let Akamai's JS
-  // challenges complete and cookies set, then run our fetch from
-  // INSIDE the page context (same-origin → all session state intact).
+  // js_scenario is the multi-step version. `execute` actions properly
+  // await async functions. We add an explicit `wait` first to let
+  // Akamai's JS challenges complete after navigation.
   //
-  // Cost: ~15-20 credits per call (vs 5 for direct call). Free tier
-  // (1k credits) → ~50 fetches/mo.
-  const browserScript = `(async () => {
-    // Let the SPA settle + Akamai's JS challenges run after navigation
-    await new Promise((r) => setTimeout(r, 2500));
+  // Cost: ~20-25 credits per call. Free tier (1k credits) → ~40 fetches.
+  const executeScript = `async () => {
     try {
       const res = await fetch(${JSON.stringify(UNIVERSAL_API)}, {
         method: "POST",
@@ -133,7 +127,7 @@ export async function fetchUniversalLiveRates(
         error: String(e && e.message || e),
       });
     }
-  })()`;
+  }`;
 
   const result = await scrapfly({
     url: "https://www.universalorlando.com/hotels/en/us/listing",
@@ -141,24 +135,46 @@ export async function fetchUniversalLiveRates(
     asp: true,
     country: "us",
     renderJs: true,
-    js: browserScript,
+    jsScenario: [
+      // Give the SPA + Akamai's JS challenges time to settle
+      { wait: { timeout: 3000 } },
+      // Run our async fetch — execute properly awaits
+      { execute: { script: executeScript } },
+    ],
     tags: ["universal-rates", "js-scenario"],
     timeoutMs: 90_000,
   });
 
-  if (!result.jsEvaluationResult) {
+  // js_scenario response shape: { response: [{ name, result, duration, ... }, ...] }
+  const scenario = result.jsScenarioResult;
+  if (!scenario) {
     throw new Error(
-      `Scrapfly returned no JS evaluation result — landed status=${result.status}. ` +
+      `Scrapfly returned no js_scenario result — landed status=${result.status}. ` +
       `First 200 of page body: ${result.body.slice(0, 200)}`
+    );
+  }
+  // Find the execute action's return value. Try a few possible shapes
+  // since Scrapfly's docs have shifted across versions.
+  const responses = (scenario.response ?? scenario.responses) as
+    | Array<{ name?: string; result?: unknown }> | undefined;
+  const executeRes = responses?.find((a) => a.name === "execute");
+  const executeResult = executeRes?.result;
+  if (typeof executeResult !== "string") {
+    console.warn(
+      `[universalLive] js_scenario unexpected shape — scenario keys: ${Object.keys(scenario).join(",")} | responses len: ${responses?.length ?? 0} | execute result type: ${typeof executeResult}`
+    );
+    throw new Error(
+      `js_scenario execute returned no string result. Scenario keys: ${Object.keys(scenario).join(",")}. ` +
+      `Full scenario: ${JSON.stringify(scenario).slice(0, 400)}`
     );
   }
 
   let inner: { ok: boolean; status?: number; body?: string; error?: string };
   try {
-    inner = JSON.parse(result.jsEvaluationResult);
+    inner = JSON.parse(executeResult);
   } catch {
     throw new Error(
-      `Scrapfly returned non-JSON eval result — ${result.jsEvaluationResult.slice(0, 200)}`
+      `js_scenario execute returned non-JSON: ${executeResult.slice(0, 200)}`
     );
   }
 

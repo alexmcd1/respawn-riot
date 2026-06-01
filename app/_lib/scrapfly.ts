@@ -39,6 +39,12 @@ export type ScrapflyOptions = {
    *  Scrapfly returns it via result.browserData.jsEvaluationResult.
    *  Requires renderJs=true. */
   js?: string;
+  /** Multi-step JS scenario: array of action objects (wait, click,
+   *  fill, execute, etc). UNLIKE the `js` param, the `execute` action
+   *  here properly awaits async functions. Use this when you need to
+   *  wait for the page to settle, fire an XHR, then capture its
+   *  result. Requires renderJs=true. */
+  jsScenario?: Array<Record<string, unknown>>;
   /** Override the timeout (default 60s — js_scenario adds 30s usually). */
   timeoutMs?: number;
 };
@@ -53,6 +59,10 @@ export type ScrapflyResult = {
    *  Caller is responsible for parsing it back into whatever shape they
    *  asked the script to return. */
   jsEvaluationResult?: string;
+  /** Raw `browser_data.js_scenario` block from Scrapfly when a js
+   *  scenario was sent. Shape: { response: [{ name, result, ... }, ...] }.
+   *  Caller picks the action result they need. */
+  jsScenarioResult?: Record<string, unknown>;
 };
 
 const BASE = "https://api.scrapfly.io/scrape";
@@ -91,6 +101,12 @@ export async function scrapfly(opts: ScrapflyOptions): Promise<ScrapflyResult> {
     // "Unable to base64 decode the JS script".
     qs.set("js", Buffer.from(opts.js, "utf8").toString("base64url"));
   }
+  if (opts.jsScenario && opts.jsScenario.length > 0) {
+    qs.set(
+      "js_scenario",
+      Buffer.from(JSON.stringify(opts.jsScenario), "utf8").toString("base64url")
+    );
+  }
   // Headers go in as headers[Name]=Value; Scrapfly forwards them to
   // the target. URLSearchParams handles the URL encoding for us.
   if (opts.headers) {
@@ -123,6 +139,7 @@ export async function scrapfly(opts: ScrapflyOptions): Promise<ScrapflyResult> {
         content_type?: string;
         browser_data?: {
           javascript_evaluation_result?: string;
+          js_scenario?: Record<string, unknown>;
         };
       };
       context?: { cost?: { total?: number } };
@@ -197,6 +214,7 @@ export async function scrapfly(opts: ScrapflyOptions): Promise<ScrapflyResult> {
       contentType: r.content_type,
       cost: wrapper.context?.cost?.total ?? 0,
       jsEvaluationResult: jsResult,
+      jsScenarioResult: bdata.js_scenario as Record<string, unknown> | undefined,
     };
   } finally {
     clearTimeout(timer);
