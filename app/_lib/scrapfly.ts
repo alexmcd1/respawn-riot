@@ -167,12 +167,36 @@ export async function scrapfly(opts: ScrapflyOptions): Promise<ScrapflyResult> {
       throw new Error(`Scrapfly returned unexpected shape: ${JSON.stringify(wrapper).slice(0, 300)}`);
     }
 
+    // Find the JS evaluation result. Scrapfly's API has used different
+    // field names across versions (javascript_evaluation_result vs
+    // js_evaluation_result, sometimes nested in browser_data, sometimes
+    // top-level on result). Try every known location.
+    type Bag = Record<string, unknown>;
+    const r2 = r as unknown as Bag;
+    const bdata = (r2.browser_data ?? {}) as Bag;
+    const jsResult =
+      (bdata.javascript_evaluation_result as string | undefined) ??
+      (bdata.js_evaluation_result as string | undefined) ??
+      (r2.javascript_evaluation_result as string | undefined) ??
+      (r2.js_evaluation_result as string | undefined);
+
+    // If renderJs/js was requested but no result came back, log the
+    // shape so we can debug field-name drift.
+    if (opts.js && jsResult == null) {
+      console.warn(
+        `[scrapfly] js_evaluation_result not found. result keys: ${Object.keys(r2).join(",")}` +
+        (bdata && Object.keys(bdata).length > 0
+          ? ` | browser_data keys: ${Object.keys(bdata).join(",")}`
+          : "")
+      );
+    }
+
     return {
       status: r.status_code,
       body: r.content ?? "",
       contentType: r.content_type,
       cost: wrapper.context?.cost?.total ?? 0,
-      jsEvaluationResult: r.browser_data?.javascript_evaluation_result,
+      jsEvaluationResult: jsResult,
     };
   } finally {
     clearTimeout(timer);
