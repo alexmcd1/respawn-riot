@@ -86,9 +86,10 @@ export async function scrapfly(opts: ScrapflyOptions): Promise<ScrapflyResult> {
   if (opts.session) qs.set("session", opts.session);
   if (opts.renderJs) qs.set("render_js", "true");
   if (opts.js) {
-    // Scrapfly expects the script base64-encoded so special chars
-    // don't break the URL parser.
-    qs.set("js", Buffer.from(opts.js, "utf8").toString("base64"));
+    // Scrapfly requires URL-SAFE base64 specifically (- and _ instead
+    // of + and /, no = padding). Standard base64 gets rejected with
+    // "Unable to base64 decode the JS script".
+    qs.set("js", Buffer.from(opts.js, "utf8").toString("base64url"));
   }
   // Headers go in as headers[Name]=Value; Scrapfly forwards them to
   // the target. URLSearchParams handles the URL encoding for us.
