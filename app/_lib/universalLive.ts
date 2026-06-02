@@ -156,6 +156,13 @@ export async function fetchUniversalLiveRates(
     if (searchBtn) { searchBtn.click(); log.push("clicked search"); }
     else log.push("search button NOT FOUND");
 
+    // Hydration diagnostics: how many of each element type exist?
+    // If inputs=0 and buttons=0, Angular hasn't hydrated yet.
+    log.push("inputs=" + document.querySelectorAll("input").length);
+    log.push("buttons=" + document.querySelectorAll("button").length);
+    log.push("approot=" + (document.querySelector("app-root") ? "yes" : "no"));
+    log.push("formfields=" + document.querySelectorAll("[formcontrolname]").length);
+
     // Store diagnostics on document.title so they survive into the
     // rendered HTML Scrapfly returns (Scrapfly's execute can't return
     // values, but it CAN mutate the DOM and we get the post-mutation
@@ -170,9 +177,12 @@ export async function fetchUniversalLiveRates(
     country: "us",
     renderJs: true,
     jsScenario: [
-      { wait: 3000 },                 // page hydration
-      { execute: fillAndClickScript }, // fill + click (side effects)
-      { wait: 6000 },                 // priced-hotels XHR completes
+      // Long wait — Akamai keeps firing challenge POSTs continuously
+      // which delays Angular hydration. Need ~10-15s before the search
+      // form is mounted to the DOM.
+      { wait: 12000 },
+      { execute: fillAndClickScript },
+      { wait: 8000 }, // priced-hotels XHR after click
     ],
     tags: ["universal-rates", "form-fill"],
     timeoutMs: 90_000,
