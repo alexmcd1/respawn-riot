@@ -12,10 +12,15 @@
 
 import { useState } from 'react'
 
-// Default ON while we test the xhr_call capture approach. Set
-// NEXT_PUBLIC_UNIVERSAL_LIVE_RATES=0 in Vercel to force off.
+// Hibernated 2026-06-01: investigation concluded the wall is Akamai's
+// continuous JS-challenge gating preventing Angular SPA hydration in
+// any free-tier headless browser service. See app/_lib/universalLive.ts
+// header notes for the full science write-up. Re-enable by setting
+// NEXT_PUBLIC_UNIVERSAL_LIVE_RATES=1 in Vercel env vars when you have
+// a tool that can punch through (Bright Data residential, ScrapingBee
+// Unblocker, paid Scrapfly tier).
 const LIVE_RATES_ENABLED =
-  process.env.NEXT_PUBLIC_UNIVERSAL_LIVE_RATES !== '0'
+  process.env.NEXT_PUBLIC_UNIVERSAL_LIVE_RATES === '1'
 import {
   UNIVERSAL_ALL_OFFERS_URL,
   UNIVERSAL_FL_RESIDENT_URL,

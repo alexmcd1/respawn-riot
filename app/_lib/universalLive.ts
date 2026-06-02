@@ -1,16 +1,61 @@
-// Universal Orlando live-rate client, powered by Scrapfly's
-// Anti Scraping Protection (residential proxies + TLS fingerprint
-// matching + JS challenge handling).
+// Universal Orlando live-rate client. HIBERNATED 2026-06-01.
 //
-// Why not just curl Universal's API? Their booking endpoint
-// (api.universalparks.com) sits behind Akamai bot detection that
-// rejects data-center IPs. We tried Browserless first; stealth
-// bypassed the JS fingerprinting layer but Akamai still IP-blocked
-// the data-center pool. Scrapfly's ASP rotates through residential
-// IPs which Akamai allow-lists.
+// This module is left intact in the repo so a future-you can revive
+// it the moment a tool exists that punches through Akamai's hardest
+// layer. See the investigation summary below for what was tried.
 //
-// Costs ~5 Scrapfly credits per call (free tier: 1,000 credits/mo →
-// ~200 free rate checks).
+// ─── Investigation summary ────────────────────────────────────────
+//
+// Universal's hotel-rate API (api.universalparks.com) sits behind
+// Akamai Bot Manager. The site's own booking UI works because a real
+// browser passes all of Akamai's layered checks. We tried to reach
+// the same data from a serverless backend without success.
+//
+// What we proved:
+//
+//   ✅ L1 — Akamai IP fingerprinting (data-center IP blocklist)
+//        Bypassed via Scrapfly ASP (residential proxies + matched
+//        TLS fingerprint). Without ASP we got "Access Denied
+//        Reference #18..." instantly even from headless Chrome.
+//
+//   ✅ L2 — Page load passes Akamai's initial JS challenge
+//        Scrapfly's renderJs=true loaded universalorlando.com/
+//        hotels/en/us/listing successfully (status 200, real HTML,
+//        not the error page).
+//
+//   ✅ L3 — XHR capture mechanism works on free tier
+//        browser_data.xhr_call captured all 8 of the page's
+//        bootstrap requests (page-config.json, pageinfo.html,
+//        getresourcelist/hotels.html, _IceLayout.html, Akamai
+//        challenge POSTs, etc).
+//
+//   ⚠️ L4 — Scrapfly's `js`/`execute` return-value capture is
+//        gated behind paid tiers. Free tier returns null/undefined
+//        for any script return value, even literal "hello" strings
+//        on non-Akamai hosts. Verified independently.
+//
+//   ❌ L5 — Angular SPA never hydrates under Akamai's continuous
+//        challenge POSTs. Form-fill scripts found 0 inputs / 0
+//        buttons / 0 [formcontrolname] elements even after 12s
+//        wait. Akamai keeps pinging the bot-detection endpoint
+//        (./M2cg6-/2VpHcE/...) returning 201, which apparently
+//        keeps the SPA in a pre-hydration holding pattern.
+//
+// What it would take to unblock:
+//   - Bright Data residential pool ($300/mo) — most reliable
+//   - ScrapingBee Unblocker (~$99/mo)
+//   - Paid Scrapfly tier with their AI extraction (~$30+/mo)
+//
+// What we shipped instead:
+//   - UniversalDealsPanel shows static catalog + RSS deal feed +
+//     booking deeplinks. Practical near-equivalent for personal use
+//     — MouseSavers/AllEars/Inside Universal catch FL Resident
+//     promo announcements within hours.
+//
+// To revive when you have a working tool:
+//   - Set NEXT_PUBLIC_UNIVERSAL_LIVE_RATES=1 in Vercel env vars
+//   - This module will be called again, no code changes needed
+//   - You may need to adjust the script depending on which tool
 
 import { scrapfly } from "./scrapfly";
 import {
