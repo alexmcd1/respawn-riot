@@ -338,10 +338,20 @@ function BandCard(data: BandCardData) {
 // Wave), NOT generic alt-music feeds. Every story here is about a
 // band that's already curated onto the page below — so the hero
 // can never surface bands the visitor wouldn't listen to.
+//
+// Image fallback chain (so every hero card always has an image):
+//   1. og:image scraped from the article (best quality when it works)
+//   2. Spotify artist photo for the band the story is about
+//   3. The band's hardcoded fallback image
+// Google News RSS article URLs are JS-redirect wrappers (the link
+// goes to news.google.com/rss/articles/... not the real publisher),
+// so og:image scraping fails on a majority of them — without this
+// chain the hero would render as empty gradient placeholders.
 
 type HeroItem = {
   news: NewsItem;
-  img: string | null;
+  img: string;
+  imgIsTrusted: boolean;
   band: string;   // which curated band this story is about
 };
 
@@ -373,21 +383,17 @@ function BreakingHero({ items }: { items: HeroItem[] }) {
             className="group lg:col-span-2 flex flex-col overflow-hidden rounded-2xl border border-pink-400/30 bg-black/60 transition hover:border-pink-400/70"
           >
             <div className="relative aspect-[16/9] w-full overflow-hidden bg-black">
-              {lead.img ? (
-                <SmartImage
-                  src={lead.img}
-                  alt={lead.news.title}
-                  trusted={isTrustedImageHost(lead.img)}
-                  sizes="(min-width: 1024px) 66vw, 100vw"
-                  className="object-cover transition group-hover:scale-[1.02]"
-                />
-              ) : (
-                <HeroPlaceholder />
-              )}
+              <SmartImage
+                src={lead.img}
+                alt={lead.band}
+                trusted={lead.imgIsTrusted}
+                sizes="(min-width: 1024px) 66vw, 100vw"
+                className="object-cover transition group-hover:scale-[1.02]"
+              />
               <span className="absolute left-3 top-3 rounded border border-pink-400/60 bg-black/75 px-2 py-0.5 font-display text-[10px] tracking-[0.3em] text-pink-200">
                 ◢ {lead.band.toUpperCase()}
               </span>
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent p-5">
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-5">
                 <p className="font-display text-[10px] tracking-[0.3em] text-pink-300">
                   {lead.news.publisher ?? lead.news.source}
                   {lead.news.pubDate && (
@@ -414,17 +420,13 @@ function BreakingHero({ items }: { items: HeroItem[] }) {
                 className="group flex flex-1 overflow-hidden rounded-2xl border border-white/10 bg-black/40 transition hover:border-pink-400/60"
               >
                 <div className="relative aspect-square w-28 shrink-0 overflow-hidden bg-black sm:w-32">
-                  {item.img ? (
-                    <SmartImage
-                      src={item.img}
-                      alt={item.news.title}
-                      trusted={isTrustedImageHost(item.img)}
-                      sizes="128px"
-                      className="object-cover transition group-hover:scale-105"
-                    />
-                  ) : (
-                    <HeroPlaceholder />
-                  )}
+                  <SmartImage
+                    src={item.img}
+                    alt={item.band}
+                    trusted={item.imgIsTrusted}
+                    sizes="128px"
+                    className="object-cover transition group-hover:scale-105"
+                  />
                 </div>
                 <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 p-3">
                   <p className="font-display text-[10px] tracking-[0.3em] text-pink-300">
@@ -451,19 +453,9 @@ function BreakingHero({ items }: { items: HeroItem[] }) {
   );
 }
 
-function HeroPlaceholder() {
-  // Subtle on-brand pattern stand-in for headlines without an OG image.
-  return (
-    <div className="absolute inset-0 bg-gradient-to-br from-pink-500/30 via-fuchsia-500/15 to-black">
-      <div className="absolute inset-0 opacity-25 [background:repeating-linear-gradient(-45deg,rgba(255,0,128,0.18)_0,rgba(255,0,128,0.18)_8px,transparent_8px,transparent_16px)]" />
-      <div className="absolute inset-0 flex items-center justify-center">
-        <span className="font-display text-3xl tracking-[0.35em] text-pink-300/70">
-          ♪
-        </span>
-      </div>
-    </div>
-  );
-}
+// (HeroPlaceholder removed — fallback chain in PopPunkPanel guarantees
+//  every hero card resolves to a real image, so the placeholder no
+//  longer fires. Restore from git history if a code path ever needs it.)
 
 // ─── Main panel ─────────────────────────────────────────────────────────
 
@@ -515,12 +507,38 @@ export default async function PopPunkPanel() {
     (b.news.pubDate || "").localeCompare(a.news.pubDate || "")
   );
   const heroPicks = rankedBandNews.slice(0, 3);
+
+  // Build a band → fallback image map so the hero can always render an
+  // image even when og:image scraping fails (which it often does for
+  // Google News article URLs — those are JS-redirect wrappers).
+  const bandFallbackImg = new Map<string, string>([
+    ...TOUR_BANDS.map((b) => [b.name, b.fallbackImg] as const),
+    ...ALBUM_BANDS.map((b) => [b.name, b.fallbackImg] as const),
+    ...NEW_WAVE_ARTISTS.map((a) => [a.name, a.fallbackImg] as const),
+  ]);
+
+  // Fetch Spotify images for the hero bands in parallel (cached for a
+  // week, so this is essentially free on subsequent renders).
+  const heroBandSpotify = await Promise.all(
+    heroPicks.map((t) => fetchArtistImage(t.band))
+  );
+  // OG image scrape per article (best quality when it works).
   const heroOgImages = await Promise.all(heroPicks.map((t) => fetchOgImage(t.news.link)));
-  const heroItems: HeroItem[] = heroPicks.map((t, i) => ({
-    news: t.news,
-    img: heroOgImages[i],
-    band: t.band,
-  }));
+
+  const heroItems: HeroItem[] = heroPicks.map((t, i) => {
+    // Fallback chain: og:image → Spotify → hardcoded → final empty-string
+    // safety net. In practice the hardcoded fallback always wins for a
+    // band that's listed on the page, so the empty-string branch should
+    // never actually fire.
+    const fallback = bandFallbackImg.get(t.band) ?? "";
+    const img = heroOgImages[i] || heroBandSpotify[i] || fallback;
+    return {
+      news: t.news,
+      img,
+      imgIsTrusted: isTrustedImageHost(img),
+      band: t.band,
+    };
+  });
 
   // ─── Headlines list filter ─────────────────────────────────────────────
   //
