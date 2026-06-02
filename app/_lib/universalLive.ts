@@ -154,12 +154,19 @@ export async function fetchUniversalLiveRates(
     typeof c.url === "string" && c.url.includes("priced-hotels")
   );
   if (!pricedCall) {
-    const urlSummary = calls
-      .map((c) => `${c.method ?? "?"} ${c.url ?? "?"} → ${c.response?.status ?? "?"}`)
-      .slice(0, 5)
-      .join(" | ");
+    // Dump every captured XHR including a body snippet — maybe one of
+    // them has hotel info we can use (e.g. getresourcelist/hotels.html
+    // could be a static catalog). Free intel from work already done.
+    const allCalls = calls.map((c, i) => {
+      const bodyHead = (c.response?.body ?? "").slice(0, 250).replace(/\s+/g, " ");
+      return `[${i}] ${c.method ?? "?"} ${c.url ?? "?"} → ${c.response?.status ?? "?"} | body: ${bodyHead}`;
+    });
+    // Log everything to Vercel — error message has size limits but logs don't
+    console.log(`[universalLive] full XHR dump:\n${allCalls.join("\n")}`);
     throw new Error(
-      `priced-hotels not in captured XHRs. Captured ${calls.length} calls: ${urlSummary}`
+      `priced-hotels not in captured XHRs. Captured ${calls.length} calls (full dump in Vercel logs). First 3 URLs: ${
+        calls.slice(0, 3).map((c) => c.url).join(" | ")
+      }`
     );
   }
 
