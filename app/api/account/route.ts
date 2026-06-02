@@ -86,9 +86,13 @@ export async function PATCH(request: Request) {
     );
   }
 
+  // Also mirror into users.name so anywhere reading the standard
+  // Auth.js name field (NextAuth session, third-party adapters, future
+  // OAuth merges) sees the same display value.
   await db`
     UPDATE users
-    SET username = ${result.normalized}
+    SET username = ${result.normalized},
+        name = ${result.normalized}
     WHERE id = ${userId}
   `;
   return NextResponse.json({ ok: true, username: result.normalized });

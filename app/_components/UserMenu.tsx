@@ -12,6 +12,7 @@ import { openSignIn } from './SignInModal'
 export default function UserMenu({ compact = false }: { compact?: boolean }) {
   const { data: session, status } = useSession()
   const [open, setOpen] = useState(false)
+  const [profileName, setProfileName] = useState<string | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
 
   // Click outside to close
@@ -25,6 +26,27 @@ export default function UserMenu({ compact = false }: { compact?: boolean }) {
     document.addEventListener('mousedown', onClick)
     return () => document.removeEventListener('mousedown', onClick)
   }, [open])
+
+  // Once signed in, fetch the user's username + computed display name
+  // so the chip shows their chosen handle (not just the email local
+  // part). The fetch runs in the background — the chip starts with the
+  // email-derived name and upgrades when the request resolves.
+  useEffect(() => {
+    if (status !== 'authenticated') return
+    let cancelled = false
+    fetch('/api/account')
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return
+        if (data?.ok && typeof data.displayName === 'string') {
+          setProfileName(data.displayName)
+        }
+      })
+      .catch(() => {
+        // Best effort — fall back to email split silently
+      })
+    return () => { cancelled = true }
+  }, [status])
 
   // Loading flash: just render a placeholder so layout doesn't shift
   if (status === 'loading') {
@@ -57,12 +79,12 @@ export default function UserMenu({ compact = false }: { compact?: boolean }) {
   }
 
   const email = session.user.email
-  const initial = email[0]?.toUpperCase() ?? '?'
 
-  // Show first 8 chars of the email's local part on small screens —
-  // long enough to recognize ("alexmcd1"), short enough not to wrap.
-  const username = email.split('@')[0]
-  const shortName = username.length > 8 ? `${username.slice(0, 8)}…` : username
+  // Prefer the user's chosen username (loaded async from /api/account),
+  // fall back to the email's local part while the fetch is in flight.
+  const handle = profileName ?? email.split('@')[0]
+  const initial = handle[0]?.toUpperCase() ?? '?'
+  const shortName = handle.length > 10 ? `${handle.slice(0, 10)}…` : handle
 
   return (
     <div ref={menuRef} className="relative">
@@ -97,9 +119,14 @@ export default function UserMenu({ compact = false }: { compact?: boolean }) {
             <p className="font-display text-[10px] tracking-[0.3em] text-fuchsia-300">
               SIGNED IN AS
             </p>
-            <p className="mt-1 truncate text-sm text-white" title={email}>
-              {email}
+            <p className="mt-1 truncate font-display text-base text-white" title={handle}>
+              {handle}
             </p>
+            {profileName && profileName !== email.split('@')[0] && (
+              <p className="mt-0.5 truncate font-mono text-[11px] text-white/45" title={email}>
+                {email}
+              </p>
+            )}
           </div>
           <div className="px-2 py-2 text-xs text-white/55">
             Your favorites, recipes, ratings + quests sync across devices.
