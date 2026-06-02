@@ -295,6 +295,106 @@ export async function ensureSchema(): Promise<void> {
       PRIMARY KEY ("userId", post_id)
     )
   `;
+
+  // ── AIM-style buddy chat (channel 09).
+  //
+  // Presence lives on the users row as a handful of columns — one row
+  // per user, no extra table needed. Heartbeats from any open tab
+  // bump `chat_last_seen_at`; the buddy-list query treats anyone
+  // last-seen within ~90s as online (unless they picked Invisible).
+  //
+  // chat_friendships: mutual-consent buddy list. requester_id sends,
+  //   addressee_id accepts. UNIQUE(requester, addressee) prevents
+  //   duplicate requests in the same direction. A pair can have at most
+  //   one "accepted" row in either direction (we enforce that in the
+  //   route handler — Postgres doesn't have direction-agnostic uniques).
+  //
+  // chat_messages: append-only DM log. read_at lets us show unread
+  //   counts and "● new" dots. The composite index on
+  //   (LEAST/GREATEST) lets us efficiently fetch a 1:1 conversation
+  //   regardless of who sent the most recent message.
+  //
+  // chat_typing: lightweight "is typing…" pings. One row per
+  //   (sender, recipient) pair, upserted on each keystroke. The client
+  //   polls and treats updated_at < 6s old as "they're typing right now".
+  await db`
+    ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS chat_status TEXT NOT NULL DEFAULT 'available'
+  `;
+  await db`
+    ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS chat_away_message TEXT
+  `;
+  await db`
+    ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS chat_profile TEXT
+  `;
+  await db`
+    ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS chat_last_seen_at TIMESTAMPTZ
+  `;
+  await db`
+    ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS chat_sound_enabled BOOLEAN NOT NULL DEFAULT TRUE
+  `;
+  await db`
+    CREATE INDEX IF NOT EXISTS users_chat_last_seen_idx
+      ON users (chat_last_seen_at DESC)
+      WHERE chat_last_seen_at IS NOT NULL
+  `;
+  await db`
+    CREATE TABLE IF NOT EXISTS chat_friendships (
+      id            SERIAL PRIMARY KEY,
+      requester_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      addressee_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      status        TEXT NOT NULL DEFAULT 'pending',
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      accepted_at   TIMESTAMPTZ,
+      UNIQUE (requester_id, addressee_id),
+      CHECK (requester_id <> addressee_id),
+      CHECK (status IN ('pending', 'accepted', 'declined', 'blocked'))
+    )
+  `;
+  await db`
+    CREATE INDEX IF NOT EXISTS chat_friendships_addressee_idx
+      ON chat_friendships (addressee_id, status)
+  `;
+  await db`
+    CREATE INDEX IF NOT EXISTS chat_friendships_requester_idx
+      ON chat_friendships (requester_id, status)
+  `;
+  await db`
+    CREATE TABLE IF NOT EXISTS chat_messages (
+      id            SERIAL PRIMARY KEY,
+      sender_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      recipient_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      body          TEXT NOT NULL,
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      read_at       TIMESTAMPTZ,
+      CHECK (sender_id <> recipient_id)
+    )
+  `;
+  await db`
+    CREATE INDEX IF NOT EXISTS chat_messages_recipient_idx
+      ON chat_messages (recipient_id, created_at DESC)
+  `;
+  await db`
+    CREATE INDEX IF NOT EXISTS chat_messages_conversation_idx
+      ON chat_messages (
+        LEAST(sender_id, recipient_id),
+        GREATEST(sender_id, recipient_id),
+        created_at DESC
+      )
+  `;
+  await db`
+    CREATE TABLE IF NOT EXISTS chat_typing (
+      sender_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      recipient_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (sender_id, recipient_id)
+    )
+  `;
+
   _schemaReady = true;
 }
 

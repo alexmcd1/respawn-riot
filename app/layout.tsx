@@ -6,6 +6,8 @@ import BackToTop from "./_components/BackToTop";
 import AuthProvider from "./_components/AuthProvider";
 import SignInModal from "./_components/SignInModal";
 import SyncController from "./_components/SyncController";
+import ChatRoot from "./_components/chat/ChatRoot";
+import { ChatProvider } from "./_components/chat/ChatContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -41,13 +43,21 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-black text-white">
         <AuthProvider>
-          <NavBar />
-          <div className="flex-1">{children}</div>
-          <BackToTop />
-          <SignInModal />
-          {/* SyncController is invisible — watches session + drives
-              localStorage ↔ /api/sync/<kind> sync per registered store */}
-          <SyncController />
+          {/* ChatProvider sits ABOVE the page tree so /buddies and the
+              floating overlay share one buddy/messages state. When
+              signed out it's a no-op (no fetches, empty arrays). */}
+          <ChatProvider>
+            <NavBar />
+            <div className="flex-1">{children}</div>
+            <BackToTop />
+            <SignInModal />
+            {/* SyncController is invisible — watches session + drives
+                localStorage ↔ /api/sync/<kind> sync per registered store */}
+            <SyncController />
+            {/* AIM-style buddy chat — floating buddy list + popup chat
+                windows. Renders nothing when signed out. */}
+            <ChatRoot />
+          </ChatProvider>
         </AuthProvider>
       </body>
     </html>
