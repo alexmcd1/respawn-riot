@@ -213,21 +213,50 @@ export async function fetchManyRss(
 
 /**
  * Build a Google News RSS search URL.
- * Returns the FIRST result for the query, or null. Cache: 1 week.
+ *
+ * Returns the MOST RECENT result (Google's RSS orders by relevance,
+ * not date — left to itself it will happily surface a viral 2020
+ * article as the "top" hit). We always:
+ *   - constrain to the last `whenDays` of content via Google's
+ *     `when:NNd` query operator (default 90 days)
+ *   - sort the returned items by pubDate desc
+ *   - DROP anything older than `maxAgeDays` even if it slips through
+ *     (default 180 days)
+ *
+ * Cache: 1 week by default.
  */
 export async function fetchTopGoogleNews(
   query: string,
-  revalidate = REVALIDATE_WEEKLY
+  revalidate = REVALIDATE_WEEKLY,
+  opts: { whenDays?: number; maxAgeDays?: number } = {}
 ): Promise<NewsItem | null> {
+  const whenDays = opts.whenDays ?? 90;
+  const maxAgeDays = opts.maxAgeDays ?? 180;
   const params = new URLSearchParams({
-    q: query,
+    // `when:NNd` is Google News's recency operator. We tack it onto
+    // the user's query so the feed itself is pre-filtered.
+    q: `${query} when:${whenDays}d`,
     hl: "en-US",
     gl: "US",
     ceid: "US:en",
   });
   const url = `https://news.google.com/rss/search?${params.toString()}`;
-  const items = await fetchRss(url, "Google News", 5, revalidate);
-  return items[0] ?? null;
+  const items = await fetchRss(url, "Google News", 10, revalidate);
+  if (items.length === 0) return null;
+  // Sort newest first. Items without a parseable pubDate go to the end
+  // (we'd rather skip them than ship something we can't date-stamp).
+  const dated = items
+    .filter((it) => !!it.pubDate)
+    .sort((a, b) => (b.pubDate || "").localeCompare(a.pubDate || ""));
+  if (dated.length === 0) return null;
+  // Final guard: drop anything older than the max-age cliff. Google
+  // occasionally returns slightly older items even with when:Nd.
+  const cutoff = Date.now() - maxAgeDays * 24 * 60 * 60 * 1000;
+  const fresh = dated.filter((it) => {
+    const t = Date.parse(it.pubDate || "");
+    return Number.isFinite(t) && t >= cutoff;
+  });
+  return fresh[0] ?? null;
 }
 
 export function formatRelative(iso: string | undefined): string | null {
