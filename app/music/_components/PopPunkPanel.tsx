@@ -164,14 +164,25 @@ const NEW_WAVE_ARTISTS: ArtistConfig[] = [
 
 // ─── Per-band data wiring ─────────────────────────────────────────────────
 
+// Recency floor for "this counts as live news". Anything older becomes
+// a static fallback card. 60-day search window, 90-day hard cliff.
+const FRESH_SEARCH_DAYS = 60;
+const FRESH_MAX_AGE_DAYS = 90;
+
 async function fetchBandHeadline(band: string, topic: string): Promise<NewsItem | null> {
-  // Recency budget: 90 days searched, 180 days max age. The defaults
-  // of fetchTopGoogleNews — kept explicit here so it's obvious why we
-  // stopped seeing 2020 articles.
   return fetchTopGoogleNews(`"${band}" ${topic}`, REVALIDATE_WEEKLY, {
-    whenDays: 90,
-    maxAgeDays: 180,
+    whenDays: FRESH_SEARCH_DAYS,
+    maxAgeDays: FRESH_MAX_AGE_DAYS,
   });
+}
+
+/** True iff `iso` parses to a date within the last MAX_AGE_DAYS. */
+function isFreshEnough(iso: string | undefined): boolean {
+  if (!iso) return false;
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return false;
+  const ageDays = (Date.now() - t) / (24 * 60 * 60 * 1000);
+  return ageDays <= FRESH_MAX_AGE_DAYS;
 }
 
 type BandCardData = {
@@ -203,25 +214,30 @@ async function buildBandCard(
   cfg: BandConfig,
   item: NewsItem | null
 ): Promise<BandCardData> {
-  // Image resolution chain: og:image (current article) → Spotify
-  // (auto-current artist photo) → hardcoded Wikipedia fallback.
+  // Promote `item` to live ONLY if its pubDate is within FRESH_MAX_AGE_DAYS.
+  // Anything older falls through to the static fallback so a 4-month-old
+  // headline stops masquerading as breaking news.
+  const liveItem = item && isFreshEnough(item.pubDate) ? item : null;
+
+  // Image resolution chain: og:image (current article, only if live) →
+  // Spotify (auto-current artist photo) → hardcoded Wikipedia fallback.
   const [ogImg, spotifyImg] = await Promise.all([
-    item ? fetchOgImage(item.link) : Promise.resolve(null),
+    liveItem ? fetchOgImage(liveItem.link) : Promise.resolve(null),
     fetchArtistImage(cfg.name),
   ]);
   const img = ogImg || spotifyImg || cfg.fallbackImg;
   const imgIsTrusted = isTrustedImageHost(img);
 
-  if (item) {
+  if (liveItem) {
     return {
       name: cfg.name,
       img,
       imgIsTrusted,
-      headline: item.title,
-      blurb: item.description ?? `Latest mention via ${item.publisher ?? "Google News"}.`,
-      href: item.link,
-      source: item.publisher ?? "Google News",
-      pubDate: item.pubDate,
+      headline: liveItem.title,
+      blurb: liveItem.description ?? `Latest mention via ${liveItem.publisher ?? "Google News"}.`,
+      href: liveItem.link,
+      source: liveItem.publisher ?? "Google News",
+      pubDate: liveItem.pubDate,
       isLive: true,
     };
   }
@@ -317,10 +333,16 @@ function BandCard(data: BandCardData) {
 }
 
 // ─── BREAKING NOW hero strip ─────────────────────────────────────────────
+//
+// Sourced from the per-band Google News results (Tour + Album + New
+// Wave), NOT generic alt-music feeds. Every story here is about a
+// band that's already curated onto the page below — so the hero
+// can never surface bands the visitor wouldn't listen to.
 
 type HeroItem = {
   news: NewsItem;
   img: string | null;
+  band: string;   // which curated band this story is about
 };
 
 function BreakingHero({ items }: { items: HeroItem[] }) {
@@ -334,11 +356,11 @@ function BreakingHero({ items }: { items: HeroItem[] }) {
           <div className="flex items-center gap-2">
             <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-pink-400 shadow-[0_0_12px_rgba(244,114,182,0.8)]" />
             <h2 className="font-display text-[11px] tracking-[0.4em] text-pink-300">
-              BREAKING NOW
+              FROM YOUR BANDS
             </h2>
           </div>
           <p className="font-mono text-[10px] text-white/45">
-            LIVE FEED · UPDATED HOURLY
+            LAST {FRESH_MAX_AGE_DAYS}D · YOUR LINEUP ONLY
           </p>
         </div>
 
@@ -362,6 +384,9 @@ function BreakingHero({ items }: { items: HeroItem[] }) {
               ) : (
                 <HeroPlaceholder />
               )}
+              <span className="absolute left-3 top-3 rounded border border-pink-400/60 bg-black/75 px-2 py-0.5 font-display text-[10px] tracking-[0.3em] text-pink-200">
+                ◢ {lead.band.toUpperCase()}
+              </span>
               <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent p-5">
                 <p className="font-display text-[10px] tracking-[0.3em] text-pink-300">
                   {lead.news.publisher ?? lead.news.source}
@@ -402,10 +427,13 @@ function BreakingHero({ items }: { items: HeroItem[] }) {
                   )}
                 </div>
                 <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 p-3">
-                  <p className="font-display text-[10px] tracking-[0.25em] text-pink-300">
+                  <p className="font-display text-[10px] tracking-[0.3em] text-pink-300">
+                    ◢ {item.band.toUpperCase()}
+                  </p>
+                  <p className="font-mono text-[10px] text-white/45">
                     {item.news.publisher ?? item.news.source}
                     {item.news.pubDate && (
-                      <span className="ml-1 font-mono text-white/45">
+                      <span className="ml-1">
                         · {formatRelative(item.news.pubDate)}
                       </span>
                     )}
@@ -440,11 +468,11 @@ function HeroPlaceholder() {
 // ─── Main panel ─────────────────────────────────────────────────────────
 
 export default async function PopPunkPanel() {
-  const [headlines, tourResults, albumResults, newWaveResults, newWaveImages] =
+  const [rawHeadlines, tourResults, albumResults, newWaveResults, newWaveImages] =
     await Promise.all([
       fetchManyRss(POP_PUNK_FEEDS, {
         perFeedMax: 6,
-        totalMax: 10,
+        totalMax: 14,
         fallbacks: POP_PUNK_FALLBACKS,
         minBeforeFallback: 4,
       }),
@@ -461,19 +489,68 @@ export default async function PopPunkPanel() {
     ALBUM_BANDS.map((cfg, i) => buildBandCard(cfg, albumResults[i]))
   );
 
-  // Hero strip: pull 3 most recent headlines from the RSS feeds + try
-  // to scrape their OG images in parallel.
-  const heroNews = headlines.slice(0, 3);
-  const heroImages = await Promise.all(heroNews.map((n) => fetchOgImage(n.link)));
-  const heroItems: HeroItem[] = heroNews.map((news, i) => ({
-    news,
-    img: heroImages[i],
+  // ─── BREAKING NOW input ────────────────────────────────────────────────
+  //
+  // Union of the per-band results we already fetched, tagged with which
+  // band each item is about. Dedupe by URL (a single article that
+  // mentions multiple bands doesn't show up multiple times), drop any
+  // entry whose pubDate falls outside our freshness window, then sort
+  // newest-first and take the top 3.
+  //
+  // Crucially: every story here is about a band that appears below
+  // (Tour News / Album News / New Wave). The hero can't surface
+  // bands the user wouldn't listen to.
+  type Tagged = { news: NewsItem; band: string };
+  const allBandNews: Tagged[] = [
+    ...tourResults.map((n, i) => (n ? { news: n, band: TOUR_BANDS[i].name } : null)),
+    ...albumResults.map((n, i) => (n ? { news: n, band: ALBUM_BANDS[i].name } : null)),
+    ...newWaveResults.map((n, i) => (n ? { news: n, band: NEW_WAVE_ARTISTS[i].name } : null)),
+  ].filter((x): x is Tagged => x != null && isFreshEnough(x.news.pubDate));
+
+  const dedup = new Map<string, Tagged>();
+  for (const t of allBandNews) {
+    if (!dedup.has(t.news.link)) dedup.set(t.news.link, t);
+  }
+  const rankedBandNews = [...dedup.values()].sort((a, b) =>
+    (b.news.pubDate || "").localeCompare(a.news.pubDate || "")
+  );
+  const heroPicks = rankedBandNews.slice(0, 3);
+  const heroOgImages = await Promise.all(heroPicks.map((t) => fetchOgImage(t.news.link)));
+  const heroItems: HeroItem[] = heroPicks.map((t, i) => ({
+    news: t.news,
+    img: heroOgImages[i],
+    band: t.band,
   }));
 
-  // Scrape OG images for the rest of the headlines list too — limited
-  // to top 6 to keep the render budget reasonable. The list further
-  // down stays text-only.
-  const listHeadlines = headlines.slice(3);
+  // ─── Headlines list filter ─────────────────────────────────────────────
+  //
+  // Only show items whose title mentions one of the bands curated for
+  // this page. Same principle as Breaking Now — keep the visible bands
+  // to the ones the visitor would listen to.
+  const allBandNames = [
+    ...TOUR_BANDS.map((b) => b.name),
+    ...ALBUM_BANDS.map((b) => b.name),
+    ...NEW_WAVE_ARTISTS.map((a) => a.name),
+  ];
+  // Normalize both sides: lowercase, strip every non-alphanumeric to a
+  // single space, then collapse runs. Catches all the messy cases —
+  // "Blink-182" matches "blink 182", "Meet Me @ The Altar" matches
+  // articles that write it with or without the @, possessives like
+  // "Fall Out Boy's tour" still match "fall out boy", etc.
+  const normalize = (s: string) =>
+    s.toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+  const bandTokens = allBandNames.map(normalize);
+  const mentionsCuratedBand = (title: string) => {
+    const t = normalize(title);
+    return bandTokens.some((b) => b.length > 2 && t.includes(b));
+  };
+  const freshHeadlines = rawHeadlines.filter(
+    (h) => isFreshEnough(h.pubDate) && mentionsCuratedBand(h.title)
+  );
+  // Drop URLs already used in the Breaking Now strip to avoid dupes.
+  const usedLinks = new Set(heroItems.map((h) => h.news.link));
+  const listHeadlines = freshHeadlines.filter((h) => !usedLinks.has(h.link));
+  // Scrape OG thumbnails for the top 6 list entries.
   const listImages = await Promise.all(
     listHeadlines.slice(0, 6).map((n) => fetchOgImage(n.link))
   );
@@ -592,15 +669,17 @@ export default async function PopPunkPanel() {
       <section className="border-t border-white/10 bg-zinc-950 px-4 py-10 sm:px-6 sm:py-14">
         <div className="mx-auto max-w-7xl">
           <div className="flex items-end justify-between gap-4">
-            <h2 className="text-2xl font-black uppercase sm:text-3xl">Headlines</h2>
+            <h2 className="text-2xl font-black uppercase sm:text-3xl">More From Your Bands</h2>
             <span className="hidden font-display text-[10px] tracking-[0.3em] text-white/40 sm:block">
-              LIVE · UPDATES HOURLY
+              LAST {FRESH_MAX_AGE_DAYS}D · YOUR LINEUP ONLY
             </span>
           </div>
-          <p className="mt-2 text-white/60">Latest from Alternative Press, Punktastic, and Substream.</p>
+          <p className="mt-2 text-white/60">
+            Stories from AltPress, Punktastic &amp; Substream — filtered to the bands listed above.
+          </p>
           {listHeadlines.length === 0 ? (
             <div className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-center text-sm text-white/60">
-              {"Couldn't reach the feeds right now. Try refreshing in a bit."}
+              No fresh stories matched your lineup this week. Check back in a few days.
             </div>
           ) : (
             <div className="mt-8 grid gap-4 md:grid-cols-2">
