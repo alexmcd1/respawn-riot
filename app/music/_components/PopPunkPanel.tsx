@@ -35,6 +35,11 @@ const POP_PUNK_FALLBACKS: Feed[] = [
   { url: "https://news.google.com/rss/search?q=pop+punk+tour+OR+album+when:30d&hl=en-US&gl=US&ceid=US:en", source: "Google News (pop punk)" },
 ];
 
+/** Shared local placeholder used as a last-resort fallback for new
+ *  bands and festivals that don't have a hardcoded Wikipedia photo.
+ *  Spotify usually overrides this for bands; festivals fall through. */
+const MUSIC_PLACEHOLDER = "/music/placeholder.svg";
+
 type BandConfig = {
   name: string;
   /** Last-resort image when Spotify isn't configured and OG scraping
@@ -79,6 +84,38 @@ const TOUR_BANDS: BandConfig[] = [
     fallbackHeadline: "Watch this space",
     fallbackBlurb: "On a planned hiatus — Hayley Williams shows still surface.",
   },
+  {
+    name: "All Time Low",
+    fallbackImg: MUSIC_PLACEHOLDER,
+    fallbackHref: "https://www.alltimelow.com/",
+    fallbackSource: "alltimelow.com",
+    fallbackHeadline: "Tour rolls on",
+    fallbackBlurb: "Check the official site for the latest dates.",
+  },
+  {
+    name: "Mayday Parade",
+    fallbackImg: MUSIC_PLACEHOLDER,
+    fallbackHref: "https://www.maydayparade.com/",
+    fallbackSource: "maydayparade.com",
+    fallbackHeadline: "Anywhere But Here era + headliners",
+    fallbackBlurb: "Steady touring and the occasional anniversary run.",
+  },
+  {
+    name: "Avril Lavigne",
+    fallbackImg: MUSIC_PLACEHOLDER,
+    fallbackHref: "https://www.avrillavigne.com/",
+    fallbackSource: "avrillavigne.com",
+    fallbackHeadline: "Greatest hits tour",
+    fallbackBlurb: "Hard-pop comeback era. Festival headliner shows.",
+  },
+  {
+    name: "Pierce the Veil",
+    fallbackImg: MUSIC_PLACEHOLDER,
+    fallbackHref: "https://www.piercetheveil.net/",
+    fallbackSource: "piercetheveil.net",
+    fallbackHeadline: "The Jaws of Life tour cycle",
+    fallbackBlurb: "Post-hardcore-leaning, but the choruses count.",
+  },
 ];
 
 const ALBUM_BANDS: BandConfig[] = [
@@ -114,6 +151,30 @@ const ALBUM_BANDS: BandConfig[] = [
     fallbackHeadline: "Make The Most Of It deluxe pressings keep moving",
     fallbackBlurb: "Still touring the album that proved they never lost a step.",
   },
+  {
+    name: "Panic! at the Disco",
+    fallbackImg: MUSIC_PLACEHOLDER,
+    fallbackHref: "https://www.panicatthedisco.com/",
+    fallbackSource: "panicatthedisco.com",
+    fallbackHeadline: "Catalog era continues",
+    fallbackBlurb: "Project wound down in 2023 — catalog news + Brendon Urie watch.",
+  },
+  {
+    name: "Alkaline Trio",
+    fallbackImg: MUSIC_PLACEHOLDER,
+    fallbackHref: "https://www.alkalinetrio.com/",
+    fallbackSource: "alkalinetrio.com",
+    fallbackHeadline: "Blood, Hair, and Eyeballs cycle",
+    fallbackBlurb: "Latest record + steady touring with the Black Sails-era lineup.",
+  },
+  {
+    name: "Good Charlotte",
+    fallbackImg: MUSIC_PLACEHOLDER,
+    fallbackHref: "https://www.goodcharlotte.com/",
+    fallbackSource: "goodcharlotte.com",
+    fallbackHeadline: "Reunion era",
+    fallbackBlurb: "Festival headliner shows + nostalgia run.",
+  },
 ];
 
 type ArtistConfig = {
@@ -122,6 +183,66 @@ type ArtistConfig = {
   fallbackHref: string;
   fallbackBlurb: string;
 };
+
+type FestivalConfig = {
+  name: string;
+  /** Compact name used for the band tag pill in the hero ("AFTERSHOCK"
+   *  reads better than "Danny Wimmer Presents Aftershock"). */
+  shortName?: string;
+  fallbackImg: string;
+  fallbackHref: string;
+  fallbackSource: string;
+  fallbackBlurb: string;
+};
+
+// Festivals — searched the same way per-band news is. Treated like
+// bands for the FROM YOUR BANDS hero strip, so a freshly-announced
+// lineup can lead the page.
+const FESTIVALS: FestivalConfig[] = [
+  {
+    name: "Welcome to Rockville",
+    shortName: "Rockville",
+    fallbackImg: MUSIC_PLACEHOLDER,
+    fallbackHref: "https://welcometorockvillefestival.com/",
+    fallbackSource: "welcometorockvillefestival.com",
+    fallbackBlurb: "Daytona Beach. Four days of rock + alt-heavy festivals each May.",
+  },
+  {
+    name: "Louder Than Life",
+    fallbackImg: MUSIC_PLACEHOLDER,
+    fallbackHref: "https://louderthanlifefestival.com/",
+    fallbackSource: "louderthanlifefestival.com",
+    fallbackBlurb: "Louisville. Headlining rock & metal weekender every September.",
+  },
+  {
+    name: "Sonic Temple",
+    fallbackImg: MUSIC_PLACEHOLDER,
+    fallbackHref: "https://sonictemplefestival.com/",
+    fallbackSource: "sonictemplefestival.com",
+    fallbackBlurb: "Columbus, OH. The spiritual successor to Rock on the Range.",
+  },
+  {
+    name: "Shaky Knees",
+    fallbackImg: MUSIC_PLACEHOLDER,
+    fallbackHref: "https://shakykneesfestival.com/",
+    fallbackSource: "shakykneesfestival.com",
+    fallbackBlurb: "Atlanta. Indie-leaning festival with strong alt-rock lineups.",
+  },
+  {
+    name: "Warped Tour",
+    fallbackImg: MUSIC_PLACEHOLDER,
+    fallbackHref: "https://vanswarpedtour.com/",
+    fallbackSource: "vanswarpedtour.com",
+    fallbackBlurb: "The return. Anniversary stops in DC, Long Beach & Orlando in 2025.",
+  },
+  {
+    name: "Aftershock",
+    fallbackImg: MUSIC_PLACEHOLDER,
+    fallbackHref: "https://aftershockfestival.com/",
+    fallbackSource: "aftershockfestival.com",
+    fallbackBlurb: "Sacramento. October's heavy-rock weekender.",
+  },
+];
 
 const NEW_WAVE_ARTISTS: ArtistConfig[] = [
   {
@@ -203,6 +324,8 @@ type BandCardData = {
 const TRUSTED_IMAGE_HOSTS = new Set(["upload.wikimedia.org", "i.scdn.co"]);
 
 function isTrustedImageHost(url: string): boolean {
+  // Local /public/ assets are always safe for Next/Image.
+  if (url.startsWith("/")) return true;
   try {
     return TRUSTED_IMAGE_HOSTS.has(new URL(url).hostname);
   } catch {
@@ -212,12 +335,15 @@ function isTrustedImageHost(url: string): boolean {
 
 async function buildBandCard(
   cfg: BandConfig,
-  item: NewsItem | null
+  item: NewsItem | null,
+  skipLinks: Set<string> = new Set()
 ): Promise<BandCardData> {
-  // Promote `item` to live ONLY if its pubDate is within FRESH_MAX_AGE_DAYS.
-  // Anything older falls through to the static fallback so a 4-month-old
-  // headline stops masquerading as breaking news.
-  const liveItem = item && isFreshEnough(item.pubDate) ? item : null;
+  // De-dupe vs the hero: if THIS article is already featured in the
+  // BREAKING NOW strip, drop it from the tile so we don't show the
+  // same story + same image twice on one page.
+  const notInHero = item && !skipLinks.has(item.link) ? item : null;
+  // Promote to live ONLY if pubDate is within FRESH_MAX_AGE_DAYS.
+  const liveItem = notInHero && isFreshEnough(notInHero.pubDate) ? notInHero : null;
 
   // Image resolution chain: og:image (current article, only if live) →
   // Spotify (auto-current artist photo) → hardcoded Wikipedia fallback.
@@ -246,6 +372,46 @@ async function buildBandCard(
     img,
     imgIsTrusted,
     headline: cfg.fallbackHeadline,
+    blurb: cfg.fallbackBlurb,
+    href: cfg.fallbackHref,
+    source: cfg.fallbackSource,
+    isLive: false,
+  };
+}
+
+/** Festivals: like bands, but Spotify lookups don't help (festivals
+ *  aren't artists) so we skip that step. The placeholder SVG carries
+ *  the visual when an OG image isn't available. */
+async function buildFestivalCard(
+  cfg: FestivalConfig,
+  item: NewsItem | null,
+  skipLinks: Set<string> = new Set()
+): Promise<BandCardData> {
+  const notInHero = item && !skipLinks.has(item.link) ? item : null;
+  const liveItem = notInHero && isFreshEnough(notInHero.pubDate) ? notInHero : null;
+
+  const ogImg = liveItem ? await fetchOgImage(liveItem.link) : null;
+  const img = ogImg || cfg.fallbackImg;
+  const imgIsTrusted = isTrustedImageHost(img);
+
+  if (liveItem) {
+    return {
+      name: cfg.shortName ?? cfg.name,
+      img,
+      imgIsTrusted,
+      headline: liveItem.title,
+      blurb: liveItem.description ?? `Latest mention via ${liveItem.publisher ?? "Google News"}.`,
+      href: liveItem.link,
+      source: liveItem.publisher ?? "Google News",
+      pubDate: liveItem.pubDate,
+      isLive: true,
+    };
+  }
+  return {
+    name: cfg.shortName ?? cfg.name,
+    img,
+    imgIsTrusted,
+    headline: "Awaiting next announcement",
     blurb: cfg.fallbackBlurb,
     href: cfg.fallbackHref,
     source: cfg.fallbackSource,
@@ -460,43 +626,48 @@ function BreakingHero({ items }: { items: HeroItem[] }) {
 // ─── Main panel ─────────────────────────────────────────────────────────
 
 export default async function PopPunkPanel() {
-  const [rawHeadlines, tourResults, albumResults, newWaveResults, newWaveImages] =
-    await Promise.all([
-      fetchManyRss(POP_PUNK_FEEDS, {
-        perFeedMax: 6,
-        totalMax: 14,
-        fallbacks: POP_PUNK_FALLBACKS,
-        minBeforeFallback: 4,
-      }),
-      Promise.all(TOUR_BANDS.map((b) => fetchBandHeadline(b.name, "tour OR concert OR setlist"))),
-      Promise.all(ALBUM_BANDS.map((b) => fetchBandHeadline(b.name, "album OR EP OR record OR single"))),
-      Promise.all(NEW_WAVE_ARTISTS.map((a) => fetchBandHeadline(a.name, "tour OR album OR single"))),
-      Promise.all(NEW_WAVE_ARTISTS.map((a) => fetchArtistImage(a.name))),
-    ]);
-
-  const tourCards = await Promise.all(
-    TOUR_BANDS.map((cfg, i) => buildBandCard(cfg, tourResults[i]))
-  );
-  const albumCards = await Promise.all(
-    ALBUM_BANDS.map((cfg, i) => buildBandCard(cfg, albumResults[i]))
-  );
+  const [
+    rawHeadlines,
+    tourResults,
+    albumResults,
+    newWaveResults,
+    newWaveImages,
+    festivalResults,
+  ] = await Promise.all([
+    fetchManyRss(POP_PUNK_FEEDS, {
+      perFeedMax: 6,
+      totalMax: 14,
+      fallbacks: POP_PUNK_FALLBACKS,
+      minBeforeFallback: 4,
+    }),
+    Promise.all(TOUR_BANDS.map((b) => fetchBandHeadline(b.name, "tour OR concert OR setlist"))),
+    Promise.all(ALBUM_BANDS.map((b) => fetchBandHeadline(b.name, "album OR EP OR record OR single"))),
+    Promise.all(NEW_WAVE_ARTISTS.map((a) => fetchBandHeadline(a.name, "tour OR album OR single"))),
+    Promise.all(NEW_WAVE_ARTISTS.map((a) => fetchArtistImage(a.name))),
+    Promise.all(
+      FESTIVALS.map((f) =>
+        fetchBandHeadline(f.name, "lineup OR announcement OR tickets OR 2025 OR 2026 OR set times")
+      )
+    ),
+  ]);
 
   // ─── BREAKING NOW input ────────────────────────────────────────────────
   //
-  // Union of the per-band results we already fetched, tagged with which
-  // band each item is about. Dedupe by URL (a single article that
-  // mentions multiple bands doesn't show up multiple times), drop any
-  // entry whose pubDate falls outside our freshness window, then sort
-  // newest-first and take the top 3.
+  // Union of the per-band + per-festival results, tagged with which
+  // band/festival each item is about. Dedupe by URL, drop entries
+  // outside the freshness window, sort newest-first, take top 3.
   //
-  // Crucially: every story here is about a band that appears below
-  // (Tour News / Album News / New Wave). The hero can't surface
-  // bands the user wouldn't listen to.
+  // Crucially: every story here is about a band or festival that
+  // appears below (Tour News / Album News / Festival News / New Wave).
+  // The hero can never surface bands the user wouldn't listen to.
   type Tagged = { news: NewsItem; band: string };
   const allBandNews: Tagged[] = [
     ...tourResults.map((n, i) => (n ? { news: n, band: TOUR_BANDS[i].name } : null)),
     ...albumResults.map((n, i) => (n ? { news: n, band: ALBUM_BANDS[i].name } : null)),
     ...newWaveResults.map((n, i) => (n ? { news: n, band: NEW_WAVE_ARTISTS[i].name } : null)),
+    ...festivalResults.map((n, i) =>
+      n ? { news: n, band: FESTIVALS[i].shortName ?? FESTIVALS[i].name } : null
+    ),
   ].filter((x): x is Tagged => x != null && isFreshEnough(x.news.pubDate));
 
   const dedup = new Map<string, Tagged>();
@@ -540,15 +711,39 @@ export default async function PopPunkPanel() {
     };
   });
 
+  // ─── Hero → tile dedup ────────────────────────────────────────────────
+  //
+  // Any article URL already used in the hero gets EXCLUDED from the
+  // band/festival tiles below — so we never show the same story (with
+  // the same image) twice on the page. The tile for that band/festival
+  // falls back to its static state (fallback headline + Spotify/
+  // hardcoded photo) when its top news item is in the hero.
+  const usedLinks = new Set(heroItems.map((h) => h.news.link));
+
+  // Now build the tile cards, passing usedLinks so each builder can
+  // demote its "live" item to a static fallback when the article is
+  // already in the hero.
+  const tourCards = await Promise.all(
+    TOUR_BANDS.map((cfg, i) => buildBandCard(cfg, tourResults[i], usedLinks))
+  );
+  const albumCards = await Promise.all(
+    ALBUM_BANDS.map((cfg, i) => buildBandCard(cfg, albumResults[i], usedLinks))
+  );
+  const festivalCards = await Promise.all(
+    FESTIVALS.map((cfg, i) => buildFestivalCard(cfg, festivalResults[i], usedLinks))
+  );
+
   // ─── Headlines list filter ─────────────────────────────────────────────
   //
-  // Only show items whose title mentions one of the bands curated for
-  // this page. Same principle as Breaking Now — keep the visible bands
-  // to the ones the visitor would listen to.
-  const allBandNames = [
+  // Only show items whose title mentions one of the bands or festivals
+  // curated for this page. Same principle as Breaking Now — keep the
+  // visible content to the lineup the visitor cares about.
+  const allCuratedNames = [
     ...TOUR_BANDS.map((b) => b.name),
     ...ALBUM_BANDS.map((b) => b.name),
     ...NEW_WAVE_ARTISTS.map((a) => a.name),
+    ...FESTIVALS.map((f) => f.name),
+    ...FESTIVALS.map((f) => f.shortName).filter((s): s is string => !!s),
   ];
   // Normalize both sides: lowercase, strip every non-alphanumeric to a
   // single space, then collapse runs. Catches all the messy cases —
@@ -557,16 +752,14 @@ export default async function PopPunkPanel() {
   // "Fall Out Boy's tour" still match "fall out boy", etc.
   const normalize = (s: string) =>
     s.toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
-  const bandTokens = allBandNames.map(normalize);
-  const mentionsCuratedBand = (title: string) => {
+  const curatedTokens = allCuratedNames.map(normalize);
+  const mentionsCurated = (title: string) => {
     const t = normalize(title);
-    return bandTokens.some((b) => b.length > 2 && t.includes(b));
+    return curatedTokens.some((b) => b.length > 2 && t.includes(b));
   };
   const freshHeadlines = rawHeadlines.filter(
-    (h) => isFreshEnough(h.pubDate) && mentionsCuratedBand(h.title)
+    (h) => isFreshEnough(h.pubDate) && mentionsCurated(h.title)
   );
-  // Drop URLs already used in the Breaking Now strip to avoid dupes.
-  const usedLinks = new Set(heroItems.map((h) => h.news.link));
   const listHeadlines = freshHeadlines.filter((h) => !usedLinks.has(h.link));
   // Scrape OG thumbnails for the top 6 list entries.
   const listImages = await Promise.all(
@@ -629,6 +822,23 @@ export default async function PopPunkPanel() {
       <section className="px-4 py-10 sm:px-6 sm:py-14">
         <div className="mx-auto max-w-7xl">
           <div className="flex items-end justify-between gap-4">
+            <h2 className="text-2xl font-black uppercase sm:text-3xl">Festival News</h2>
+            <span className="hidden font-display text-[10px] tracking-[0.3em] text-white/40 sm:block">
+              LIVE · UPDATES WEEKLY
+            </span>
+          </div>
+          <p className="mt-2 text-white/60">
+            Lineup announcements, ticket drops, and set times for the festivals you care about.
+          </p>
+          <div className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+            {festivalCards.map((c) => <BandCard key={c.name} {...c} />)}
+          </div>
+        </div>
+      </section>
+
+      <section className="border-t border-white/10 bg-zinc-950 px-4 py-10 sm:px-6 sm:py-14">
+        <div className="mx-auto max-w-7xl">
+          <div className="flex items-end justify-between gap-4">
             <h2 className="text-2xl font-black uppercase sm:text-3xl">New Musicians, Same Energy</h2>
             <span className="hidden font-display text-[10px] tracking-[0.3em] text-white/40 sm:block">
               LIVE · UPDATES WEEKLY
@@ -637,7 +847,13 @@ export default async function PopPunkPanel() {
           <p className="mt-2 text-white/60">The bands keeping the flag in the air right now.</p>
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {NEW_WAVE_ARTISTS.map((cfg, i) => {
-              const item = newWaveResults[i];
+              const rawItem = newWaveResults[i];
+              // Dedup vs hero — if this artist's news is in BREAKING NOW,
+              // show the static fallback in the tile instead.
+              const item =
+                rawItem && !usedLinks.has(rawItem.link) && isFreshEnough(rawItem.pubDate)
+                  ? rawItem
+                  : null;
               const spotifyImg = newWaveImages[i];
               const img = spotifyImg || cfg.fallbackImg;
               const trusted = isTrustedImageHost(img);
