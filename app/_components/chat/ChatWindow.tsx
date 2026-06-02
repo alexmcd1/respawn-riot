@@ -36,8 +36,8 @@ export default function ChatWindow({
   buddyId: number
   username: string
   minimized: boolean
-  /** Distance from the right edge in pixels — buddy list reserves the
-   *  far right slot, each open window is stacked to the left of it. */
+  /** Distance from the LEFT edge in pixels — buddy list reserves the
+   *  far left slot, each open window is stacked to the right of it. */
   offset: number
 }) {
   const chat = useChat()
@@ -206,7 +206,7 @@ export default function ChatWindow({
     <aside
       className="fixed bottom-3 z-40 flex w-[300px] flex-col overflow-hidden rounded-xl border-2 border-cyan-400/50 bg-[#0c0c0c]/95 font-display shadow-[0_0_30px_-8px_rgba(34,211,238,0.7)] backdrop-blur sm:bottom-4 sm:w-[320px]"
       style={{
-        right: `${offset}px`,
+        left: `${offset}px`,
         maxHeight: minimized ? undefined : 'calc(100vh - 140px)',
       }}
       aria-label={`Chat with ${peer?.username ?? username}`}

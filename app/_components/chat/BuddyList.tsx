@@ -40,9 +40,11 @@ export default function BuddyList() {
   )
 
   if (!chat.ready || !chat.me) {
-    // First load — show a compact placeholder pill while /buddies fetches
+    // First load — show a compact placeholder pill while /buddies fetches.
+    // Bottom-LEFT corner so we don't sit on top of the back-to-top
+    // button (which lives in the bottom-RIGHT corner once you scroll).
     return (
-      <div className="pointer-events-none fixed bottom-3 right-3 z-40 sm:bottom-4 sm:right-4">
+      <div className="pointer-events-none fixed bottom-3 left-3 z-40 sm:bottom-4 sm:left-4">
         <div className="rounded-full border border-fuchsia-500/40 bg-black/85 px-3 py-1.5 font-display text-[10px] tracking-[0.3em] text-fuchsia-300/60">
           ▶ CONNECTING…
         </div>
@@ -58,7 +60,7 @@ export default function BuddyList() {
       <button
         type="button"
         onClick={() => setCollapsed(false)}
-        className="fixed bottom-3 right-3 z-40 flex items-center gap-2 rounded-full border border-fuchsia-500/40 bg-black/85 px-3 py-1.5 font-display text-[11px] tracking-[0.25em] text-fuchsia-300 shadow-[0_0_20px_-8px_rgba(255,46,179,0.6)] backdrop-blur transition hover:border-fuchsia-400 hover:text-fuchsia-200 sm:bottom-4 sm:right-4"
+        className="fixed bottom-3 left-3 z-40 flex items-center gap-2 rounded-full border border-fuchsia-500/40 bg-black/85 px-3 py-1.5 font-display text-[11px] tracking-[0.25em] text-fuchsia-300 shadow-[0_0_20px_-8px_rgba(255,46,179,0.6)] backdrop-blur transition hover:border-fuchsia-400 hover:text-fuchsia-200 sm:bottom-4 sm:left-4"
         aria-label="Open buddy list"
       >
         <span className={`h-2 w-2 rounded-full ${myStatus.dotClass} ${chat.me.status === 'available' ? 'animate-pulse' : ''}`} />
@@ -82,7 +84,7 @@ export default function BuddyList() {
   return (
     <>
       <aside
-        className="fixed bottom-3 right-3 z-40 flex w-[300px] flex-col overflow-hidden rounded-xl border-2 border-fuchsia-500/60 bg-[#0c0c0c]/95 font-display shadow-[0_0_30px_-8px_rgba(255,46,179,0.7)] backdrop-blur sm:bottom-4 sm:right-4 sm:w-[320px]"
+        className="fixed bottom-3 left-3 z-40 flex w-[300px] flex-col overflow-hidden rounded-xl border-2 border-fuchsia-500/60 bg-[#0c0c0c]/95 font-display shadow-[0_0_30px_-8px_rgba(255,46,179,0.7)] backdrop-blur sm:bottom-4 sm:left-4 sm:w-[320px]"
         style={{ maxHeight: 'calc(100vh - 140px)' }}
         aria-label="Buddy list"
       >

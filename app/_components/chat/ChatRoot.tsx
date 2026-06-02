@@ -64,11 +64,13 @@ function ChatOverlay() {
     <>
       {!hideBuddyListBehindChats && <BuddyList />}
       {visibleWindows.map((w, idx) => {
-        // Stack the most recently opened chat closest to the buddy list,
-        // older ones further left. When the buddy list is hidden (narrow
-        // viewport with chats open), stack from the right edge instead.
-        const baseRight = hideBuddyListBehindChats ? 12 : buddyListSlot + gap
-        const offset = baseRight + idx * (windowWidth + gap)
+        // Buddy list lives in the bottom-LEFT corner. Open chat windows
+        // stack to the RIGHT of it, with the most recently opened chat
+        // closest to the buddy list. When the buddy list is hidden
+        // (narrow viewport with chats open), stack from the left edge
+        // instead so chats still get the full width they need.
+        const baseLeft = hideBuddyListBehindChats ? 12 : buddyListSlot + gap
+        const offset = baseLeft + idx * (windowWidth + gap)
         return (
           <ChatWindow
             key={w.buddyId}
