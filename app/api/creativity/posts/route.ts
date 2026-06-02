@@ -57,7 +57,7 @@ export async function GET(request: Request) {
     rows = (await db`
       SELECT p.id, p.title, p.body, p.tags, p.score, p.comment_count,
              p.created_at::text AS created_at,
-             u.name AS author_name,
+             COALESCE(NULLIF(TRIM(u.username), ''), NULLIF(TRIM(u.name), ''), SPLIT_PART(u.email, '@', 1), 'anonymous') AS author_name,
              v."userId" AS viewer_amplified
       FROM creativity_posts p
       JOIN users u ON u.id = p."authorId"
@@ -74,7 +74,7 @@ export async function GET(request: Request) {
     rows = (await db`
       SELECT p.id, p.title, p.body, p.tags, p.score, p.comment_count,
              p.created_at::text AS created_at,
-             u.name AS author_name,
+             COALESCE(NULLIF(TRIM(u.username), ''), NULLIF(TRIM(u.name), ''), SPLIT_PART(u.email, '@', 1), 'anonymous') AS author_name,
              v."userId" AS viewer_amplified
       FROM creativity_posts p
       JOIN users u ON u.id = p."authorId"
@@ -88,7 +88,7 @@ export async function GET(request: Request) {
     rows = (await db`
       SELECT p.id, p.title, p.body, p.tags, p.score, p.comment_count,
              p.created_at::text AS created_at,
-             u.name AS author_name,
+             COALESCE(NULLIF(TRIM(u.username), ''), NULLIF(TRIM(u.name), ''), SPLIT_PART(u.email, '@', 1), 'anonymous') AS author_name,
              v."userId" AS viewer_amplified
       FROM creativity_posts p
       JOIN users u ON u.id = p."authorId"

@@ -55,6 +55,17 @@ export async function ensureSchema(): Promise<void> {
     CREATE UNIQUE INDEX IF NOT EXISTS users_email_unique
       ON users (email)
   `;
+  // Username — picked by the user from /account. Optional (NULL until
+  // set). Unique when present. Display fallback chain in the UI:
+  // username → name → email local part → "anonymous".
+  await db`
+    ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS username TEXT
+  `;
+  await db`
+    CREATE UNIQUE INDEX IF NOT EXISTS users_username_unique
+      ON users (LOWER(username)) WHERE username IS NOT NULL
+  `;
   await db`
     CREATE TABLE IF NOT EXISTS accounts (
       id                  SERIAL PRIMARY KEY,

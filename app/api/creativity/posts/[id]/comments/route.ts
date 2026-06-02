@@ -134,6 +134,19 @@ export async function POST(
     WHERE id = ${postId}
   `;
 
+  // Fetch the COALESCE display name so the optimistic insert matches
+  // what GET would show on refresh
+  const meRows = (await db`
+    SELECT COALESCE(
+      NULLIF(TRIM(username), ''),
+      NULLIF(TRIM(name), ''),
+      SPLIT_PART(email, '@', 1),
+      'anonymous'
+    ) AS author_name
+    FROM users WHERE id = ${userId}
+  `) as Array<{ author_name: string }>;
+  const authorName = meRows[0]?.author_name?.trim() ?? "anonymous";
+
   return NextResponse.json({
     ok: true,
     comment: {
@@ -141,7 +154,7 @@ export async function POST(
       postId: c.post_id,
       parentId: c.parent_id,
       authorId: c.author_id,
-      authorName: session.user.email?.split("@")[0] ?? "you",
+      authorName,
       body: c.body,
       depth: c.depth,
       createdAt: c.created_at,

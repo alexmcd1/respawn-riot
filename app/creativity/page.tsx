@@ -43,11 +43,19 @@ async function fetchPosts(sort: Sort, viewerId: number | null): Promise<PostList
     viewer_amplified: number | null;
   }>;
 
+  // Display-name fallback computed in SQL: username → name → email
+  // local part → 'anonymous'. Inlined into each tagged template since
+  // the fallback expression has no user-controlled inputs.
   if (sort === "live") {
     rows = (await db`
       SELECT p.id, p.title, p.body, p.tags, p.score, p.comment_count,
              p.created_at::text AS created_at,
-             u.name AS author_name,
+             COALESCE(
+               NULLIF(TRIM(u.username), ''),
+               NULLIF(TRIM(u.name), ''),
+               SPLIT_PART(u.email, '@', 1),
+               'anonymous'
+             ) AS author_name,
              v."userId" AS viewer_amplified
       FROM creativity_posts p
       JOIN users u ON u.id = p."authorId"
@@ -64,7 +72,12 @@ async function fetchPosts(sort: Sort, viewerId: number | null): Promise<PostList
     rows = (await db`
       SELECT p.id, p.title, p.body, p.tags, p.score, p.comment_count,
              p.created_at::text AS created_at,
-             u.name AS author_name,
+             COALESCE(
+               NULLIF(TRIM(u.username), ''),
+               NULLIF(TRIM(u.name), ''),
+               SPLIT_PART(u.email, '@', 1),
+               'anonymous'
+             ) AS author_name,
              v."userId" AS viewer_amplified
       FROM creativity_posts p
       JOIN users u ON u.id = p."authorId"
@@ -78,7 +91,12 @@ async function fetchPosts(sort: Sort, viewerId: number | null): Promise<PostList
     rows = (await db`
       SELECT p.id, p.title, p.body, p.tags, p.score, p.comment_count,
              p.created_at::text AS created_at,
-             u.name AS author_name,
+             COALESCE(
+               NULLIF(TRIM(u.username), ''),
+               NULLIF(TRIM(u.name), ''),
+               SPLIT_PART(u.email, '@', 1),
+               'anonymous'
+             ) AS author_name,
              v."userId" AS viewer_amplified
       FROM creativity_posts p
       JOIN users u ON u.id = p."authorId"
@@ -116,6 +134,21 @@ export default async function CreativityPage({
   let session: Session | null = null;
   try { session = (await auth()) as Session | null; } catch { /* signed-out fallback */ }
   const viewerId = session?.user?.id ? parseInt(session.user.id, 10) : null;
+
+  // Detect signed-in users who haven't set a username yet so we can
+  // nudge them to pick one before broadcasting.
+  let viewerNeedsUsername = false;
+  if (viewerId) {
+    try {
+      await ensureSchema();
+      const rows = (await sql()`
+        SELECT username FROM users WHERE id = ${viewerId}
+      `) as Array<{ username: string | null }>;
+      viewerNeedsUsername = !rows[0]?.username;
+    } catch {
+      // Best-effort; banner just won't show
+    }
+  }
   let posts: PostListItem[] = [];
   let loadError: string | null = null;
   try {
@@ -150,6 +183,23 @@ export default async function CreativityPage({
       {/* Body */}
       <section className="px-4 py-8 sm:px-6 sm:py-10">
         <div className="mx-auto max-w-3xl space-y-5">
+          {/* Username nudge — only shown for signed-in users without one */}
+          {viewerNeedsUsername && (
+            <Link
+              href="/account"
+              className="block rounded-2xl border border-cyan-400/40 bg-cyan-500/10 p-4 text-sm transition hover:bg-cyan-500/15"
+            >
+              <p className="font-display text-[10px] tracking-[0.3em] text-cyan-300">
+                ▌ PICK A HANDLE
+              </p>
+              <p className="mt-1.5 text-white/90">
+                You&apos;re signed in but haven&apos;t set a username yet. Your
+                transmissions will show your email handle until you do.{" "}
+                <span className="text-cyan-200 underline">Set one in Account →</span>
+              </p>
+            </Link>
+          )}
+
           {/* New transmission */}
           <NewPostForm />
 

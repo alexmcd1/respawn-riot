@@ -31,7 +31,7 @@ export async function GET(
   const viewerIdParam = viewerId ?? 0;
   const postRows = (await db`
     SELECT p.id, p.title, p.body, p.tags, p.score, p.comment_count,
-           p."authorId" AS author_id, u.name AS author_name,
+           p."authorId" AS author_id, COALESCE(NULLIF(TRIM(u.username), ''), NULLIF(TRIM(u.name), ''), SPLIT_PART(u.email, '@', 1), 'anonymous') AS author_name,
            p.created_at::text AS created_at,
            v."userId" AS viewer_amplified
     FROM creativity_posts p
@@ -76,7 +76,7 @@ export async function GET(
 
   const commentRows = (await db`
     SELECT c.id, c.post_id, c.parent_id,
-           c."authorId" AS author_id, u.name AS author_name,
+           c."authorId" AS author_id, COALESCE(NULLIF(TRIM(u.username), ''), NULLIF(TRIM(u.name), ''), SPLIT_PART(u.email, '@', 1), 'anonymous') AS author_name,
            c.body, c.depth,
            c.created_at::text AS created_at,
            c.deleted_at::text AS deleted_at

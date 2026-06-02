@@ -4,6 +4,7 @@
 // out, an avatar bubble when logged in (click → dropdown with email +
 // Sign out). Uses next-auth's useSession() for state.
 
+import Link from 'next/link'
 import { signOut, useSession } from 'next-auth/react'
 import { useEffect, useRef, useState } from 'react'
 import { openSignIn } from './SignInModal'
@@ -103,6 +104,13 @@ export default function UserMenu({ compact = false }: { compact?: boolean }) {
           <div className="px-2 py-2 text-xs text-white/55">
             Your favorites, recipes, ratings + quests sync across devices.
           </div>
+          <Link
+            href="/account"
+            onClick={() => setOpen(false)}
+            className="block border-t border-white/10 px-4 py-3 font-display text-sm tracking-[0.2em] text-white/70 hover:bg-fuchsia-500/10 hover:text-fuchsia-200"
+          >
+            ⚙ ACCOUNT &amp; USERNAME
+          </Link>
           <button
             type="button"
             onClick={() => {
