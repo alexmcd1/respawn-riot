@@ -63,6 +63,21 @@ export type ScrapflyResult = {
    *  scenario was sent. Shape: { response: [{ name, result, ... }, ...] }.
    *  Caller picks the action result they need. */
   jsScenarioResult?: Record<string, unknown>;
+  /** XHR/fetch calls Scrapfly captured during the page's lifetime.
+   *  Available when renderJs=true. Each entry has the request URL,
+   *  method, response status, and response body. Lets us "spy" on
+   *  the page's own API calls without running custom JS. */
+  xhrCalls?: Array<{
+    url?: string;
+    method?: string;
+    type?: string;
+    request?: { body?: string; headers?: Record<string, string> };
+    response?: {
+      status?: number;
+      body?: string;
+      headers?: Record<string, string>;
+    };
+  }>;
 };
 
 const BASE = "https://api.scrapfly.io/scrape";
@@ -140,6 +155,7 @@ export async function scrapfly(opts: ScrapflyOptions): Promise<ScrapflyResult> {
         browser_data?: {
           javascript_evaluation_result?: string;
           js_scenario?: Record<string, unknown>;
+          xhr_call?: unknown;  // shape determined at runtime
         };
       };
       context?: { cost?: { total?: number } };
@@ -208,6 +224,19 @@ export async function scrapfly(opts: ScrapflyOptions): Promise<ScrapflyResult> {
       );
     }
 
+    // xhr_call's exact shape varies; some versions wrap in {calls: [...]},
+    // some return a flat array directly. Handle both.
+    const rawXhr = bdata.xhr_call as unknown;
+    let xhrCalls: ScrapflyResult["xhrCalls"];
+    if (Array.isArray(rawXhr)) {
+      xhrCalls = rawXhr as ScrapflyResult["xhrCalls"];
+    } else if (rawXhr && typeof rawXhr === "object") {
+      const wrap = rawXhr as { calls?: unknown };
+      if (Array.isArray(wrap.calls)) {
+        xhrCalls = wrap.calls as ScrapflyResult["xhrCalls"];
+      }
+    }
+
     return {
       status: r.status_code,
       body: r.content ?? "",
@@ -215,6 +244,7 @@ export async function scrapfly(opts: ScrapflyOptions): Promise<ScrapflyResult> {
       cost: wrapper.context?.cost?.total ?? 0,
       jsEvaluationResult: jsResult,
       jsScenarioResult: bdata.js_scenario as Record<string, unknown> | undefined,
+      xhrCalls,
     };
   } finally {
     clearTimeout(timer);

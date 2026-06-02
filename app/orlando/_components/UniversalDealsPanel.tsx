@@ -12,8 +12,10 @@
 
 import { useState } from 'react'
 
+// Default ON while we test the xhr_call capture approach. Set
+// NEXT_PUBLIC_UNIVERSAL_LIVE_RATES=0 in Vercel to force off.
 const LIVE_RATES_ENABLED =
-  process.env.NEXT_PUBLIC_UNIVERSAL_LIVE_RATES === '1'
+  process.env.NEXT_PUBLIC_UNIVERSAL_LIVE_RATES !== '0'
 import {
   UNIVERSAL_ALL_OFFERS_URL,
   UNIVERSAL_FL_RESIDENT_URL,

@@ -105,83 +105,83 @@ export async function fetchUniversalLiveRates(
   };
   if (req.promoCode) targetBody.promo_code = req.promoCode;
 
-  // Previous attempts: Scrapfly's execute action returns null for
-  // async functions (it captures the Promise pre-resolution, not the
-  // resolved value). Workaround: use synchronous XMLHttpRequest inside
-  // the simpler `js` param. Sync XHR is deprecated for user browsers
-  // (blocks the UI thread), but Scrapfly's headless Chrome is a
-  // server-side rendering tool — there's no UI to block.
-  const syncScript = `(() => {
-    try {
-      const xhr = new XMLHttpRequest();
-      xhr.open("POST", ${JSON.stringify(UNIVERSAL_API)}, false); // false = sync
-      xhr.setRequestHeader("accept", "application/json, text/plain, */*");
-      xhr.setRequestHeader("content-type", "application/json");
-      xhr.setRequestHeader("x-ibm-client-id", ${JSON.stringify(IBM_CLIENT_ID)});
-      xhr.setRequestHeader("x-instance-id", ${JSON.stringify(APP_INSTANCE_ID)});
-      xhr.setRequestHeader("x-source-id", "1003002");
-      xhr.setRequestHeader("x-uniwebservice-apikey", "WebApp");
-      xhr.setRequestHeader("x-uniwebservice-appversion", "upr-web-hotels-1.0");
-      xhr.setRequestHeader("x-uniwebservice-device", "Chrome");
-      xhr.setRequestHeader("x-uniwebservice-platform", "Web");
-      xhr.withCredentials = true;
-      xhr.send(${JSON.stringify(JSON.stringify(targetBody))});
-      return JSON.stringify({
-        ok: true,
-        status: xhr.status,
-        body: xhr.responseText,
-      });
-    } catch (e) {
-      return JSON.stringify({
-        ok: false,
-        error: String(e && e.message || e),
-      });
-    }
-  })()`;
-
+  // Approach: don't run our own JS at all. Load the listing page in
+  // Scrapfly's headless browser; Universal's Angular app auto-fires
+  // priced-hotels as part of page setup. Scrapfly's
+  // browser_data.xhr_call captures every XHR the page made — we just
+  // grep through it for the priced-hotels response.
+  //
+  // Tradeoff: we don't control the dates/promo this way — we get
+  // whatever defaults Universal's page picks. But we'll find out
+  // whether the mechanism works at all + see the data shape, which
+  // tells us if it's worth building URL-param or form-fill control.
+  //
+  // Cost: ~10-15 credits (ASP + render_js, no extra actions).
   const result = await scrapfly({
     url: "https://www.universalorlando.com/hotels/en/us/listing",
     method: "GET",
     asp: true,
     country: "us",
     renderJs: true,
-    js: syncScript,
-    tags: ["universal-rates", "sync-xhr"],
+    jsScenario: [
+      // Generous wait so the page's auto-fire XHR completes
+      { wait: 6000 },
+    ],
+    tags: ["universal-rates", "xhr-capture"],
     timeoutMs: 90_000,
   });
 
-  if (!result.jsEvaluationResult || typeof result.jsEvaluationResult !== "string") {
+  const calls = result.xhrCalls ?? [];
+  if (calls.length === 0) {
     throw new Error(
-      `Scrapfly js eval returned no string — value=${JSON.stringify(result.jsEvaluationResult)?.slice(0, 200)}, landed status=${result.status}`
+      `Scrapfly returned no XHR captures. status=${result.status}, scenarioResult keys=${
+        result.jsScenarioResult ? Object.keys(result.jsScenarioResult).join(",") : "(none)"
+      }`
     );
   }
 
-  let inner: { ok: boolean; status?: number; body?: string; error?: string };
-  try {
-    inner = JSON.parse(result.jsEvaluationResult);
-  } catch {
+  // Find the priced-hotels response
+  const pricedCall = calls.find((c) =>
+    typeof c.url === "string" && c.url.includes("priced-hotels")
+  );
+  if (!pricedCall) {
+    const urlSummary = calls
+      .map((c) => `${c.method ?? "?"} ${c.url ?? "?"} → ${c.response?.status ?? "?"}`)
+      .slice(0, 5)
+      .join(" | ");
     throw new Error(
-      `Scrapfly js eval returned non-JSON: ${result.jsEvaluationResult.slice(0, 200)}`
+      `priced-hotels not in captured XHRs. Captured ${calls.length} calls: ${urlSummary}`
     );
   }
 
-  if (!inner.ok) {
+  const status = pricedCall.response?.status;
+  const body = pricedCall.response?.body ?? "";
+  if (status !== 200) {
     throw new Error(
-      `Universal fetch failed inside Scrapfly browser — ${inner.error ?? "unknown"}`
+      `priced-hotels via XHR capture HTTP ${status} — ${body.slice(0, 300)}`
     );
   }
-  if (inner.status !== 200) {
-    throw new Error(
-      `Universal priced-hotels HTTP ${inner.status} via Scrapfly browser — ${(inner.body ?? "").slice(0, 300)}`
-    );
-  }
+
+  // We hit hotel data — but with the page's own date params. Log
+  // those so we know what the page actually requested. Useful for
+  // figuring out if we can override via URL params later.
+  console.log(
+    `[universalLive] XHR-capture success. request body: ${
+      pricedCall.request?.body?.slice(0, 200) ?? "(none)"
+    }`
+  );
+
+  // NOTE: req.checkIn / req.checkOut / req.promoCode aren't used here.
+  // The page chose its own dates. If we ship this approach we need a
+  // way to control them — see notes in the route handler.
+  void req;
 
   let data: RawPricedHotel[];
   try {
-    data = JSON.parse(inner.body ?? "[]") as RawPricedHotel[];
+    data = JSON.parse(body) as RawPricedHotel[];
   } catch {
     throw new Error(
-      `Universal returned non-JSON inside Scrapfly browser — ${(inner.body ?? "").slice(0, 200)}`
+      `priced-hotels XHR returned non-JSON — ${body.slice(0, 200)}`
     );
   }
   if (!Array.isArray(data)) {
