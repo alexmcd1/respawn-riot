@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "../../../../../auth";
+import { isAdminEmail } from "../../../../_lib/admin";
 import { ensureSchema, sql } from "../../../../_lib/db";
 
 export const dynamic = "force-dynamic";
@@ -25,14 +26,28 @@ export async function DELETE(
     return NextResponse.json({ ok: false, error: "Not signed in" }, { status: 401 });
   }
   const userId = parseInt(session.user.id, 10);
+  const isAdmin = isAdminEmail(session.user.email);
   const db = sql();
 
-  const rows = (await db`
-    UPDATE creativity_comments
-    SET deleted_at = NOW()
-    WHERE id = ${commentId} AND "authorId" = ${userId} AND deleted_at IS NULL
-    RETURNING post_id
-  `) as Array<{ post_id: number }>;
+  // Same admin pattern as posts: admins delete any, flag with
+  // deleted_by_admin when removing someone else's content.
+  let rows: Array<{ post_id: number }>;
+  if (isAdmin) {
+    rows = (await db`
+      UPDATE creativity_comments
+      SET deleted_at = NOW(),
+          deleted_by_admin = ("authorId" <> ${userId})
+      WHERE id = ${commentId} AND deleted_at IS NULL
+      RETURNING post_id
+    `) as Array<{ post_id: number }>;
+  } else {
+    rows = (await db`
+      UPDATE creativity_comments
+      SET deleted_at = NOW()
+      WHERE id = ${commentId} AND "authorId" = ${userId} AND deleted_at IS NULL
+      RETURNING post_id
+    `) as Array<{ post_id: number }>;
+  }
   if (rows.length === 0) {
     return NextResponse.json(
       { ok: false, error: "Not yours to delete (or already deleted)" },

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "../../../../../auth";
+import { isAdminEmail } from "../../../../_lib/admin";
 import { ensureSchema, sql } from "../../../../_lib/db";
 import {
   threadComments,
@@ -137,13 +138,29 @@ export async function DELETE(
     return NextResponse.json({ ok: false, error: "Not signed in" }, { status: 401 });
   }
   const userId = parseInt(session.user.id, 10);
+  const isAdmin = isAdminEmail(session.user.email);
   const db = sql();
-  const rows = (await db`
-    UPDATE creativity_posts
-    SET deleted_at = NOW()
-    WHERE id = ${id} AND "authorId" = ${userId} AND deleted_at IS NULL
-    RETURNING id
-  `) as Array<{ id: number }>;
+
+  // Author can always delete their own. Admins can delete anyone's,
+  // and we flag those as deleted_by_admin so the UI shows
+  // "[removed by mod]" instead of the generic "[deleted]".
+  let rows: Array<{ id: number }>;
+  if (isAdmin) {
+    rows = (await db`
+      UPDATE creativity_posts
+      SET deleted_at = NOW(),
+          deleted_by_admin = ("authorId" <> ${userId})
+      WHERE id = ${id} AND deleted_at IS NULL
+      RETURNING id
+    `) as Array<{ id: number }>;
+  } else {
+    rows = (await db`
+      UPDATE creativity_posts
+      SET deleted_at = NOW()
+      WHERE id = ${id} AND "authorId" = ${userId} AND deleted_at IS NULL
+      RETURNING id
+    `) as Array<{ id: number }>;
+  }
   if (rows.length === 0) {
     return NextResponse.json(
       { ok: false, error: "Not yours to delete (or already deleted)" },

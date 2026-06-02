@@ -61,6 +61,7 @@ export type PostDetail = {
   createdAt: string;
   viewerAmplified?: boolean;
   viewerCanDelete?: boolean;
+  viewerIsAdmin?: boolean;    // shows extra mod tools when true
 };
 
 export type CommentNode = {
@@ -73,6 +74,7 @@ export type CommentNode = {
   depth: number;
   createdAt: string;
   deletedAt: string | null;
+  deletedByAdmin?: boolean;
   viewerCanDelete?: boolean;
   replies: CommentNode[];     // populated by threadComments() below
 };

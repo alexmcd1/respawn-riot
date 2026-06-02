@@ -88,9 +88,16 @@ function CommentItem({
   onReplyPosted: (c: CommentNode) => void
   onDeleted: (id: number) => void
 }) {
+  const { data: session } = useSession()
   const [replying, setReplying] = useState(false)
   const canReplyDeeper = comment.depth < MAX_COMMENT_DEPTH
   const isDeleted = comment.deletedAt != null
+  // Heuristic for "this is an admin removing someone else's content":
+  // viewer can delete, but they're NOT the author. Mirrors the page's
+  // logic for posts.
+  const sessionUserId = session?.user?.id ? parseInt(session.user.id, 10) : null
+  const isAdminAction =
+    !!comment.viewerCanDelete && sessionUserId != null && sessionUserId !== comment.authorId
 
   // Tinted left accent based on depth so threads are visually scannable
   const depthAccent = [
@@ -103,7 +110,8 @@ function CommentItem({
   ][comment.depth % 6]
 
   async function onDelete() {
-    if (!confirm('Delete this reply?')) return
+    const verb = isAdminAction ? "Remove this reply as moderator" : "Delete this reply"
+    if (!confirm(`${verb}?`)) return
     const res = await fetch(`/api/creativity/comments/${comment.id}`, { method: 'DELETE' })
     const data = await res.json().catch(() => ({}))
     if (data.ok) onDeleted(comment.id)
@@ -127,9 +135,13 @@ function CommentItem({
             <button
               type="button"
               onClick={onDelete}
-              className="text-white/40 hover:text-red-300"
+              className={
+                isAdminAction
+                  ? "rounded-md border border-amber-400/40 bg-amber-500/10 px-1.5 py-0.5 text-amber-200 hover:bg-amber-500/20"
+                  : "text-white/40 hover:text-red-300"
+              }
             >
-              delete
+              {isAdminAction ? "⚙ MOD REMOVE" : "delete"}
             </button>
           )}
         </div>

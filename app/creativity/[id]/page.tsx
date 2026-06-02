@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Session } from "next-auth";
 import { auth } from "../../../auth";
+import { isAdminEmail } from "../../_lib/admin";
 import { ensureSchema, sql } from "../../_lib/db";
 import {
   relativeTime,
@@ -22,7 +23,8 @@ type Loaded = { post: PostDetail; comments: CommentNode[] };
 
 async function loadPostAndComments(
   id: number,
-  viewerId: number | null
+  viewerId: number | null,
+  isAdmin: boolean
 ): Promise<Loaded | null> {
   await ensureSchema();
   const db = sql();
@@ -70,7 +72,8 @@ async function loadPostAndComments(
     authorName: p.author_name?.trim() || "anonymous",
     createdAt: p.created_at,
     viewerAmplified: viewerId ? p.viewer_amplified != null : undefined,
-    viewerCanDelete: viewerId === p.author_id,
+    viewerCanDelete: viewerId === p.author_id || isAdmin,
+    viewerIsAdmin: isAdmin,
   };
 
   const commentRows = (await db`
@@ -84,7 +87,8 @@ async function loadPostAndComments(
            ) AS author_name,
            c.body, c.depth,
            c.created_at::text AS created_at,
-           c.deleted_at::text AS deleted_at
+           c.deleted_at::text AS deleted_at,
+           c.deleted_by_admin
     FROM creativity_comments c
     JOIN users u ON u.id = c."authorId"
     WHERE c.post_id = ${id}
@@ -99,6 +103,7 @@ async function loadPostAndComments(
     depth: number;
     created_at: string;
     deleted_at: string | null;
+    deleted_by_admin: boolean;
   }>;
 
   const flat: CommentRow[] = commentRows.map((c) => ({
@@ -107,11 +112,14 @@ async function loadPostAndComments(
     parentId: c.parent_id,
     authorId: c.author_id,
     authorName: c.author_name?.trim() || "anonymous",
-    body: c.deleted_at ? "[deleted]" : c.body,
+    body: c.deleted_at
+      ? (c.deleted_by_admin ? "[removed by moderator]" : "[deleted]")
+      : c.body,
     depth: c.depth,
     createdAt: c.created_at,
     deletedAt: c.deleted_at,
-    viewerCanDelete: viewerId === c.author_id && !c.deleted_at,
+    deletedByAdmin: c.deleted_by_admin,
+    viewerCanDelete: (viewerId === c.author_id || isAdmin) && !c.deleted_at,
   }));
 
   return { post, comments: threadComments(flat) };
@@ -125,7 +133,7 @@ export async function generateMetadata({
   const { id: rawId } = await params;
   const id = parseInt(rawId, 10);
   if (!Number.isFinite(id)) return { title: "Transmission — Respawn Riot" };
-  const loaded = await loadPostAndComments(id, null);
+  const loaded = await loadPostAndComments(id, null, false);
   if (!loaded) return { title: "Transmission — Respawn Riot" };
   return {
     title: `${loaded.post.title} — Creativity Corner`,
@@ -145,9 +153,10 @@ export default async function PostPage({
   let session: Session | null = null;
   try { session = (await auth()) as Session | null; } catch { /* signed-out fallback */ }
   const viewerId = session?.user?.id ? parseInt(session.user.id, 10) : null;
+  const isAdmin = isAdminEmail(session?.user?.email);
   let loaded: Loaded | null = null;
   try {
-    loaded = await loadPostAndComments(id, viewerId);
+    loaded = await loadPostAndComments(id, viewerId, isAdmin);
   } catch {
     // DB unreachable — fall through to 404 rather than 500
     loaded = null;
@@ -204,7 +213,10 @@ export default async function PostPage({
                   {post.viewerCanDelete && (
                     <>
                       <span className="text-white/35">·</span>
-                      <DeletePostButton postId={post.id} />
+                      <DeletePostButton
+                        postId={post.id}
+                        isAdminAction={post.viewerIsAdmin === true && viewerId !== post.authorId}
+                      />
                     </>
                   )}
                 </div>

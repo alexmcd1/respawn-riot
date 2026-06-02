@@ -249,8 +249,13 @@ export async function ensureSchema(): Promise<void> {
       comment_count INTEGER NOT NULL DEFAULT 0,
       created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      deleted_at    TIMESTAMPTZ
+      deleted_at    TIMESTAMPTZ,
+      deleted_by_admin BOOLEAN NOT NULL DEFAULT FALSE
     )
+  `;
+  await db`
+    ALTER TABLE creativity_posts
+      ADD COLUMN IF NOT EXISTS deleted_by_admin BOOLEAN NOT NULL DEFAULT FALSE
   `;
   await db`
     CREATE INDEX IF NOT EXISTS creativity_posts_created_idx
@@ -269,8 +274,13 @@ export async function ensureSchema(): Promise<void> {
       body        TEXT NOT NULL,
       depth       INTEGER NOT NULL DEFAULT 0,
       created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      deleted_at  TIMESTAMPTZ
+      deleted_at  TIMESTAMPTZ,
+      deleted_by_admin BOOLEAN NOT NULL DEFAULT FALSE
     )
+  `;
+  await db`
+    ALTER TABLE creativity_comments
+      ADD COLUMN IF NOT EXISTS deleted_by_admin BOOLEAN NOT NULL DEFAULT FALSE
   `;
   await db`
     CREATE INDEX IF NOT EXISTS creativity_comments_post_idx
