@@ -106,19 +106,28 @@ export async function fetchUniversalLiveRates(
   if (req.promoCode) targetBody.promo_code = req.promoCode;
 
   // Approach: don't run our own JS at all. Load the listing page in
-  // Scrapfly's headless browser; Universal's Angular app auto-fires
-  // priced-hotels as part of page setup. Scrapfly's
-  // browser_data.xhr_call captures every XHR the page made — we just
-  // grep through it for the priced-hotels response.
+  // Scrapfly's headless browser with date params in the URL — IF
+  // Universal's page reads them, it'll auto-fire priced-hotels for
+  // those dates. Scrapfly's browser_data.xhr_call captures every XHR
+  // the page made — we just grep through it for the priced-hotels
+  // response.
   //
-  // Tradeoff: we don't control the dates/promo this way — we get
-  // whatever defaults Universal's page picks. But we'll find out
-  // whether the mechanism works at all + see the data shape, which
-  // tells us if it's worth building URL-param or form-fill control.
+  // Universal's API body uses `from` and `thru` field names — guessing
+  // their URL params follow the same convention. If this doesn't
+  // trigger the search, the captured XHR list will help us figure
+  // out what does (e.g. seeing the page fall back to default dates).
   //
   // Cost: ~10-15 credits (ASP + render_js, no extra actions).
+  const listingUrl =
+    `https://www.universalorlando.com/hotels/en/us/listing` +
+    `?from=${encodeURIComponent(req.checkIn)}` +
+    `&thru=${encodeURIComponent(req.checkOut)}` +
+    `&adults=${req.adults}` +
+    (req.children > 0 ? `&children=${req.children}` : "") +
+    (req.promoCode ? `&promo=${req.promoCode}` : "");
+
   const result = await scrapfly({
-    url: "https://www.universalorlando.com/hotels/en/us/listing",
+    url: listingUrl,
     method: "GET",
     asp: true,
     country: "us",
