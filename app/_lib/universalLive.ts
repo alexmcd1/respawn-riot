@@ -156,8 +156,11 @@ export async function fetchUniversalLiveRates(
     if (searchBtn) { searchBtn.click(); log.push("clicked search"); }
     else log.push("search button NOT FOUND");
 
-    // Store diagnostics on window so we could see them via screenshot if needed
-    window.__rrLog = log;
+    // Store diagnostics on document.title so they survive into the
+    // rendered HTML Scrapfly returns (Scrapfly's execute can't return
+    // values, but it CAN mutate the DOM and we get the post-mutation
+    // body back).
+    document.title = "__RR_LOG__:" + log.join(";") + ":__END__";
   })()`;
 
   const result = await scrapfly({
@@ -189,19 +192,22 @@ export async function fetchUniversalLiveRates(
     typeof c.url === "string" && c.url.includes("priced-hotels")
   );
   if (!pricedCall) {
-    // Dump every captured XHR including a body snippet — maybe one of
-    // them has hotel info we can use (e.g. getresourcelist/hotels.html
-    // could be a static catalog). Free intel from work already done.
+    // Dump every captured XHR to Vercel logs
     const allCalls = calls.map((c, i) => {
       const bodyHead = (c.response?.body ?? "").slice(0, 250).replace(/\s+/g, " ");
       return `[${i}] ${c.method ?? "?"} ${c.url ?? "?"} → ${c.response?.status ?? "?"} | body: ${bodyHead}`;
     });
-    // Log everything to Vercel — error message has size limits but logs don't
     console.log(`[universalLive] full XHR dump:\n${allCalls.join("\n")}`);
+
+    // Extract our embedded diagnostic log from the page title
+    // (set by the execute action — visible since execute side effects
+    // mutate the DOM that Scrapfly returns in result.body)
+    const titleMatch = result.body.match(/__RR_LOG__:([^]*?):__END__/);
+    const fillClickLog = titleMatch ? titleMatch[1] : "(no log marker found)";
+
     throw new Error(
-      `priced-hotels not in captured XHRs. Captured ${calls.length} calls (full dump in Vercel logs). First 3 URLs: ${
-        calls.slice(0, 3).map((c) => c.url).join(" | ")
-      }`
+      `priced-hotels not in captured XHRs. Form-fill log: [${fillClickLog}]. ` +
+      `Captured ${calls.length} XHRs (full dump in Vercel logs).`
     );
   }
 
