@@ -24,17 +24,34 @@ export default async function AccountPage() {
   const userId = parseInt(session.user.id, 10);
   await ensureSchema();
   const db = sql();
-  const rows = (await db`
-    SELECT id, email, name, username, created_at::text AS created_at
-    FROM users WHERE id = ${userId}
-  `) as Array<{
+  // Defensive: also handles case where created_at column doesn't exist
+  // yet on a stale deploy. Pattern: try with the column, fall back
+  // without it on error.
+  let me: {
     id: number;
     email: string | null;
     name: string | null;
     username: string | null;
-    created_at: string;
-  }>;
-  const me = rows[0];
+    created_at: string | null;
+  } | undefined;
+  try {
+    const rows = (await db`
+      SELECT id, email, name, username, created_at::text AS created_at
+      FROM users WHERE id = ${userId}
+    `) as Array<typeof me extends infer T ? T : never>;
+    me = rows[0] as typeof me;
+  } catch {
+    const rows = (await db`
+      SELECT id, email, name, username
+      FROM users WHERE id = ${userId}
+    `) as Array<{
+      id: number;
+      email: string | null;
+      name: string | null;
+      username: string | null;
+    }>;
+    if (rows[0]) me = { ...rows[0], created_at: null };
+  }
 
   if (!me) {
     return (
@@ -90,7 +107,7 @@ export default async function AccountPage() {
                 Joined
               </span>
               <span className="font-mono text-sm text-white/75">
-                {me.created_at.slice(0, 10)}
+                {me.created_at ? me.created_at.slice(0, 10) : "—"}
               </span>
             </div>
           </div>

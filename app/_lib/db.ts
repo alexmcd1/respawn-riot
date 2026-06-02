@@ -66,6 +66,14 @@ export async function ensureSchema(): Promise<void> {
     CREATE UNIQUE INDEX IF NOT EXISTS users_username_unique
       ON users (LOWER(username)) WHERE username IS NOT NULL
   `;
+  // created_at — Auth.js's base users schema doesn't include this,
+  // but the /account page shows a "joined" date and future features
+  // (user profiles, karma) will want it. Default to NOW() so rows
+  // created in the past get backfilled with the install time.
+  await db`
+    ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  `;
   await db`
     CREATE TABLE IF NOT EXISTS accounts (
       id                  SERIAL PRIMARY KEY,
