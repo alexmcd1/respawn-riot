@@ -209,6 +209,63 @@ export async function ensureSchema(): Promise<void> {
     CREATE INDEX IF NOT EXISTS sent_notifications_subscriber_idx
       ON sent_notifications (subscriber_id)
   `;
+
+  // ── Creativity Corner — Reddit-style forum (channel 10).
+  //
+  // posts: top-level "TRANSMISSIONS" with title + markdown body + tags
+  // comments: threaded via parent_id self-ref (null = top-level)
+  // votes: one row per (user, post) for amplify-toggle
+  //
+  // Denormalized counts on posts (score, comment_count) so the list
+  // view doesn't aggregate on every request. Mutation routes keep
+  // them in sync.
+  await db`
+    CREATE TABLE IF NOT EXISTS creativity_posts (
+      id            SERIAL PRIMARY KEY,
+      "authorId"    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      title         TEXT NOT NULL,
+      body          TEXT NOT NULL,
+      tags          TEXT[] NOT NULL DEFAULT '{}'::TEXT[],
+      score         INTEGER NOT NULL DEFAULT 0,
+      comment_count INTEGER NOT NULL DEFAULT 0,
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      deleted_at    TIMESTAMPTZ
+    )
+  `;
+  await db`
+    CREATE INDEX IF NOT EXISTS creativity_posts_created_idx
+      ON creativity_posts (created_at DESC) WHERE deleted_at IS NULL
+  `;
+  await db`
+    CREATE INDEX IF NOT EXISTS creativity_posts_score_idx
+      ON creativity_posts (score DESC) WHERE deleted_at IS NULL
+  `;
+  await db`
+    CREATE TABLE IF NOT EXISTS creativity_comments (
+      id          SERIAL PRIMARY KEY,
+      post_id     INTEGER NOT NULL REFERENCES creativity_posts(id) ON DELETE CASCADE,
+      parent_id   INTEGER REFERENCES creativity_comments(id) ON DELETE CASCADE,
+      "authorId"  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      body        TEXT NOT NULL,
+      depth       INTEGER NOT NULL DEFAULT 0,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      deleted_at  TIMESTAMPTZ
+    )
+  `;
+  await db`
+    CREATE INDEX IF NOT EXISTS creativity_comments_post_idx
+      ON creativity_comments (post_id, created_at)
+  `;
+  await db`
+    CREATE TABLE IF NOT EXISTS creativity_votes (
+      "userId"    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      post_id     INTEGER NOT NULL REFERENCES creativity_posts(id) ON DELETE CASCADE,
+      value       SMALLINT NOT NULL CHECK (value IN (-1, 1)),
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY ("userId", post_id)
+    )
+  `;
   _schemaReady = true;
 }
 
