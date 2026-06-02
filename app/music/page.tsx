@@ -10,9 +10,16 @@ export const metadata: Metadata = {
     "Pop punk tour news, comeback albums, and live tour dates for the bands you actually listen to.",
 };
 
-// Match the shortest cache window on the page (headlines RSS, 1h).
-// Per-band Google News results set their own 1-week revalidate inside fetch.
-export const revalidate = 3600;
+// Render dynamically at request time. The underlying data fetches
+// (RSS feeds, Google News per-band, Spotify, OG-image scrapes) are
+// each individually cached via Next's fetch revalidate (1h to 1w
+// depending on source), so the page is still fast — it just doesn't
+// bake HTML at build time the way static generation does. The
+// difference shows up when env vars (e.g. SPOTIFY_*) change after a
+// build: under static caching the page kept serving the build-time
+// snapshot for up to an hour; force-dynamic picks up the new state
+// on the very next request.
+export const dynamic = "force-dynamic";
 
 export default function MusicPage() {
   return (
