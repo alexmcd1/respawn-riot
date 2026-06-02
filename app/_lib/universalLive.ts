@@ -105,38 +105,73 @@ export async function fetchUniversalLiveRates(
   };
   if (req.promoCode) targetBody.promo_code = req.promoCode;
 
-  // Approach: don't run our own JS at all. Load the listing page in
-  // Scrapfly's headless browser with date params in the URL — IF
-  // Universal's page reads them, it'll auto-fire priced-hotels for
-  // those dates. Scrapfly's browser_data.xhr_call captures every XHR
-  // the page made — we just grep through it for the priced-hotels
-  // response.
+  // Approach: load listing page, run a DOM-manipulation script that
+  // fills the date inputs and clicks the search button. We don't need
+  // the script to return anything — Scrapfly's execute action runs
+  // side effects fine even when return capture is broken. The search
+  // button click triggers the page's own priced-hotels XHR which
+  // browser_data.xhr_call captures (xhr_call mechanism IS reliable
+  // on free tier, verified earlier).
   //
-  // Universal's API body uses `from` and `thru` field names — guessing
-  // their URL params follow the same convention. If this doesn't
-  // trigger the search, the captured XHR list will help us figure
-  // out what does (e.g. seeing the page fall back to default dates).
+  // Self-discovering script: searches by aria-label / placeholder
+  // / type attributes rather than guessing exact selectors, since
+  // Universal's Angular class names may change.
   //
-  // Cost: ~10-15 credits (ASP + render_js, no extra actions).
-  const listingUrl =
-    `https://www.universalorlando.com/hotels/en/us/listing` +
-    `?from=${encodeURIComponent(req.checkIn)}` +
-    `&thru=${encodeURIComponent(req.checkOut)}` +
-    `&adults=${req.adults}` +
-    (req.children > 0 ? `&children=${req.children}` : "") +
-    (req.promoCode ? `&promo=${req.promoCode}` : "");
+  // Cost: ~20 credits (ASP + render_js + js_scenario).
+  const fillAndClickScript = `(() => {
+    const log = [];
+    const setVal = (el, v) => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+      setter.call(el, v);
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+      el.dispatchEvent(new Event("blur", { bubbles: true }));
+    };
+
+    // Find date inputs by aria-label / placeholder / type
+    const allInputs = Array.from(document.querySelectorAll("input"));
+    const checkInInput = allInputs.find((el) => {
+      const aria = (el.getAttribute("aria-label") || "").toLowerCase();
+      const ph = (el.getAttribute("placeholder") || "").toLowerCase();
+      return aria.includes("check in") || aria.includes("check-in") || aria.includes("arrival") || ph.includes("check in");
+    });
+    const checkOutInput = allInputs.find((el) => {
+      const aria = (el.getAttribute("aria-label") || "").toLowerCase();
+      const ph = (el.getAttribute("placeholder") || "").toLowerCase();
+      return aria.includes("check out") || aria.includes("check-out") || aria.includes("departure") || ph.includes("check out");
+    });
+
+    if (checkInInput) { setVal(checkInInput, ${JSON.stringify(req.checkIn)}); log.push("filled checkIn"); }
+    else log.push("checkIn NOT FOUND");
+    if (checkOutInput) { setVal(checkOutInput, ${JSON.stringify(req.checkOut)}); log.push("filled checkOut"); }
+    else log.push("checkOut NOT FOUND");
+
+    // Find the search button by text content
+    const allButtons = Array.from(document.querySelectorAll("button, [role=button], input[type=submit]"));
+    const searchBtn = allButtons.find((el) => {
+      const text = (el.textContent || el.value || "").toLowerCase();
+      return text.includes("search hotels") || text.includes("get started") || text.includes("find hotels");
+    });
+
+    if (searchBtn) { searchBtn.click(); log.push("clicked search"); }
+    else log.push("search button NOT FOUND");
+
+    // Store diagnostics on window so we could see them via screenshot if needed
+    window.__rrLog = log;
+  })()`;
 
   const result = await scrapfly({
-    url: listingUrl,
+    url: "https://www.universalorlando.com/hotels/en/us/listing",
     method: "GET",
     asp: true,
     country: "us",
     renderJs: true,
     jsScenario: [
-      // Generous wait so the page's auto-fire XHR completes
-      { wait: 6000 },
+      { wait: 3000 },                 // page hydration
+      { execute: fillAndClickScript }, // fill + click (side effects)
+      { wait: 6000 },                 // priced-hotels XHR completes
     ],
-    tags: ["universal-rates", "xhr-capture"],
+    tags: ["universal-rates", "form-fill"],
     timeoutMs: 90_000,
   });
 
