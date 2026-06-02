@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { Session } from "next-auth";
 import { auth } from "../../../auth";
 import { ensureSchema, sql } from "../../_lib/db";
 import {
@@ -129,8 +130,8 @@ export default async function PostPage({
   const id = parseInt(rawId, 10);
   if (!Number.isFinite(id)) notFound();
 
-  let session: Awaited<ReturnType<typeof auth>> = null;
-  try { session = await auth(); } catch { /* signed-out fallback */ }
+  let session: Session | null = null;
+  try { session = (await auth()) as Session | null; } catch { /* signed-out fallback */ }
   const viewerId = session?.user?.id ? parseInt(session.user.id, 10) : null;
   let loaded: Loaded | null = null;
   try {

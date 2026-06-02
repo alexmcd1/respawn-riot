@@ -10,6 +10,7 @@ import {
   type PostListItem,
   type Sort,
 } from "../_lib/creativity";
+import type { Session } from "next-auth";
 import { auth } from "../../auth";
 import PostCard from "./_components/PostCard";
 import NewPostForm from "./_components/NewPostForm";
@@ -112,8 +113,8 @@ export default async function CreativityPage({
   // Gracefully degrade if DB / auth is unreachable — surface a banner
   // instead of a 500. Common in local dev (no DATABASE_URL) and any
   // production outage scenario.
-  let session: Awaited<ReturnType<typeof auth>> = null;
-  try { session = await auth(); } catch { /* signed-out fallback */ }
+  let session: Session | null = null;
+  try { session = (await auth()) as Session | null; } catch { /* signed-out fallback */ }
   const viewerId = session?.user?.id ? parseInt(session.user.id, 10) : null;
   let posts: PostListItem[] = [];
   let loadError: string | null = null;
