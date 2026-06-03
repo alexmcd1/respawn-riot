@@ -1,0 +1,72 @@
+<!-- Placeholder sponsor image for the DadJokeSkull "message from our
+     sponsor" easter egg. The component prefers /skull/sponsor.png and
+     only falls back to this SVG when the PNG 404s.
+
+     Drop a real PNG at public/skull/sponsor.png whenever the actual
+     "ad" art is ready — landscape (~3:2) reads best in the modal
+     layout, 800x540 or larger keeps it crisp on retina screens. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" preserveAspectRatio="xMidYMid meet">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1a0420"/>
+      <stop offset="50%" stop-color="#0a0512"/>
+      <stop offset="100%" stop-color="#050007"/>
+    </linearGradient>
+    <linearGradient id="text-grad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#ff2eb3"/>
+      <stop offset="100%" stop-color="#22d3ee"/>
+    </linearGradient>
+    <pattern id="dots" x="0" y="0" width="14" height="14" patternUnits="userSpaceOnUse">
+      <circle cx="3" cy="3" r="1" fill="rgba(255,46,179,0.10)"/>
+    </pattern>
+  </defs>
+
+  <!-- Background slab with halftone-ish dot overlay -->
+  <rect width="600" height="400" fill="url(#bg)" rx="20"/>
+  <rect width="600" height="400" fill="url(#dots)" rx="20"/>
+
+  <!-- Top tape strip — fake "AD BREAK" label -->
+  <rect x="0" y="0" width="600" height="34" fill="rgba(255,46,179,0.18)"/>
+  <text x="20" y="22" font-family="ui-monospace, 'Courier New', monospace" font-size="11" letter-spacing="6" font-weight="700" fill="#ff2eb3">
+    ▌ AD BREAK · ALL-AGES VIEWING
+  </text>
+  <text x="580" y="22" text-anchor="end" font-family="ui-monospace, 'Courier New', monospace" font-size="11" letter-spacing="4" fill="rgba(255,255,255,0.45)">
+    CH 09
+  </text>
+
+  <!-- Big headline -->
+  <text x="300" y="138" text-anchor="middle" font-family="Impact, 'Arial Narrow', sans-serif" font-size="60" font-weight="900" letter-spacing="3" fill="url(#text-grad)">
+    JOIN THE RIOT
+  </text>
+
+  <!-- Subhead -->
+  <text x="300" y="186" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="20" font-weight="500" letter-spacing="2" fill="#f5f5f5">
+    no passwords · no spam · just chaos
+  </text>
+
+  <!-- Fake CTA pill -->
+  <g transform="translate(195, 230)">
+    <rect width="210" height="46" rx="23" fill="#ff2eb3"/>
+    <text x="105" y="30" text-anchor="middle" font-family="Impact, 'Arial Narrow', sans-serif" font-size="20" font-weight="900" letter-spacing="4" fill="#0a0510">
+      → RESPAWNRIOT.IO
+    </text>
+  </g>
+
+  <!-- Sparks around the CTA -->
+  <g fill="#22d3ee">
+    <circle cx="160" cy="218" r="3"/>
+    <circle cx="438" cy="218" r="3"/>
+    <circle cx="140" cy="252" r="2"/>
+    <circle cx="458" cy="252" r="2"/>
+  </g>
+  <g fill="#ff2eb3">
+    <circle cx="178" cy="290" r="2"/>
+    <circle cx="420" cy="290" r="2"/>
+  </g>
+
+  <!-- Bottom tape strip — placeholder "brand" line -->
+  <rect x="0" y="364" width="600" height="36" fill="rgba(34,211,238,0.15)"/>
+  <text x="300" y="389" text-anchor="middle" font-family="ui-monospace, 'Courier New', monospace" font-size="12" letter-spacing="8" font-weight="600" fill="#22d3ee">
+    KID GHOST APPROVED ✦ BRING A FRIEND
+  </text>
+</svg>

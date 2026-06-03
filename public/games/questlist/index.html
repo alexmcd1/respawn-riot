@@ -98,6 +98,20 @@
     details>summary::-webkit-details-marker{display:none}
     .no-tap-highlight{ -webkit-tap-highlight-color: transparent }
     input[type="checkbox"]{ accent-color:#ff2eb3 }
+    /* Native <select> option list — most browsers default to system
+       chrome which renders gray-on-gray on our dark theme. Forcing
+       a dark background + white text gives legible options inside
+       the priority / project dropdowns. (Note: macOS Safari ignores
+       option styling; users on Safari will still get system chrome
+       there, which is generally legible.) */
+    select option{ background:#1a0a20; color:#fff; }
+    /* Date-input affordances — the browser-default calendar picker
+       icon renders as a near-invisible dark gray glyph on dark
+       backgrounds. Invert it so it shows up. */
+    input[type="date"]::-webkit-calendar-picker-indicator{ filter:invert(1) opacity(0.55); cursor:pointer; }
+    input[type="date"]::-webkit-calendar-picker-indicator:hover{ opacity:1; }
+    /* Tiny field labels above each meta control on the QuickAdd row */
+    .field-label{ display:block; font-size:9px; letter-spacing:0.22em; text-transform:uppercase; color:rgba(255,255,255,0.45); margin-bottom:3px; padding-left:2px; }
 
     /* --- Pencil strike animation --- */
     @keyframes revealBar   { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0% 0 0); } }
@@ -1608,39 +1622,53 @@ function QuickAdd({ projects, allTags, onAdd, playSound }){
         </button>
       </div>
 
-      {/* Row 2 — meta controls + Add button. Each control has flex-1
-          + a sensible min-width so they distribute evenly on wide
-          screens and wrap cleanly into rows of 2 on narrow ones,
-          without ever overlapping. */}
-      <div className="flex flex-wrap items-center gap-2">
-        <select
-          value={priority}
-          onChange={e=>setPriority(e.target.value)}
-          disabled={listening}
-          className="flex-1 min-w-[148px] px-2 py-1.5 rounded-lg glass-lite text-sm ring-focus">
-          {Object.entries(PRIORITIES).map(([k,v])=>(
-            <option key={k} value={k}>{v.label} · +{v.xp} XP</option>
-          ))}
-        </select>
-        <input
-          type="date"
-          value={due}
-          onChange={e=>setDue(e.target.value)}
-          disabled={listening}
-          className="flex-1 min-w-[140px] px-2 py-1.5 rounded-lg glass-lite text-sm ring-focus"/>
-        <select
-          value={project}
-          onChange={e=>setProject(e.target.value)}
-          disabled={listening}
-          className="flex-1 min-w-[120px] px-2 py-1.5 rounded-lg glass-lite text-sm ring-focus">
-          {projects.map(p=> <option key={p} value={p}>{p}</option>)}
-        </select>
-        <input
-          value={tagInput}
-          onChange={e=>setTagInput(e.target.value)}
-          disabled={listening}
-          placeholder="tags, comma, separated"
-          className="flex-1 min-w-[160px] px-2 py-1.5 rounded-lg glass-lite text-sm ring-focus"/>
+      {/* Row 2 — meta controls + Add button. Each control gets a tiny
+          uppercase field-label so users know what each input means
+          without having to read placeholder text inside the field
+          (and so the tag input doesn't look like it already contains
+          the comma-separated example values). */}
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="flex-1 min-w-[148px]">
+          <span className="field-label">Priority</span>
+          <select
+            value={priority}
+            onChange={e=>setPriority(e.target.value)}
+            disabled={listening}
+            className="w-full px-2 py-1.5 rounded-lg glass-lite text-sm ring-focus">
+            {Object.entries(PRIORITIES).map(([k,v])=>(
+              <option key={k} value={k}>{v.label} · +{v.xp} XP</option>
+            ))}
+          </select>
+        </label>
+        <label className="flex-1 min-w-[140px]">
+          <span className="field-label">Due date</span>
+          <input
+            type="date"
+            value={due}
+            onChange={e=>setDue(e.target.value)}
+            disabled={listening}
+            className="w-full px-2 py-1.5 rounded-lg glass-lite text-sm ring-focus"/>
+        </label>
+        <label className="flex-1 min-w-[120px]">
+          <span className="field-label">Project</span>
+          <select
+            value={project}
+            onChange={e=>setProject(e.target.value)}
+            disabled={listening}
+            className="w-full px-2 py-1.5 rounded-lg glass-lite text-sm ring-focus">
+            {projects.map(p=> <option key={p} value={p}>{p}</option>)}
+          </select>
+        </label>
+        <label className="flex-1 min-w-[160px]">
+          <span className="field-label">Tags</span>
+          <input
+            value={tagInput}
+            onChange={e=>setTagInput(e.target.value)}
+            disabled={listening}
+            placeholder="e.g. work, errand"
+            title="Comma-separated. Optional."
+            className="w-full px-2 py-1.5 rounded-lg glass-lite text-sm ring-focus"/>
+        </label>
         <button
           className="ml-auto px-5 py-2 rounded-lg font-semibold text-sm bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:brightness-110 shadow-lg shadow-fuchsia-500/20 shrink-0"
           disabled={listening}>

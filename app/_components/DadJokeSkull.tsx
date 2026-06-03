@@ -5,36 +5,30 @@
 //   THE KID GHOST'S DAD JOKE POPPER
 //
 //   A little punk-rock skull mascot that peeks in from the side of the
-//   screen every ~5–12 minutes, types out a dad joke setup, then swaps
-//   to its laughing face for the punchline (with a body-shake animation)
-//   and slides back out.
+//   screen every ~5–12 minutes, types out a dad joke, switches to its
+//   laughing face for the punchline, then peeks back out.
 //
-//   Click the skull → skip ahead to the punchline.
-//   Click the × on the bubble → dismiss this round early.
-//   Click the laughing skull → dismiss.
+//   Roughly 1 in 10 appearances replaces the joke with a "MESSAGE FROM
+//   OUR SPONSOR" — a centered modal with sparks, soft glow, and a happy
+//   confetti chime. Trigger explicitly with ?skull=sponsor in the URL.
 //
-//   State machine:
-//     hidden → entering → talking → laughing → leaving → hidden → ...
+//   URL test params:
+//     ?skull=now     → fire a joke ~500ms after load (instead of waiting)
+//     ?skull=sponsor → fire the sponsor experience ~500ms after load
 //
-//   Each appearance picks a random JOKE (no immediate repeats) and a
-//   random side (left/right). localStorage tracks the last appearance
-//   so a fresh page load shortly after one doesn't fire another right
-//   away. The component mounts once at the root layout, runs on every
-//   page except /sign-in.
-//
-//   Assets — drop these in /public/skull/:
-//     talking.png    ← image used during entering + talking phases
-//     laughing.png   ← image used during laughing phase (with .skull-wiggle)
+//   Assets (replaceable PNGs, with shipped SVG fallbacks):
+//     /skull/talking.png    ← Kid Ghost talking pose
+//     /skull/laughing.png   ← Kid Ghost laughing pose
+//     /skull/sponsor.png    ← sponsor-modal hero image (landscape, ~3:2)
 //
 // ═════════════════════════════════════════════════════════════════════════
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Image from 'next/image'
+import { playConfetti } from './chat/sounds'
 
 // ─── Joke pool ──────────────────────────────────────────────────────────
-// Mix of skeleton-coded, punk/music, and classic dad. New jokes welcome —
-// just append. The picker avoids repeating the same one twice in a row.
 const JOKES: Array<{ setup: string; punchline: string }> = [
   // Skeleton / skull
   { setup: "why don't skeletons fight each other?",      punchline: "they don't have the guts." },
@@ -60,9 +54,7 @@ const JOKES: Array<{ setup: string; punchline: string }> = [
   { setup: "what do you call cheese that isn't yours?",   punchline: "nacho cheese." },
   { setup: "I told my dog a joke about tails.",           punchline: "he didn't get the wag of it." },
 
-  // ── 50 more added per request — same flavor (punk / music / skull /
-  //    classic dad), kept clean (bad puns, not raunchy).
-
+  // ── 50 more added per request — punk / music / skull / classic dad
   // More punk
   { setup: "why did the punk bring a ladder to the show?",                 punchline: "he heard the bands were up-and-coming." },
   { setup: "what's a punk's favorite vegetable?",                          punchline: "a mosh-room." },
@@ -79,7 +71,6 @@ const JOKES: Array<{ setup: string; punchline: string }> = [
   { setup: "what's a punk's favorite math class?",                         punchline: "di-vision." },
   { setup: "why did the punk go to therapy?",                              punchline: "mom said he had issues with authority." },
   { setup: "why did the punk fail driver's ed?",                           punchline: "too many illegal moshes." },
-
   // More music
   { setup: "why did the music note get arrested?",                         punchline: "it was up to no treble." },
   { setup: "why did the bass player bring a ladder?",                      punchline: "to reach the high notes." },
@@ -93,7 +84,6 @@ const JOKES: Array<{ setup: string; punchline: string }> = [
   { setup: "why don't songs ever lose arguments?",                         punchline: "they always have the last note." },
   { setup: "what kind of music do drummers listen to?",                    punchline: "beats me." },
   { setup: "what did the snare drum say to the kick drum?",                punchline: "I'll back you up." },
-
   // More skull / skeleton
   { setup: "how do skeletons start a band?",                               punchline: "they put out a bone-fide ad." },
   { setup: "why don't skeletons gamble?",                                  punchline: "no skin in the game." },
@@ -105,7 +95,6 @@ const JOKES: Array<{ setup: string; punchline: string }> = [
   { setup: "why did the skeleton stay home from school?",                  punchline: "his heart wasn't in it." },
   { setup: "what do skeletons say before dinner?",                         punchline: "bone appétit." },
   { setup: "why don't skeletons get into fights?",                         punchline: "they always lose by a hair." },
-
   // More classic dad
   { setup: "why don't eggs tell jokes?",                                   punchline: "they'd crack each other up." },
   { setup: "what did the ocean say to the shore?",                         punchline: "nothing. it just waved." },
@@ -134,46 +123,97 @@ const LAUGH_HOLD_MS       = 5_200        // time on screen during "laughing"
 const LEAVE_ANIM_MS       = 500
 const TYPEWRITER_MS_PER_CHAR = 28
 
-// Test escape hatch — append ?skull=now to any URL to force the skull
-// to appear ~500ms after page load instead of waiting the normal delay.
+// Sponsor easter egg
+const SPONSOR_CHANCE      = 0.10         // ~1 in 10 appearances → sponsor instead of joke
+const SPONSOR_POP_IN_MS   = 550          // matches .sponsor-pop-in keyframe duration
+const SPONSOR_HOLD_MS     = 7_500        // total visible time after pop-in completes
+const SPONSOR_POP_OUT_MS  = 400          // matches .sponsor-pop-out keyframe duration
+
+// Test escape hatch — append ?skull=<mode> to any URL to force the
+// first appearance to fire after ~500ms with the requested mode:
+//   ?skull=now     → normal joke (any random joke from the pool)
+//   ?skull=sponsor → sponsor-modal experience
 const TEST_QUERY_PARAM = 'skull'
-const TEST_QUERY_VALUE = 'now'
 
 type Side = 'left' | 'right'
-type Phase = 'hidden' | 'entering' | 'talking' | 'laughing' | 'leaving'
+type Phase =
+  | 'hidden'
+  // joke phases
+  | 'entering' | 'talking' | 'laughing' | 'leaving'
+  // sponsor phases
+  | 'sponsor-in' | 'sponsor-show' | 'sponsor-out'
+
+type Spark = {
+  /** Final x-offset from spark spawn point, in px */ dx: number
+  /** Final y-offset from spark spawn point, in px */ dy: number
+  /** Spawn position around modal — 0..1 fraction of the modal perimeter */ pos: number
+  /** Animation duration in seconds */              dur: number
+  /** Animation delay in seconds */                 delay: number
+  /** Hex color (pink or cyan) */                   color: string
+}
+
+const SPARK_COUNT = 18
+
+/** Generate a fresh set of sparks each time the sponsor opens. Positions
+ *  spread around the modal perimeter; each flies outward at the angle
+ *  matching its anchor point so they look like they're radiating from
+ *  the modal's edge, not just the center. */
+function generateSparks(): Spark[] {
+  return Array.from({ length: SPARK_COUNT }, (_, i) => {
+    const pos = (i + Math.random() * 0.6) / SPARK_COUNT
+    // Convert perimeter fraction to an angle for the outward velocity.
+    const angle = pos * Math.PI * 2 - Math.PI / 2
+    const distance = 140 + Math.random() * 100
+    return {
+      dx: Math.cos(angle) * distance,
+      dy: Math.sin(angle) * distance,
+      pos,
+      dur: 1.0 + Math.random() * 0.7,
+      delay: Math.random() * 0.35,
+      color: i % 2 === 0 ? '#ff2eb3' : '#22d3ee',
+    }
+  })
+}
+
+/** Map perimeter fraction (0..1) to a {top,left} CSS position around a
+ *  rectangle's border. Used to anchor each spark to the modal edge. */
+function perimeterPosition(pos: number): { top: string; left: string } {
+  // pos 0..0.25 = top edge, 0.25..0.5 = right edge, 0.5..0.75 = bottom, 0.75..1 = left
+  if (pos < 0.25) return { top: '0%', left: `${(pos / 0.25) * 100}%` }
+  if (pos < 0.5)  return { top: `${((pos - 0.25) / 0.25) * 100}%`, left: '100%' }
+  if (pos < 0.75) return { top: '100%', left: `${100 - ((pos - 0.5) / 0.25) * 100}%` }
+  return { top: `${100 - ((pos - 0.75) / 0.25) * 100}%`, left: '0%' }
+}
 
 export default function DadJokeSkull() {
   const pathname = usePathname() ?? ''
   const hiddenOnPath = HIDDEN_ON.some((p) => pathname.startsWith(p))
-  // Read the test query param straight off window.location. Using
-  // Next's useSearchParams() hook here would propagate dynamic-rendering
-  // requirements through the root layout into every page on the site,
-  // killing static generation for pages that opt into it. window-read
-  // is fine because this is a client component and the value is only
-  // used inside useEffect (after mount, so SSR doesn't see it).
-  const [forceShow, setForceShow] = useState(false)
+
+  // URL escape-hatch — read off window.location so we don't drag in
+  // useSearchParams (which would propagate dynamic rendering up to
+  // the layout). Only used inside useEffect → SSR doesn't see it.
+  const [forceMode, setForceMode] = useState<'none' | 'now' | 'sponsor'>('none')
   useEffect(() => {
     try {
-      const params = new URLSearchParams(window.location.search)
-      setForceShow(params.get(TEST_QUERY_PARAM) === TEST_QUERY_VALUE)
+      const v = new URLSearchParams(window.location.search).get(TEST_QUERY_PARAM)
+      if (v === 'now') setForceMode('now')
+      else if (v === 'sponsor') setForceMode('sponsor')
+      else setForceMode('none')
     } catch { /* ignore */ }
   }, [pathname])
 
   const [phase, setPhase] = useState<Phase>('hidden')
   const [side, setSide] = useState<Side>('right')
   const [joke, setJoke] = useState<{ setup: string; punchline: string } | null>(null)
-  // Tracks per-image whether the .png 404'd. If so we fall back to the
-  // SVG placeholder shipped at /skull/<name>.svg. Once a .png fails it
-  // stays "failed" for the rest of the session — no point retrying.
-  const [pngFailed, setPngFailed] = useState<{ talking: boolean; laughing: boolean }>({
-    talking: false,
-    laughing: false,
+  const [sparks, setSparks] = useState<Spark[]>([])
+  // Per-image PNG-404 fallback to the bundled SVG.
+  const [pngFailed, setPngFailed] = useState<{ talking: boolean; laughing: boolean; sponsor: boolean }>({
+    talking: false, laughing: false, sponsor: false,
   })
 
-  // Pending timeouts — cleared on dismiss / unmount so a closed bubble
-  // doesn't reopen itself a moment later from a stale scheduler.
   const timeoutsRef = useRef<number[]>([])
   const lastJokeIdxRef = useRef<number>(-1)
+  const isFirstAppearanceRef = useRef<boolean>(true)
 
   const clearTimers = useCallback(() => {
     for (const id of timeoutsRef.current) window.clearTimeout(id)
@@ -197,16 +237,14 @@ export default function DadJokeSkull() {
   const scheduleNext = useCallback(() => {
     const nextMs = MIN_GAP_MS + Math.random() * (MAX_GAP_MS - MIN_GAP_MS)
     later(() => startAppearance(), nextMs)
-    // startAppearance referenced via closure below — eslint disabled OK
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [later])
 
-  const startAppearance = useCallback(() => {
+  const startJoke = useCallback(() => {
     clearTimers()
     setJoke(pickJoke())
     setSide(Math.random() > 0.5 ? 'left' : 'right')
     setPhase('entering')
-
     later(() => setPhase('talking'),  ENTER_ANIM_MS)
     later(() => setPhase('laughing'), ENTER_ANIM_MS + SETUP_HOLD_MS)
     later(() => setPhase('leaving'),  ENTER_ANIM_MS + SETUP_HOLD_MS + LAUGH_HOLD_MS)
@@ -216,17 +254,52 @@ export default function DadJokeSkull() {
     }, ENTER_ANIM_MS + SETUP_HOLD_MS + LAUGH_HOLD_MS + LEAVE_ANIM_MS)
   }, [clearTimers, later, pickJoke, scheduleNext])
 
-  const dismiss = useCallback(() => {
+  const startSponsor = useCallback(() => {
     clearTimers()
-    setPhase('leaving')
+    setSparks(generateSparks())
+    setPhase('sponsor-in')
+    // Tiny delay before audio so it lines up with the pop-in scale peak.
+    later(() => playConfetti(), 120)
+    later(() => setPhase('sponsor-show'), SPONSOR_POP_IN_MS)
+    later(() => setPhase('sponsor-out'),  SPONSOR_POP_IN_MS + SPONSOR_HOLD_MS)
     later(() => {
       setPhase('hidden')
       scheduleNext()
-    }, LEAVE_ANIM_MS)
+    }, SPONSOR_POP_IN_MS + SPONSOR_HOLD_MS + SPONSOR_POP_OUT_MS)
   }, [clearTimers, later, scheduleNext])
 
+  /** Dispatcher — decides joke vs sponsor each appearance. On the very
+   *  first appearance, the URL ?skull=sponsor / ?skull=now flag forces
+   *  the choice. After that, recurrence uses a 10% random sponsor roll. */
+  const startAppearance = useCallback(() => {
+    const isFirst = isFirstAppearanceRef.current
+    isFirstAppearanceRef.current = false
+    const wantsSponsor =
+      (isFirst && forceMode === 'sponsor') ||
+      (!(isFirst && forceMode === 'now') && Math.random() < SPONSOR_CHANCE)
+    if (wantsSponsor) startSponsor()
+    else startJoke()
+  }, [forceMode, startSponsor, startJoke])
+
+  const dismiss = useCallback(() => {
+    clearTimers()
+    // Use the leave animation appropriate to the current phase.
+    if (phase === 'sponsor-in' || phase === 'sponsor-show') {
+      setPhase('sponsor-out')
+      later(() => {
+        setPhase('hidden')
+        scheduleNext()
+      }, SPONSOR_POP_OUT_MS)
+    } else {
+      setPhase('leaving')
+      later(() => {
+        setPhase('hidden')
+        scheduleNext()
+      }, LEAVE_ANIM_MS)
+    }
+  }, [clearTimers, later, scheduleNext, phase])
+
   const advanceToPunchline = useCallback(() => {
-    // Only meaningful during the talking phase — otherwise click is a dismiss.
     setPhase((cur) => {
       if (cur !== 'talking') return cur
       clearTimers()
@@ -239,36 +312,125 @@ export default function DadJokeSkull() {
     })
   }, [clearTimers, later, scheduleNext])
 
-  // First-appearance scheduler. Simple per-page-load timer: every fresh
-  // page load fires after FIRST_APPEARANCE_MS regardless of when the
-  // skull last appeared. (Earlier versions gated this on a localStorage
-  // timestamp to prevent multi-tab lockstep firing, but the gating made
-  // single-tab use feel broken — load page, see skull at 12s, reload,
-  // wait 5+ min for next appearance, conclude the feature is broken.
-  // In-session recurrence still uses MIN_GAP/MAX_GAP via scheduleNext.)
-  //
-  // Test escape hatch: ?skull=now fires after 500ms for verification.
+  // First-appearance scheduler
   useEffect(() => {
     if (hiddenOnPath) return
-    const initialDelay = forceShow ? 500 : FIRST_APPEARANCE_MS
+    const initialDelay = forceMode === 'none' ? FIRST_APPEARANCE_MS : 500
     const id = window.setTimeout(startAppearance, initialDelay)
     return () => {
       window.clearTimeout(id)
       clearTimers()
     }
-  }, [hiddenOnPath, forceShow, startAppearance, clearTimers])
+  }, [hiddenOnPath, forceMode, startAppearance, clearTimers])
 
-  if (hiddenOnPath || phase === 'hidden' || !joke) return null
+  if (hiddenOnPath || phase === 'hidden') return null
+
+  // ─── Sponsor render branch ────────────────────────────────────────────
+  if (phase === 'sponsor-in' || phase === 'sponsor-show' || phase === 'sponsor-out') {
+    const popClass = phase === 'sponsor-out' ? 'sponsor-pop-out' : 'sponsor-pop-in'
+    return (
+      <>
+        {/* Backdrop — click anywhere outside the modal to dismiss */}
+        <button
+          type="button"
+          onClick={dismiss}
+          aria-label="Dismiss sponsor message"
+          className="fixed inset-0 z-40 cursor-default border-0 bg-black/65 p-0 backdrop-blur-sm"
+        />
+
+        {/* Centered modal */}
+        <div
+          role="dialog"
+          aria-live="polite"
+          aria-label="Message from our sponsor"
+          className={`pointer-events-none fixed left-1/2 top-1/2 z-50 ${popClass}`}
+          style={{ width: 'min(560px, 92vw)' }}
+        >
+          {/* Inner glow border — soft rounded corners, breathing pink+cyan glow */}
+          <div className="pointer-events-auto relative sponsor-glow overflow-hidden rounded-3xl border border-fuchsia-400/60 bg-[#0a0510]">
+            {/* Close button */}
+            <button
+              type="button"
+              onClick={dismiss}
+              aria-label="Dismiss"
+              className="absolute right-3 top-3 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-fuchsia-400/70 bg-black/70 text-fuchsia-200 transition hover:bg-fuchsia-500 hover:text-black"
+            >
+              ✕
+            </button>
+
+            {/* Header */}
+            <div className="px-5 pt-4 pb-2">
+              <p className="font-display text-[10px] tracking-[0.35em] text-fuchsia-300">
+                ▌ MESSAGE FROM OUR SPONSOR
+              </p>
+            </div>
+
+            {/* Sponsor image — landscape aspect; fills width */}
+            <div className="relative w-full" style={{ aspectRatio: '3 / 2' }}>
+              <Image
+                src={pngFailed.sponsor ? '/skull/sponsor.svg' : '/skull/sponsor.png'}
+                alt="A message from our sponsor"
+                fill
+                sizes="(min-width: 600px) 560px, 92vw"
+                style={{ objectFit: 'cover' }}
+                priority
+                onError={() => setPngFailed((p) => ({ ...p, sponsor: true }))}
+              />
+            </div>
+
+            {/* Footer caption */}
+            <div className="flex items-center justify-between gap-3 border-t border-white/10 px-5 py-3">
+              <p className="font-mono text-[11px] leading-snug text-white/55">
+                we now return to your regularly scheduled chaos
+              </p>
+              <button
+                type="button"
+                onClick={dismiss}
+                className="font-display text-[10px] tracking-[0.25em] text-cyan-300 hover:text-cyan-100"
+              >
+                ↻ BACK
+              </button>
+            </div>
+          </div>
+
+          {/* Sparks — each anchored to a point on the modal perimeter,
+              flying outward at the matching angle. Pointer-events disabled
+              so they don't intercept clicks aimed at the close button. */}
+          <div aria-hidden className="pointer-events-none absolute inset-0">
+            {sparks.map((s, i) => {
+              const pos = perimeterPosition(s.pos)
+              return (
+                <span
+                  key={i}
+                  className="skull-spark"
+                  style={{
+                    top: pos.top,
+                    left: pos.left,
+                    backgroundColor: s.color,
+                    boxShadow: `0 0 12px 2px ${s.color}`,
+                    ['--dx' as string]: `${s.dx}px`,
+                    ['--dy' as string]: `${s.dy}px`,
+                    ['--dur' as string]: `${s.dur}s`,
+                    ['--delay' as string]: `${s.delay}s`,
+                  } as React.CSSProperties}
+                />
+              )
+            })}
+          </div>
+        </div>
+      </>
+    )
+  }
+
+  // ─── Joke render branch ───────────────────────────────────────────────
+  if (!joke) return null
 
   const visible = phase === 'entering' || phase === 'talking' || phase === 'laughing'
   const laughing = phase === 'laughing'
 
-  // Peek positions: 20% sticking past the edge keeps ~80% visible —
-  // looks like the skull is leaning into the frame from the wall.
   const peekedOutX = side === 'right' ? '110%' : '-110%'
   const peekedInX  = side === 'right' ? '20%'  : '-20%'
   const translateX = visible ? peekedInX : peekedOutX
-
   const transitionMs = phase === 'leaving' ? LEAVE_ANIM_MS : ENTER_ANIM_MS
 
   return (
@@ -308,9 +470,6 @@ export default function DadJokeSkull() {
             sizes="140px"
             style={{ objectFit: 'contain' }}
             onError={() => {
-              // PNG isn't in the repo yet — fall back to the SVG placeholder
-              // shipped at /skull/<name>.svg. Stays "failed" for the rest
-              // of the session so we don't retry the 404 repeatedly.
               setPngFailed((prev) =>
                 laughing ? { ...prev, laughing: true } : { ...prev, talking: true }
               )
@@ -319,10 +478,7 @@ export default function DadJokeSkull() {
         </span>
       </button>
 
-      {/* Speech bubble — positioned next to the skull, with a tail
-          pointing toward it. Sits ABOVE the skull vertically because
-          the skull is mid-height and the bubble feels more natural
-          coming off the upper-side of the face. */}
+      {/* Speech bubble */}
       {(phase === 'talking' || phase === 'laughing') && (
         <div
           className="font-display fixed z-50"
@@ -353,9 +509,7 @@ export default function DadJokeSkull() {
               {laughing ? 'HAHAHA · TAP TO DISMISS' : '▸ TAP FOR PUNCHLINE'}
             </p>
 
-            {/* Tail of the speech bubble — CSS triangle pointing at the
-                skull. Border-color matches the bubble border so it reads
-                as part of the same shape. */}
+            {/* Speech-bubble tail */}
             <span
               aria-hidden
               className="absolute"
@@ -379,8 +533,6 @@ export default function DadJokeSkull() {
 }
 
 // ─── Typewriter ─────────────────────────────────────────────────────────
-// Reveal text one character at a time. Restarts whenever `text` changes
-// (so swapping from setup → punchline retypes from the start).
 function Typewriter({ text }: { text: string }) {
   const [displayed, setDisplayed] = useState('')
   useEffect(() => {

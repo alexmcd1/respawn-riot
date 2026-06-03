@@ -61,6 +61,29 @@ export function playMessagePing(): void {
   tone({ ac, dest: masterGain, freq: 1318.5, start: now + 0.05, duration: 0.14, type: 'sine' })
 }
 
+/** Festive confetti burst — ascending major triad with a quick sparkle
+ *  on top. Used by the "message from our sponsor" easter egg. */
+export function playConfetti(): void {
+  const ac = ctx()
+  if (!ac) return
+  if (ac.state === 'suspended') void ac.resume().catch(() => {})
+  const now = ac.currentTime
+  const masterGain = ac.createGain()
+  masterGain.gain.value = 0.13
+  masterGain.connect(ac.destination)
+
+  // Ascending C-major arpeggio (C5, E5, G5, C6) — short, snappy
+  tone({ ac, dest: masterGain, freq: 523.25, start: now,        duration: 0.18, type: 'triangle' })
+  tone({ ac, dest: masterGain, freq: 659.25, start: now + 0.06, duration: 0.18, type: 'triangle' })
+  tone({ ac, dest: masterGain, freq: 783.99, start: now + 0.12, duration: 0.22, type: 'triangle' })
+  tone({ ac, dest: masterGain, freq: 1046.5, start: now + 0.18, duration: 0.30, type: 'sine' })
+
+  // Sparkle layer — high random-ish chime cluster a beat later
+  tone({ ac, dest: masterGain, freq: 1568, start: now + 0.32, duration: 0.20, type: 'sine', gain: 0.55 })
+  tone({ ac, dest: masterGain, freq: 2093, start: now + 0.40, duration: 0.18, type: 'sine', gain: 0.45 })
+  tone({ ac, dest: masterGain, freq: 2637, start: now + 0.48, duration: 0.16, type: 'sine', gain: 0.35 })
+}
+
 function tone({
   ac,
   dest,

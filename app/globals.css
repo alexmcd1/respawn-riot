@@ -246,3 +246,63 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .skull-bob, .skull-wiggle { animation: none; }
 }
+
+/* ---------- "Message from our sponsor" easter egg ----------
+   Soft glowing modal centered on the page + sparks flying out
+   from its edges. Pink/cyan double-glow keeps it on-brand. */
+
+.sponsor-pop-in {
+  animation: sponsor-pop-in 0.55s cubic-bezier(0.22, 1.4, 0.36, 1) forwards;
+}
+.sponsor-pop-out {
+  animation: sponsor-pop-out 0.40s ease-in forwards;
+}
+@keyframes sponsor-pop-in {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.86) rotate(-1.5deg); }
+  60%  { opacity: 1; transform: translate(-50%, -50%) scale(1.04) rotate(0.8deg); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(0); }
+}
+@keyframes sponsor-pop-out {
+  to { opacity: 0; transform: translate(-50%, -50%) scale(0.86); }
+}
+
+/* Slow breathing glow on the modal border — bubblegum pink + cyan */
+.sponsor-glow {
+  animation: sponsor-glow 2.8s ease-in-out infinite;
+}
+@keyframes sponsor-glow {
+  0%, 100% {
+    box-shadow:
+      0 0 32px -8px rgba(255, 46, 179, 0.55),
+      0 0 64px -16px rgba(34, 211, 238, 0.35);
+  }
+  50% {
+    box-shadow:
+      0 0 48px -6px rgba(255, 46, 179, 0.85),
+      0 0 92px -18px rgba(34, 211, 238, 0.55);
+  }
+}
+
+/* Spark animation — each spark uses CSS custom properties (--dx, --dy)
+   to set its flight direction, so a single keyframe handles all 16 of
+   them in different directions. */
+.skull-spark {
+  position: absolute;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: spark-fly var(--dur, 1.2s) ease-out var(--delay, 0s) forwards;
+  opacity: 0;
+}
+@keyframes spark-fly {
+  0%   { transform: translate(0, 0) scale(0); opacity: 0; }
+  18%  { transform: translate(calc(var(--dx, 0px) * 0.25), calc(var(--dy, 0px) * 0.25)) scale(1.1); opacity: 1; }
+  100% { transform: translate(var(--dx, 0px), var(--dy, 0px)) scale(0.3); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sponsor-pop-in, .sponsor-pop-out, .sponsor-glow, .skull-spark {
+    animation: none;
+  }
+  .sponsor-pop-in { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
