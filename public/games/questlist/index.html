@@ -2676,5 +2676,54 @@ function Toast({ toast }){
 /* --------------------------------- Mount ---------------------------------- */
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
   </script>
+
+  <!-- ─── iframe height reporter ──────────────────────────────────────
+       When this page is embedded in /quest-list (as it is on the
+       Respawn Riot site), we want the OUTER page to be the only
+       scrollable surface — not an internal iframe scrollbar. To make
+       that work, the parent needs to know how tall our content is so
+       it can size the iframe to fit.
+
+       We measure the document height on initial load + whenever any
+       layout change happens (ResizeObserver on documentElement) and
+       post the number to the parent. The page wrapper listens for
+       'qlist-height' messages and resizes the iframe accordingly.
+
+       No-op when not embedded in an iframe (direct visit to
+       /games/questlist/index.html). -->
+  <script>
+    (function () {
+      if (window.parent === window) return;
+      var lastH = 0;
+      var pendingTimer = null;
+      function send() {
+        pendingTimer = null;
+        var h = Math.max(
+          document.documentElement.scrollHeight,
+          document.body ? document.body.scrollHeight : 0
+        );
+        if (h !== lastH && h > 0) {
+          lastH = h;
+          try {
+            window.parent.postMessage({ type: 'qlist-height', height: h }, '*');
+          } catch (_) { /* parent gone — ignore */ }
+        }
+      }
+      function schedule() {
+        if (pendingTimer != null) return;
+        pendingTimer = window.setTimeout(send, 120);
+      }
+      // Initial send after layout settles
+      window.addEventListener('load', function () { window.setTimeout(send, 100); });
+      // Continued tracking via ResizeObserver — fires whenever the
+      // document's intrinsic size changes (e.g. tasks added/deleted,
+      // modal opened, sidebar toggled on mobile).
+      if (typeof ResizeObserver !== 'undefined') {
+        var ro = new ResizeObserver(schedule);
+        ro.observe(document.documentElement);
+      }
+      window.addEventListener('resize', schedule);
+    })();
+  </script>
 </body>
 </html>

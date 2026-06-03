@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import QuestListEmbed from "./_components/QuestListEmbed";
 
 export const metadata: Metadata = {
   title: "QuestList — kid_ghost | Respawn Riot",
@@ -35,23 +36,11 @@ export default function QuestListPage() {
         </div>
       </section>
 
-      {/* Viewport-height iframe — matches the math page pattern. The OLD
-          version used h-[1100px], which is taller than most viewports
-          AND smaller than QuestList's own task list when populated. That
-          combo gave us BOTH an outer page scrollbar (iframe taller than
-          window) AND an inner one (QuestList content taller than 1100px
-          iframe). Switching to 100dvh-minus-hero gives QuestList exactly
-          the viewport to work with — one scrollbar, internal, where the
-          user expects it. */}
-      <section className="px-0 sm:px-6 sm:py-6">
-        <div className="mx-auto max-w-5xl overflow-hidden border-y border-violet-400/30 bg-black sm:rounded-2xl sm:border sm:shadow-[0_0_40px_rgba(139,92,246,0.18)]">
-          <iframe
-            src="/games/questlist/index.html"
-            title="QuestList by kid_ghost"
-            className="block w-full h-[calc(100dvh-104px)] sm:h-[calc(100dvh-160px)] sm:min-h-[720px]"
-          />
-        </div>
-      </section>
+      {/* Auto-resizing iframe — content height comes back via postMessage
+          from inside QuestList (see public/games/questlist/index.html
+          end-of-body script) so the outer page becomes the only scroll
+          surface. No more "window inside a window" double-scroll. */}
+      <QuestListEmbed />
     </main>
   );
 }
