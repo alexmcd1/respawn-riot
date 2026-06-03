@@ -358,10 +358,28 @@ export default function DadJokeSkull() {
               ✕
             </button>
 
-            {/* Header */}
-            <div className="px-5 pt-4 pb-2">
-              <p className="font-display text-[10px] tracking-[0.35em] text-fuchsia-300">
-                ▌ MESSAGE FROM OUR SPONSOR
+            {/* Header — same glitchy treatment the RESPAWN/RIOT logo uses
+                on the homepage banner. Always-on RGB split via .glitch
+                + gradient-clipped text fill so the headline reads as a
+                broadcast interruption (channel feel, sponsor moment). */}
+            <div className="px-5 pt-4 pb-3 text-center">
+              <p className="font-mono text-[10px] tracking-[0.35em] text-fuchsia-300/75">
+                ▌ AD BREAK · CH 09
+              </p>
+              <p className="mt-1 font-display text-xl leading-tight tracking-[0.16em] sm:text-2xl">
+                <span
+                  className="glitch bg-gradient-to-b from-white via-fuchsia-200 to-fuchsia-500 bg-clip-text text-transparent"
+                  data-text="MESSAGE FROM"
+                >
+                  MESSAGE FROM
+                </span>
+                <span className="mx-2 text-fuchsia-400">/</span>
+                <span
+                  className="glitch bg-gradient-to-b from-cyan-200 via-pink-300 to-pink-600 bg-clip-text text-transparent"
+                  data-text="OUR SPONSOR"
+                >
+                  OUR SPONSOR
+                </span>
               </p>
             </div>
 
