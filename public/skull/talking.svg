@@ -1,0 +1,64 @@
+<!-- Placeholder "talking" skull. Replace with public/skull/talking.png
+     when the real art is available — the component prefers .png and
+     only falls back to this .svg when the PNG 404s. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 240" preserveAspectRatio="xMidYMid meet">
+  <defs>
+    <!-- Soft glow used on both outline copies. -->
+    <filter id="glow" x="-25%" y="-25%" width="150%" height="150%">
+      <feGaussianBlur stdDeviation="2" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Three stacked copies of the skull silhouette:
+       1. Pink, offset left/up (chromatic-aberration left edge)
+       2. Cyan, offset right/down (chromatic-aberration right edge)
+       3. White-stroked black skull on top -->
+  <g id="skull-art">
+    <!-- Skull body — rounded cranium + jaw + teeth row -->
+    <path d="M 100 22
+             C 55 22, 28 55, 28 100
+             L 28 138
+             C 28 156, 38 168, 50 170
+             L 56 170
+             L 56 188
+             C 56 200, 64 206, 76 206
+             L 124 206
+             C 136 206, 144 200, 144 188
+             L 144 170
+             L 150 170
+             C 162 168, 172 156, 172 138
+             L 172 100
+             C 172 55, 145 22, 100 22 Z"
+          fill="black" stroke="white" stroke-width="6" stroke-linejoin="round"/>
+
+    <!-- Left eye — squinted / winking -->
+    <path d="M 55 90 Q 70 85 82 95 Q 70 105 60 100 Z"
+          fill="white"/>
+    <!-- Right eye — wide open round -->
+    <ellipse cx="128" cy="98" rx="20" ry="22" fill="white"/>
+
+    <!-- Nose triangle -->
+    <path d="M 96 118 L 104 118 L 100 135 Z" fill="white"/>
+
+    <!-- Teeth grid -->
+    <rect x="76" y="160" width="48" height="22" fill="white"/>
+    <line x1="88" y1="160" x2="88" y2="182" stroke="black" stroke-width="3"/>
+    <line x1="100" y1="160" x2="100" y2="182" stroke="black" stroke-width="3"/>
+    <line x1="112" y1="160" x2="112" y2="182" stroke="black" stroke-width="3"/>
+
+    <!-- Lightning bolt on the left side -->
+    <path d="M 22 110 L 36 100 L 28 118 L 40 114 L 22 138 L 32 122 L 18 126 Z"
+          fill="#ff2eb3" stroke="white" stroke-width="2" stroke-linejoin="round"/>
+  </g>
+
+  <!-- Pink chromatic-aberration ghost (left/up) -->
+  <use href="#skull-art" x="-3" y="-2" opacity="0.85"
+       style="filter: drop-shadow(0 0 4px #ff2eb3);"
+       fill="none" stroke="#ff2eb3" stroke-width="4"/>
+
+  <!-- Cyan chromatic-aberration ghost (right/down) -->
+  <use href="#skull-art" x="3" y="2" opacity="0.85"
+       style="filter: drop-shadow(0 0 4px #22d3ee);"
+       fill="none" stroke="#22d3ee" stroke-width="4"/>
+</svg>

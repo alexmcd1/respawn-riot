@@ -85,6 +85,13 @@ export default function DadJokeSkull() {
   const [phase, setPhase] = useState<Phase>('hidden')
   const [side, setSide] = useState<Side>('right')
   const [joke, setJoke] = useState<{ setup: string; punchline: string } | null>(null)
+  // Tracks per-image whether the .png 404'd. If so we fall back to the
+  // SVG placeholder shipped at /skull/<name>.svg. Once a .png fails it
+  // stays "failed" for the rest of the session — no point retrying.
+  const [pngFailed, setPngFailed] = useState<{ talking: boolean; laughing: boolean }>({
+    talking: false,
+    laughing: false,
+  })
 
   // Pending timeouts — cleared on dismiss / unmount so a closed bubble
   // doesn't reopen itself a moment later from a stale scheduler.
@@ -218,12 +225,24 @@ export default function DadJokeSkull() {
           }}
         >
           <Image
-            src={laughing ? '/skull/laughing.png' : '/skull/talking.png'}
+            src={
+              laughing
+                ? (pngFailed.laughing ? '/skull/laughing.svg' : '/skull/laughing.png')
+                : (pngFailed.talking  ? '/skull/talking.svg'  : '/skull/talking.png')
+            }
             alt={laughing ? 'Kid Ghost laughing at his own joke' : 'Kid Ghost telling a joke'}
             fill
             sizes="140px"
             style={{ objectFit: 'contain' }}
             unoptimized
+            onError={() => {
+              // PNG isn't in the repo yet — fall back to the SVG placeholder
+              // shipped at /skull/<name>.svg. Stays "failed" for the rest
+              // of the session so we don't retry the 404 repeatedly.
+              setPngFailed((prev) =>
+                laughing ? { ...prev, laughing: true } : { ...prev, talking: true }
+              )
+            }}
           />
         </span>
       </button>
