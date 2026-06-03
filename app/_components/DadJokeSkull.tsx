@@ -124,7 +124,16 @@ const LEAVE_ANIM_MS       = 500
 const TYPEWRITER_MS_PER_CHAR = 28
 
 // Sponsor easter egg
-const SPONSOR_CHANCE      = 0.10         // ~1 in 10 appearances → sponsor instead of joke
+//
+// Trigger paths:
+//   1. The hidden "› a word from our sponsor" link inside the joke
+//      bubble, revealed only after the punchline drops. Very low-
+//      contrast on purpose — meant to be discovered, not noticed.
+//   2. The ?skull=sponsor URL param (test escape hatch).
+//
+// The random per-appearance roll is OFF (SPONSOR_CHANCE = 0). Set it
+// to a small fraction (e.g. 0.05) to bring back surprise pop-ups.
+const SPONSOR_CHANCE      = 0            // 0 = never auto-fires; rely on the bubble link / URL
 const SPONSOR_POP_IN_MS   = 550          // matches .sponsor-pop-in keyframe duration
 const SPONSOR_HOLD_MS     = 7_500        // total visible time after pop-in completes
 const SPONSOR_POP_OUT_MS  = 400          // matches .sponsor-pop-out keyframe duration
@@ -311,6 +320,15 @@ export default function DadJokeSkull() {
       return 'laughing'
     })
   }, [clearTimers, later, scheduleNext])
+
+  /** Bridge from the joke bubble into the sponsor experience. Triggered
+   *  by the easter-egg link below the punchline. Cancels the pending
+   *  joke auto-dismiss so we don't fire startSponsor() and then
+   *  immediately hide it a second later. */
+  const switchToSponsor = useCallback(() => {
+    clearTimers()
+    startSponsor()
+  }, [clearTimers, startSponsor])
 
   // First-appearance scheduler
   useEffect(() => {
@@ -526,6 +544,24 @@ export default function DadJokeSkull() {
             <p className="mt-2 font-display text-[10px] tracking-[0.25em] text-fuchsia-300/70">
               {laughing ? 'HAHAHA · TAP TO DISMISS' : '▸ TAP FOR PUNCHLINE'}
             </p>
+
+            {/* Sponsor easter-egg link — only visible after the punchline,
+                very low contrast on purpose. Hover lifts to a soft fuchsia
+                tint so curious users find it without it shouting for
+                attention on every joke. */}
+            {laughing && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  switchToSponsor()
+                }}
+                title="A word from our sponsor"
+                className="mt-2 block w-full border-t border-white/5 pt-2 text-left font-mono text-[9px] tracking-[0.22em] text-white/20 transition hover:border-fuchsia-400/25 hover:text-fuchsia-300/80"
+              >
+                › a word from our sponsor
+              </button>
+            )}
 
             {/* Speech-bubble tail */}
             <span
