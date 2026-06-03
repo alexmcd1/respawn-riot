@@ -44,8 +44,13 @@ export default function MiniAppNav({
   color?: MiniAppNavColor
 }) {
   const c = COLOR[color]
+  // Sticky offset clears the parent NavBar (top bar ~61px + ticker
+  // strip ~30px = ~91px total) with a small buffer. Was top-[88px]
+  // which left a 3px sliver of the tab row hidden behind the
+  // ticker on most viewports — that's the "overlap" users reported
+  // on /orlando and similar mini-app pages.
   return (
-    <div className="sticky top-[88px] z-30 border-b border-white/10 bg-black/85 backdrop-blur-md">
+    <div className="sticky top-24 z-30 border-b border-white/10 bg-black/85 backdrop-blur-md">
       <nav
         aria-label="Section"
         className="mx-auto max-w-7xl px-2 sm:px-6"
