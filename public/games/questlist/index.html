@@ -45,11 +45,15 @@
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     html,body,#root{height:100%}
+    /* Background gradient retuned to use the parent site's palette
+       (fuchsia + cyan over deep black) instead of indigo + pink over
+       navy. Subtle change but it's what makes the app feel native to
+       the rest of Respawn Riot. */
     body{
       background:
-        radial-gradient(1000px 600px at 90% -10%, rgba(99,102,241,0.18), transparent 60%),
-        radial-gradient(800px 600px at -10% 110%, rgba(236,72,153,0.14), transparent 60%),
-        linear-gradient(180deg,#0b1020 0%,#0a0f1c 100%);
+        radial-gradient(1000px 600px at 90% -10%, rgba(255, 46, 179, 0.18), transparent 60%),
+        radial-gradient(800px 600px at -10% 110%, rgba(34, 211, 238, 0.12), transparent 60%),
+        linear-gradient(180deg, #050007 0%, #0a0512 100%);
       color:#e5e7eb;
       font-family: Inter, system-ui, sans-serif;
     }
@@ -70,18 +74,22 @@
       transform: translate(-50%, 0);
       animation: toastSlideIn 260ms cubic-bezier(.2,.7,.3,1);
     }
+    /* XP / progress bar — retuned to fuchsia → pink → cyan to mirror
+       the gradients used in the main NavBar logo + creativity hero. */
     .gradient-bar{
-      background: linear-gradient(90deg,#6366f1 0%,#8b5cf6 40%,#ec4899 80%,#f59e0b 100%);
+      background: linear-gradient(90deg, #ff2eb3 0%, #ec4899 45%, #22d3ee 100%);
       background-size:200% 100%;
     }
     .scroll-thin::-webkit-scrollbar{width:8px;height:8px}
-    .scroll-thin::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.08); border-radius:8px}
-    .ring-focus:focus{outline:none; box-shadow:0 0 0 2px rgba(139,92,246,0.55)}
+    .scroll-thin::-webkit-scrollbar-thumb{background:rgba(255, 46, 179, 0.20); border-radius:8px}
+    .scroll-thin::-webkit-scrollbar-thumb:hover{background:rgba(255, 46, 179, 0.35)}
+    /* Focus ring + checkbox accent on the site's fuchsia */
+    .ring-focus:focus{outline:none; box-shadow:0 0 0 2px rgba(255, 46, 179, 0.55)}
     .chip{ display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:9999px; font-size:11px; font-weight:600; border:1px solid rgba(255,255,255,0.08)}
     details>summary{list-style:none}
     details>summary::-webkit-details-marker{display:none}
     .no-tap-highlight{ -webkit-tap-highlight-color: transparent }
-    input[type="checkbox"]{ accent-color:#8b5cf6 }
+    input[type="checkbox"]{ accent-color:#ff2eb3 }
 
     /* --- Pencil strike animation --- */
     @keyframes revealBar   { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0% 0 0); } }

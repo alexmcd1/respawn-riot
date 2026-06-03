@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "QuestList — kid_ghost | Respawn Riot",
@@ -9,29 +10,45 @@ export const metadata: Metadata = {
 export default function QuestListPage() {
   return (
     <main className="bg-black text-white">
-      <section className="border-b border-white/10 px-6 py-10">
-        <div className="mx-auto max-w-5xl">
-          <p className="text-xs uppercase tracking-[0.3em] text-violet-400">
-            Built In-House
-          </p>
-          <h1 className="mt-3 text-4xl font-black uppercase tracking-tight sm:text-5xl">
-            QuestList <span className="text-violet-500">{"//"}</span> kid_ghost
-          </h1>
-          <p className="mt-3 max-w-2xl text-white/70">
-            {"A gamified task tracker. Complete tasks, earn XP, level up, collect coins. Everything is stored in your browser's localStorage — your data, your machine."}
-          </p>
-          <p className="mt-2 text-xs uppercase tracking-[0.25em] text-white/40">
-            Built by kid_ghost
-          </p>
+      {/* Compact hero — matches the channel/cyberpunk pattern used across
+          the rest of the site, so the QuestList page reads as part of
+          Respawn Riot instead of a bolted-on iframe demo. */}
+      <section className="border-b border-white/10 px-4 py-4 sm:px-6 sm:py-8">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="font-display text-[10px] tracking-[0.3em] text-violet-300 sm:text-xs">
+              ▌ CHANNEL 05 / BUILT IN-HOUSE
+            </p>
+            <h1 className="mt-1 font-display text-2xl tracking-[0.04em] sm:mt-2 sm:text-4xl">
+              QUESTLIST <span className="text-violet-400">{"//"}</span> KID_GHOST
+            </h1>
+          </div>
+          <Link
+            href="/games/questlist/index.html"
+            target="_blank"
+            rel="noopener"
+            prefetch={false}
+            className="rounded-md border border-violet-400/60 px-3 py-1.5 font-display text-[11px] tracking-[0.25em] text-violet-200 hover:bg-violet-500/10 sm:text-xs"
+          >
+            ⤢ FULLSCREEN
+          </Link>
         </div>
       </section>
 
-      <section className="px-2 py-6 sm:px-6 sm:py-10">
-        <div className="mx-auto max-w-5xl overflow-hidden rounded-2xl border border-white/10 bg-[#0a0a14]">
+      {/* Viewport-height iframe — matches the math page pattern. The OLD
+          version used h-[1100px], which is taller than most viewports
+          AND smaller than QuestList's own task list when populated. That
+          combo gave us BOTH an outer page scrollbar (iframe taller than
+          window) AND an inner one (QuestList content taller than 1100px
+          iframe). Switching to 100dvh-minus-hero gives QuestList exactly
+          the viewport to work with — one scrollbar, internal, where the
+          user expects it. */}
+      <section className="px-0 sm:px-6 sm:py-6">
+        <div className="mx-auto max-w-5xl overflow-hidden border-y border-violet-400/30 bg-black sm:rounded-2xl sm:border sm:shadow-[0_0_40px_rgba(139,92,246,0.18)]">
           <iframe
             src="/games/questlist/index.html"
             title="QuestList by kid_ghost"
-            className="block h-[1100px] w-full sm:h-[1200px]"
+            className="block w-full h-[calc(100dvh-104px)] sm:h-[calc(100dvh-160px)] sm:min-h-[720px]"
           />
         </div>
       </section>
