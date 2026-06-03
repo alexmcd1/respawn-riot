@@ -234,7 +234,6 @@ export default function DadJokeSkull() {
             fill
             sizes="140px"
             style={{ objectFit: 'contain' }}
-            unoptimized
             onError={() => {
               // PNG isn't in the repo yet — fall back to the SVG placeholder
               // shipped at /skull/<name>.svg. Stays "failed" for the rest
