@@ -356,13 +356,22 @@ export default function DadJokeSkull() {
           className="fixed inset-0 z-40 cursor-default border-0 bg-black/65 p-0 backdrop-blur-sm"
         />
 
-        {/* Centered modal */}
+        {/* Centered modal — base transform is set inline as a fallback
+            so the element stays centered during the instant when the
+            animation class swaps from .sponsor-pop-in to .sponsor-pop-out
+            (between those, the pop-in's forwards-persisted transform
+            stops applying, and without this inline default the element
+            would briefly snap to top-left = viewport center then animate
+            back, looking like it flew off to the bottom-right). */}
         <div
           role="dialog"
           aria-live="polite"
           aria-label="Message from our sponsor"
           className={`pointer-events-none fixed left-1/2 top-1/2 z-50 ${popClass}`}
-          style={{ width: 'min(560px, 92vw)' }}
+          style={{
+            width: 'min(560px, 92vw)',
+            transform: 'translate(-50%, -50%)',
+          }}
         >
           {/* Inner glow border — soft rounded corners, breathing pink+cyan glow */}
           <div className="pointer-events-auto relative sponsor-glow overflow-hidden rounded-3xl border border-fuchsia-400/60 bg-[#0a0510]">
@@ -384,7 +393,13 @@ export default function DadJokeSkull() {
               <p className="font-mono text-[10px] tracking-[0.35em] text-fuchsia-300/75">
                 ▌ AD BREAK · CH 09
               </p>
-              <p className="mt-1 font-display text-xl leading-tight tracking-[0.16em] sm:text-2xl">
+              {/* Headline matches the homepage banner pattern exactly:
+                  font-display, TIGHT 0.04em tracking, gradient-clipped
+                  letters. Bigger here (2xl→3xl) than the previous
+                  attempt so each letter is wide enough that the glitch
+                  RGB ghosts (2–4px offsets) read as shimmer beside it
+                  instead of blurring it. */}
+              <p className="mt-1 font-display text-2xl leading-[0.95] tracking-[0.04em] sm:text-3xl">
                 <span
                   className="glitch bg-gradient-to-b from-white via-fuchsia-200 to-fuchsia-500 bg-clip-text text-transparent"
                   data-text="MESSAGE FROM"
@@ -401,14 +416,20 @@ export default function DadJokeSkull() {
               </p>
             </div>
 
-            {/* Sponsor image — landscape aspect; fills width */}
-            <div className="relative w-full" style={{ aspectRatio: '3 / 2' }}>
+            {/* Sponsor image — renders at its natural aspect ratio (the
+                shipped art is 1086×1448 portrait) and caps height at
+                55vh so it doesn't dominate the viewport on shorter
+                screens. Background matches modal so any letterboxing
+                blends in. Avoids the previous 3:2-cover crop that cut
+                off the sides of the art. */}
+            <div className="relative w-full bg-[#0a0510]">
               <Image
                 src={pngFailed.sponsor ? '/skull/sponsor.svg' : '/skull/sponsor.png'}
                 alt="A message from our sponsor"
-                fill
+                width={1086}
+                height={1448}
                 sizes="(min-width: 600px) 560px, 92vw"
-                style={{ objectFit: 'cover' }}
+                className="mx-auto block w-auto max-h-[55vh] max-w-full"
                 priority
                 onError={() => setPngFailed((p) => ({ ...p, sponsor: true }))}
               />

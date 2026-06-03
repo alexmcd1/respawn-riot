@@ -262,8 +262,14 @@ body {
   60%  { opacity: 1; transform: translate(-50%, -50%) scale(1.04) rotate(0.8deg); }
   100% { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(0); }
 }
+/* Explicit `from` so the swap from .sponsor-pop-in → .sponsor-pop-out
+   doesn't briefly flash through the un-translated default state (which
+   would land the element's top-left at viewport center, looking like
+   it flew off to the bottom-right). Combined with the inline base
+   transform on the modal, this keeps the exit centered + smooth. */
 @keyframes sponsor-pop-out {
-  to { opacity: 0; transform: translate(-50%, -50%) scale(0.86); }
+  from { opacity: 1; transform: translate(-50%, -50%) scale(1)   rotate(0); }
+  to   { opacity: 0; transform: translate(-50%, -50%) scale(0.86) rotate(0); }
 }
 
 /* Slow breathing glow on the modal border — bubblegum pink + cyan */
