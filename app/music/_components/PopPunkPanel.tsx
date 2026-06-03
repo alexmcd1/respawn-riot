@@ -333,32 +333,61 @@ function isTrustedImageHost(url: string): boolean {
   }
 }
 
+/** Pick the first image URL in the chain that isn't already in `used`,
+ *  add it to the set, and return it (with the trusted-host flag for
+ *  SmartImage). If every candidate is already used or null, fall back
+ *  to the shared placeholder.
+ *
+ *  This is the centerpiece of the "no duplicate band photos on the
+ *  same page" rule — call this in order (hero first, then tiles top to
+ *  bottom), passing the SAME set, and each call picks the freshest
+ *  not-yet-used image from its candidates. */
+function pickUnusedImage(
+  candidates: ReadonlyArray<string | null | undefined>,
+  used: Set<string>
+): { url: string; trusted: boolean } {
+  for (const c of candidates) {
+    if (c && !used.has(c)) {
+      used.add(c);
+      return { url: c, trusted: isTrustedImageHost(c) };
+    }
+  }
+  // Every candidate is null or already in use — fall through to the
+  // local placeholder. (We don't add the placeholder to `used` so
+  // multiple bands with exhausted candidates can all use it. Adding
+  // variation to the placeholder per-band would be the next step if
+  // this proves visually noisy.)
+  return { url: MUSIC_PLACEHOLDER, trusted: true };
+}
+
 async function buildBandCard(
   cfg: BandConfig,
   item: NewsItem | null,
-  skipLinks: Set<string> = new Set()
+  usedImages: Set<string>
 ): Promise<BandCardData> {
-  // De-dupe vs the hero: if THIS article is already featured in the
-  // BREAKING NOW strip, drop it from the tile so we don't show the
-  // same story + same image twice on one page.
-  const notInHero = item && !skipLinks.has(item.link) ? item : null;
   // Promote to live ONLY if pubDate is within FRESH_MAX_AGE_DAYS.
-  const liveItem = notInHero && isFreshEnough(notInHero.pubDate) ? notInHero : null;
+  // (We no longer skip the article when it's already featured in the
+  // hero — repeating a band across sections is fine, the image-dedup
+  // via pickUnusedImage makes sure the visual doesn't repeat.)
+  const liveItem = item && isFreshEnough(item.pubDate) ? item : null;
 
-  // Image resolution chain: og:image (current article, only if live) →
-  // Spotify (auto-current artist photo) → hardcoded Wikipedia fallback.
+  // Gather all image candidates in parallel.
   const [ogImg, spotifyImg] = await Promise.all([
     liveItem ? fetchOgImage(liveItem.link) : Promise.resolve(null),
     fetchArtistImage(cfg.name),
   ]);
-  const img = ogImg || spotifyImg || cfg.fallbackImg;
-  const imgIsTrusted = isTrustedImageHost(img);
+  // Image-dedup: pick the first not-already-used option from the chain.
+  // og:image is the freshest signal (current article), then Spotify
+  // (auto-current artist photo), then the hardcoded Wikipedia fallback.
+  // If they're ALL claimed by earlier cards, pickUnusedImage falls
+  // through to the local /music/placeholder.svg.
+  const choice = pickUnusedImage([ogImg, spotifyImg, cfg.fallbackImg], usedImages);
 
   if (liveItem) {
     return {
       name: cfg.name,
-      img,
-      imgIsTrusted,
+      img: choice.url,
+      imgIsTrusted: choice.trusted,
       headline: liveItem.title,
       blurb: liveItem.description ?? `Latest mention via ${liveItem.publisher ?? "Google News"}.`,
       href: liveItem.link,
@@ -369,8 +398,8 @@ async function buildBandCard(
   }
   return {
     name: cfg.name,
-    img,
-    imgIsTrusted,
+    img: choice.url,
+    imgIsTrusted: choice.trusted,
     headline: cfg.fallbackHeadline,
     blurb: cfg.fallbackBlurb,
     href: cfg.fallbackHref,
@@ -380,25 +409,22 @@ async function buildBandCard(
 }
 
 /** Festivals: like bands, but Spotify lookups don't help (festivals
- *  aren't artists) so we skip that step. The placeholder SVG carries
- *  the visual when an OG image isn't available. */
+ *  aren't artists) so the candidate chain is shorter: og:image →
+ *  hardcoded fallback (usually the shared placeholder). */
 async function buildFestivalCard(
   cfg: FestivalConfig,
   item: NewsItem | null,
-  skipLinks: Set<string> = new Set()
+  usedImages: Set<string>
 ): Promise<BandCardData> {
-  const notInHero = item && !skipLinks.has(item.link) ? item : null;
-  const liveItem = notInHero && isFreshEnough(notInHero.pubDate) ? notInHero : null;
-
+  const liveItem = item && isFreshEnough(item.pubDate) ? item : null;
   const ogImg = liveItem ? await fetchOgImage(liveItem.link) : null;
-  const img = ogImg || cfg.fallbackImg;
-  const imgIsTrusted = isTrustedImageHost(img);
+  const choice = pickUnusedImage([ogImg, cfg.fallbackImg], usedImages);
 
   if (liveItem) {
     return {
       name: cfg.shortName ?? cfg.name,
-      img,
-      imgIsTrusted,
+      img: choice.url,
+      imgIsTrusted: choice.trusted,
       headline: liveItem.title,
       blurb: liveItem.description ?? `Latest mention via ${liveItem.publisher ?? "Google News"}.`,
       href: liveItem.link,
@@ -409,8 +435,8 @@ async function buildFestivalCard(
   }
   return {
     name: cfg.shortName ?? cfg.name,
-    img,
-    imgIsTrusted,
+    img: choice.url,
+    imgIsTrusted: choice.trusted,
     headline: "Awaiting next announcement",
     blurb: cfg.fallbackBlurb,
     href: cfg.fallbackHref,
@@ -679,59 +705,82 @@ export default async function PopPunkPanel() {
   );
   const heroPicks = rankedBandNews.slice(0, 3);
 
-  // Build a band → fallback image map so the hero can always render an
-  // image even when og:image scraping fails (which it often does for
-  // Google News article URLs — those are JS-redirect wrappers).
+  // ─── Image dedup state ────────────────────────────────────────────────
+  //
+  // Single shared Set tracks every image URL used on the page so far.
+  // pickUnusedImage() reads + writes it as each card is built — so two
+  // cards never end up with the same photo even if they'd both prefer
+  // it. The hero is built first (claiming its image slots), then tiles
+  // in section order. When a band has only one good image and it's
+  // already claimed, that band's tile falls through the chain to the
+  // /music/placeholder.svg.
+  const usedImages = new Set<string>();
+
+  // Fallback map so the hero's pickUnusedImage chain can fall through
+  // to each band's hand-picked photo.
   const bandFallbackImg = new Map<string, string>([
     ...TOUR_BANDS.map((b) => [b.name, b.fallbackImg] as const),
     ...ALBUM_BANDS.map((b) => [b.name, b.fallbackImg] as const),
     ...NEW_WAVE_ARTISTS.map((a) => [a.name, a.fallbackImg] as const),
+    ...FESTIVALS.map((f) => [f.shortName ?? f.name, f.fallbackImg] as const),
   ]);
 
-  // Fetch Spotify images for the hero bands in parallel (cached for a
-  // week, so this is essentially free on subsequent renders).
-  const heroBandSpotify = await Promise.all(
-    heroPicks.map((t) => fetchArtistImage(t.band))
+  // Hero candidates: gather every option in parallel, then sequentially
+  // pick so the dedup-against-each-other works within the hero too.
+  const heroCandidates = await Promise.all(
+    heroPicks.map(async (t) => {
+      const [og, spotify] = await Promise.all([
+        fetchOgImage(t.news.link),
+        fetchArtistImage(t.band),
+      ]);
+      return { og, spotify, fallback: bandFallbackImg.get(t.band) ?? "" };
+    })
   );
-  // OG image scrape per article (best quality when it works).
-  const heroOgImages = await Promise.all(heroPicks.map((t) => fetchOgImage(t.news.link)));
 
   const heroItems: HeroItem[] = heroPicks.map((t, i) => {
-    // Fallback chain: og:image → Spotify → hardcoded → final empty-string
-    // safety net. In practice the hardcoded fallback always wins for a
-    // band that's listed on the page, so the empty-string branch should
-    // never actually fire.
-    const fallback = bandFallbackImg.get(t.band) ?? "";
-    const img = heroOgImages[i] || heroBandSpotify[i] || fallback;
+    const cands = heroCandidates[i];
+    const choice = pickUnusedImage(
+      [cands.og, cands.spotify, cands.fallback],
+      usedImages
+    );
     return {
       news: t.news,
-      img,
-      imgIsTrusted: isTrustedImageHost(img),
+      img: choice.url,
+      imgIsTrusted: choice.trusted,
       band: t.band,
     };
   });
 
-  // ─── Hero → tile dedup ────────────────────────────────────────────────
+  // ─── Tile cards: built sequentially so image picks don't race ─────────
   //
-  // Any article URL already used in the hero gets EXCLUDED from the
-  // band/festival tiles below — so we never show the same story (with
-  // the same image) twice on the page. The tile for that band/festival
-  // falls back to its static state (fallback headline + Spotify/
-  // hardcoded photo) when its top news item is in the hero.
-  const usedLinks = new Set(heroItems.map((h) => h.news.link));
+  // Each builder mutates `usedImages` as it picks. Doing this in a
+  // for-loop (not Promise.all) keeps the picks deterministic and
+  // ordered top-to-bottom on the page. The fetches INSIDE each builder
+  // still run in parallel — and the relevant data is cached — so the
+  // wall-clock impact is minimal.
+  const tourCards: BandCardData[] = [];
+  for (let i = 0; i < TOUR_BANDS.length; i++) {
+    tourCards.push(await buildBandCard(TOUR_BANDS[i], tourResults[i], usedImages));
+  }
+  const albumCards: BandCardData[] = [];
+  for (let i = 0; i < ALBUM_BANDS.length; i++) {
+    albumCards.push(await buildBandCard(ALBUM_BANDS[i], albumResults[i], usedImages));
+  }
+  const festivalCards: BandCardData[] = [];
+  for (let i = 0; i < FESTIVALS.length; i++) {
+    festivalCards.push(await buildFestivalCard(FESTIVALS[i], festivalResults[i], usedImages));
+  }
 
-  // Now build the tile cards, passing usedLinks so each builder can
-  // demote its "live" item to a static fallback when the article is
-  // already in the hero.
-  const tourCards = await Promise.all(
-    TOUR_BANDS.map((cfg, i) => buildBandCard(cfg, tourResults[i], usedLinks))
-  );
-  const albumCards = await Promise.all(
-    ALBUM_BANDS.map((cfg, i) => buildBandCard(cfg, albumResults[i], usedLinks))
-  );
-  const festivalCards = await Promise.all(
-    FESTIVALS.map((cfg, i) => buildFestivalCard(cfg, festivalResults[i], usedLinks))
-  );
+  // Same dedup for the New Wave artists (rendered inline below — we
+  // build the choices here so the dedup state stays in one place).
+  const newWaveChoices = NEW_WAVE_ARTISTS.map((cfg, i) => {
+    const spot = newWaveImages[i];
+    return pickUnusedImage([spot, cfg.fallbackImg], usedImages);
+  });
+
+  // Keep article-URL dedup for the Headlines list so we don't list the
+  // same article twice on the page (independent of the image dedup).
+  const usedLinks = new Set(heroItems.map((h) => h.news.link));
 
   // ─── Headlines list filter ─────────────────────────────────────────────
   //
@@ -848,15 +897,14 @@ export default async function PopPunkPanel() {
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {NEW_WAVE_ARTISTS.map((cfg, i) => {
               const rawItem = newWaveResults[i];
-              // Dedup vs hero — if this artist's news is in BREAKING NOW,
-              // show the static fallback in the tile instead.
+              // Same article can repeat across sections; the image-dedup
+              // (newWaveChoices, computed above against the page-wide
+              // usedImages set) takes care of visual repetition.
               const item =
-                rawItem && !usedLinks.has(rawItem.link) && isFreshEnough(rawItem.pubDate)
-                  ? rawItem
-                  : null;
-              const spotifyImg = newWaveImages[i];
-              const img = spotifyImg || cfg.fallbackImg;
-              const trusted = isTrustedImageHost(img);
+                rawItem && isFreshEnough(rawItem.pubDate) ? rawItem : null;
+              const choice = newWaveChoices[i];
+              const img = choice.url;
+              const trusted = choice.trusted;
               const href = item?.link ?? cfg.fallbackHref;
               const headline = item?.title;
               const rel = formatRelative(item?.pubDate);
