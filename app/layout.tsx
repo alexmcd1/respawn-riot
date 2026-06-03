@@ -8,6 +8,7 @@ import SignInModal from "./_components/SignInModal";
 import SyncController from "./_components/SyncController";
 import ChatRoot from "./_components/chat/ChatRoot";
 import { ChatProvider } from "./_components/chat/ChatContext";
+import DadJokeSkull from "./_components/DadJokeSkull";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -57,6 +58,10 @@ export default function RootLayout({
             {/* AIM-style buddy chat — floating buddy list + popup chat
                 windows. Renders nothing when signed out. */}
             <ChatRoot />
+            {/* Kid Ghost dad-joke skull — peeks in every ~5–12 min,
+                tells a joke, switches to its laughing face on the
+                punchline. Visible to signed-in and signed-out alike. */}
+            <DadJokeSkull />
           </ChatProvider>
         </AuthProvider>
       </body>

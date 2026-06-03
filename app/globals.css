@@ -208,3 +208,41 @@ body {
 /* Sticker — slight tilt */
 .sticker { transform: rotate(-3deg); transition: transform 0.2s ease; }
 .sticker:hover { transform: rotate(0deg) scale(1.05); }
+
+/* ---------- Dad-joke skull (DadJokeSkull.tsx) ----------
+   Two animation states for the punk-skull mascot that peeks in
+   from the side of every page:
+
+   .skull-bob    — gentle "I'm talking" rocking while the setup is
+                   on screen. Slow vertical bob + tiny rotation tilt.
+
+   .skull-wiggle — punchy "I'm laughing" shake when the punchline
+                   drops. Faster rotation + scale pulse, mimics a
+                   cartoon body-shake-laugh.
+
+   Both respect prefers-reduced-motion so motion-sensitive visitors
+   see the static image instead of constant movement. */
+
+.skull-bob {
+  animation: skull-bob 2.4s ease-in-out infinite;
+  transform-origin: 50% 85%;
+}
+@keyframes skull-bob {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50%      { transform: translateY(-4px) rotate(2deg); }
+}
+
+.skull-wiggle {
+  animation: skull-wiggle 0.32s ease-in-out infinite;
+  transform-origin: 50% 85%;
+}
+@keyframes skull-wiggle {
+  0%, 100% { transform: rotate(-6deg) scale(1.00); }
+  25%      { transform: rotate(7deg)  scale(1.10) translateY(-3px); }
+  50%      { transform: rotate(-4deg) scale(0.96) translateY(2px); }
+  75%      { transform: rotate(6deg)  scale(1.07) translateY(-2px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skull-bob, .skull-wiggle { animation: none; }
+}
