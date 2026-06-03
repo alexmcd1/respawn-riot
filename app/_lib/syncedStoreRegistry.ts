@@ -10,7 +10,10 @@ import "../food/_lib/ratingsSync";
 import "../food/_lib/shoppingSync";
 import "../music/_lib/musicArtistsSync";
 import "../music/_lib/musicCitiesSync";
-// NOTE: quest-list state lives inside an iframe (static HTML game) —
-// syncing it needs postMessage plumbing in the iframe HTML. Wired in
-// a follow-up commit. For now, quests stay localStorage-only inside
-// the iframe origin.
+// QuestList state lives inside an iframe (static HTML game at
+// public/games/questlist/index.html). It syncs DIRECTLY from the
+// iframe to /api/sync/questlist instead of going through this
+// registry — postMessage plumbing turned out to be unnecessary since
+// the iframe is same-origin and the Auth.js session cookie rides
+// along on a normal fetch. See the "Cloud sync" block in the App
+// component of that file for the implementation.

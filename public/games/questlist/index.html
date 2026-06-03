@@ -574,6 +574,82 @@ function App(){
   });
   useEffect(()=>{ try{ localStorage.setItem('questlist.v1', JSON.stringify(state)); }catch(e){} },[state]);
 
+  /* ─── Cloud sync ─────────────────────────────────────────────────────
+     When the user is signed in, mirror QuestList state to
+     /api/sync/questlist so it follows them across devices. Because
+     this iframe is served from the same origin as the parent site
+     (respawnriot.io/games/questlist/index.html), a direct same-origin
+     fetch automatically sends the Auth.js session cookie — no
+     postMessage handshake needed.
+
+     Strategy:
+       - On mount: GET. If server has data AND its updated_at is
+         strictly newer than the last sync timestamp we have stored
+         locally, adopt the server state (cross-device pull).
+       - On every state change: debounced PUT 900ms after the last
+         change. Server's response updated_at is stored as our new
+         "last sync" baseline.
+
+     Trade-off documented elsewhere: a user who built up state on
+     this device offline, then signed in, will see the server's
+     existing cross-device state take over on first GET if it exists.
+     The Export JSON button in the sidebar is the escape hatch for
+     anyone who wants to merge manually. */
+  const SYNC_KIND = 'questlist';
+  const SYNC_LAST_KEY = 'questlist.v1.lastSync';
+  const SYNC_DEBOUNCE_MS = 900;
+  const skipNextPutRef = useRef(false);
+
+  // Pull from cloud on mount.
+  useEffect(()=>{
+    let cancelled = false;
+    fetch(`/api/sync/${SYNC_KIND}`, { credentials:'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if(cancelled || !data || !data.ok || !data.value) return;
+        const serverAt = data.updated_at ? new Date(data.updated_at).getTime() : 0;
+        let localAt = 0;
+        try { localAt = parseInt(localStorage.getItem(SYNC_LAST_KEY) || '0', 10) || 0; } catch(_){}
+        // Adopt server iff strictly newer than what we've already
+        // acknowledged. (localAt = 0 on first sync ever for this
+        // device — any server data wins.)
+        if(serverAt > localAt){
+          skipNextPutRef.current = true; // don't bounce server data back as a PUT
+          setState({...DEFAULT_STATE, ...data.value, gmail: migrateGmailState(data.value.gmail)});
+          try { localStorage.setItem(SYNC_LAST_KEY, String(serverAt)); } catch(_){}
+        }
+      })
+      .catch(()=>{ /* signed out / offline / network err — local-only mode */ });
+    return ()=>{ cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Push to cloud on every state change (debounced).
+  useEffect(()=>{
+    if(skipNextPutRef.current){
+      // We just adopted server state above — don't immediately PUT
+      // it back. Reset the flag so the next genuine local change syncs.
+      skipNextPutRef.current = false;
+      return;
+    }
+    const id = window.setTimeout(()=>{
+      fetch(`/api/sync/${SYNC_KIND}`, {
+        method:'PUT',
+        headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({ value: state }),
+        credentials:'include',
+      })
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if(!data || !data.ok || !data.updated_at) return;
+          const serverAt = new Date(data.updated_at).getTime();
+          try { localStorage.setItem(SYNC_LAST_KEY, String(serverAt)); } catch(_){}
+        })
+        .catch(()=>{ /* swallow — local save already happened above */ });
+    }, SYNC_DEBOUNCE_MS);
+    return ()=> window.clearTimeout(id);
+  }, [state]);
+
   const playSound = useSound(state.settings.soundOn);
 
   const [filter, setFilter] = useState({ status:'active', project:'All', tag:'', q:'', sort:'smart' });

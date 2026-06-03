@@ -18,9 +18,13 @@ const ALLOWED_KINDS = new Set([
   "recipes",          // SavedRecipe[]
   "restaurants",      // Rating[]
   "shopping",         // ShoppingItem[]
-  "quests",           // Quest[]
+  "quests",           // Quest[]            (the simple shared "quest-list" sidebar lib)
   "music-artists",    // string[]
   "music-cities",     // string[]
+  "questlist",        // Full /quest-list iframe app state (tasks, XP, projects,
+                      // settings, etc.). Pushed/pulled directly from inside the
+                      // iframe at public/games/questlist/index.html — same origin
+                      // so the Auth.js session cookie rides along.
 ]);
 
 function badRequest(msg: string, status = 400) {
