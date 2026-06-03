@@ -59,6 +59,67 @@ const JOKES: Array<{ setup: string; punchline: string }> = [
   { setup: "how does the moon cut its hair?",             punchline: "eclipse it." },
   { setup: "what do you call cheese that isn't yours?",   punchline: "nacho cheese." },
   { setup: "I told my dog a joke about tails.",           punchline: "he didn't get the wag of it." },
+
+  // ── 50 more added per request — same flavor (punk / music / skull /
+  //    classic dad), kept clean (bad puns, not raunchy).
+
+  // More punk
+  { setup: "why did the punk bring a ladder to the show?",                 punchline: "he heard the bands were up-and-coming." },
+  { setup: "what's a punk's favorite vegetable?",                          punchline: "a mosh-room." },
+  { setup: "why was the mosh pit so quiet?",                               punchline: "someone brought a librarian." },
+  { setup: "why don't punks ever get cold?",                               punchline: "their hair stands on end." },
+  { setup: "why did the punk get a job at the bank?",                      punchline: "he loved the safety pins." },
+  { setup: "why don't punks play hide and seek?",                          punchline: "they refuse to conform." },
+  { setup: "what kind of pizza does a punk order?",                        punchline: "anti-pasta." },
+  { setup: "why was the punk band always early?",                          punchline: "they hated the establishment hours." },
+  { setup: "what did the studded belt say to the leather jacket?",         punchline: "we make quite a pair." },
+  { setup: "why did the punk's plant die?",                                punchline: "he refused to root for anything." },
+  { setup: "what do you call a punk with perfect attendance?",             punchline: "a contradiction." },
+  { setup: "why did the punk spray-paint every wall in town?",             punchline: "he was just trying to make a name for himself." },
+  { setup: "what's a punk's favorite math class?",                         punchline: "di-vision." },
+  { setup: "why did the punk go to therapy?",                              punchline: "mom said he had issues with authority." },
+  { setup: "why did the punk fail driver's ed?",                           punchline: "too many illegal moshes." },
+
+  // More music
+  { setup: "why did the music note get arrested?",                         punchline: "it was up to no treble." },
+  { setup: "why did the bass player bring a ladder?",                      punchline: "to reach the high notes." },
+  { setup: "what's a vampire's favorite key?",                             punchline: "B-flat." },
+  { setup: "why did the singer get locked out?",                           punchline: "she lost her keys." },
+  { setup: "why did the chord break up with the melody?",                  punchline: "things got too pitchy." },
+  { setup: "why was the metalhead at the library?",                        punchline: "he came for the riffs." },
+  { setup: "why was the bandleader holding a ruler?",                      punchline: "to measure the bars." },
+  { setup: "why did the orchestra split up?",                              punchline: "too much treble at home." },
+  { setup: "what did the album say to the speaker?",                       punchline: "you blow me away." },
+  { setup: "why don't songs ever lose arguments?",                         punchline: "they always have the last note." },
+  { setup: "what kind of music do drummers listen to?",                    punchline: "beats me." },
+  { setup: "what did the snare drum say to the kick drum?",                punchline: "I'll back you up." },
+
+  // More skull / skeleton
+  { setup: "how do skeletons start a band?",                               punchline: "they put out a bone-fide ad." },
+  { setup: "why don't skeletons gamble?",                                  punchline: "no skin in the game." },
+  { setup: "what did the skeleton order at the BBQ?",                      punchline: "spare ribs." },
+  { setup: "why was the skeleton bad at lying?",                           punchline: "he was completely transparent." },
+  { setup: "why did the skeleton skip the dance battle?",                  punchline: "he was bone-tired." },
+  { setup: "why don't skeletons mosh?",                                    punchline: "too many breakdowns." },
+  { setup: "what did the skeleton say at karaoke?",                        punchline: "I haven't got the heart for it." },
+  { setup: "why did the skeleton stay home from school?",                  punchline: "his heart wasn't in it." },
+  { setup: "what do skeletons say before dinner?",                         punchline: "bone appétit." },
+  { setup: "why don't skeletons get into fights?",                         punchline: "they always lose by a hair." },
+
+  // More classic dad
+  { setup: "why don't eggs tell jokes?",                                   punchline: "they'd crack each other up." },
+  { setup: "what did the ocean say to the shore?",                         punchline: "nothing. it just waved." },
+  { setup: "why don't scientists trust stairs?",                           punchline: "they're always up to something." },
+  { setup: "what's the best time to go to the dentist?",                   punchline: "tooth-hurty." },
+  { setup: "why don't lobsters share?",                                    punchline: "they're shellfish." },
+  { setup: "why did the calendar feel insecure?",                          punchline: "its days were numbered." },
+  { setup: "what's a tornado's favorite game?",                            punchline: "twister." },
+  { setup: "what do you call a sad strawberry?",                           punchline: "a blueberry." },
+  { setup: "why don't programmers like nature?",                           punchline: "too many bugs." },
+  { setup: "why did the picture go to jail?",                              punchline: "it was framed." },
+  { setup: "what kind of shoes do ninjas wear?",                           punchline: "sneakers." },
+  { setup: "what do you call a fish wearing a crown?",                     punchline: "a king-fish." },
+  { setup: "why did the cookie go to the doctor?",                         punchline: "it was feeling crummy." },
 ]
 
 // ─── Tuning ─────────────────────────────────────────────────────────────
