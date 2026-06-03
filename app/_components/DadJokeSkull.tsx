@@ -64,16 +64,19 @@ const JOKES: Array<{ setup: string; punchline: string }> = [
 // ─── Tuning ─────────────────────────────────────────────────────────────
 const HIDDEN_ON = ['/sign-in']
 
-const FIRST_APPEARANCE_MS = 25_000       // seconds after first page load
-const MIN_GAP_MS          = 5  * 60_000  // soonest the next one can fire
-const MAX_GAP_MS          = 12 * 60_000  // latest the next one will fire
+const FIRST_APPEARANCE_MS = 12_000       // seconds after page load before first peek
+const MIN_GAP_MS          = 5  * 60_000  // soonest the next one can fire (in-session)
+const MAX_GAP_MS          = 12 * 60_000  // latest the next one will fire (in-session)
 const ENTER_ANIM_MS       = 600
 const SETUP_HOLD_MS       = 4_800        // time on screen during "talking"
 const LAUGH_HOLD_MS       = 5_200        // time on screen during "laughing"
 const LEAVE_ANIM_MS       = 500
 const TYPEWRITER_MS_PER_CHAR = 28
 
-const STORAGE_LAST_SHOWN = 'rr.skull.lastShown'
+// Test escape hatch — append ?skull=now to any URL to force the skull
+// to appear ~500ms after page load instead of waiting the normal delay.
+const TEST_QUERY_PARAM = 'skull'
+const TEST_QUERY_VALUE = 'now'
 
 type Side = 'left' | 'right'
 type Phase = 'hidden' | 'entering' | 'talking' | 'laughing' | 'leaving'
@@ -81,6 +84,19 @@ type Phase = 'hidden' | 'entering' | 'talking' | 'laughing' | 'leaving'
 export default function DadJokeSkull() {
   const pathname = usePathname() ?? ''
   const hiddenOnPath = HIDDEN_ON.some((p) => pathname.startsWith(p))
+  // Read the test query param straight off window.location. Using
+  // Next's useSearchParams() hook here would propagate dynamic-rendering
+  // requirements through the root layout into every page on the site,
+  // killing static generation for pages that opt into it. window-read
+  // is fine because this is a client component and the value is only
+  // used inside useEffect (after mount, so SSR doesn't see it).
+  const [forceShow, setForceShow] = useState(false)
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search)
+      setForceShow(params.get(TEST_QUERY_PARAM) === TEST_QUERY_VALUE)
+    } catch { /* ignore */ }
+  }, [pathname])
 
   const [phase, setPhase] = useState<Phase>('hidden')
   const [side, setSide] = useState<Side>('right')
@@ -129,7 +145,6 @@ export default function DadJokeSkull() {
     setJoke(pickJoke())
     setSide(Math.random() > 0.5 ? 'left' : 'right')
     setPhase('entering')
-    try { window.localStorage.setItem(STORAGE_LAST_SHOWN, String(Date.now())) } catch { /* ignore */ }
 
     later(() => setPhase('talking'),  ENTER_ANIM_MS)
     later(() => setPhase('laughing'), ENTER_ANIM_MS + SETUP_HOLD_MS)
@@ -163,27 +178,24 @@ export default function DadJokeSkull() {
     })
   }, [clearTimers, later, scheduleNext])
 
-  // First-appearance scheduler
+  // First-appearance scheduler. Simple per-page-load timer: every fresh
+  // page load fires after FIRST_APPEARANCE_MS regardless of when the
+  // skull last appeared. (Earlier versions gated this on a localStorage
+  // timestamp to prevent multi-tab lockstep firing, but the gating made
+  // single-tab use feel broken — load page, see skull at 12s, reload,
+  // wait 5+ min for next appearance, conclude the feature is broken.
+  // In-session recurrence still uses MIN_GAP/MAX_GAP via scheduleNext.)
+  //
+  // Test escape hatch: ?skull=now fires after 500ms for verification.
   useEffect(() => {
     if (hiddenOnPath) return
-    let initialDelay = FIRST_APPEARANCE_MS
-    try {
-      const last = parseInt(window.localStorage.getItem(STORAGE_LAST_SHOWN) ?? '0', 10)
-      if (last) {
-        const sinceLast = Date.now() - last
-        if (sinceLast < MIN_GAP_MS) {
-          // Just appeared on another tab / page load — wait out the gap
-          // plus a randomized half-minute so two tabs don't fire in lockstep.
-          initialDelay = MIN_GAP_MS - sinceLast + 30_000 + Math.random() * 30_000
-        }
-      }
-    } catch { /* localStorage unavailable — fall back to default */ }
+    const initialDelay = forceShow ? 500 : FIRST_APPEARANCE_MS
     const id = window.setTimeout(startAppearance, initialDelay)
     return () => {
       window.clearTimeout(id)
       clearTimers()
     }
-  }, [hiddenOnPath, startAppearance, clearTimers])
+  }, [hiddenOnPath, forceShow, startAppearance, clearTimers])
 
   if (hiddenOnPath || phase === 'hidden' || !joke) return null
 
