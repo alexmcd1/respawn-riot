@@ -600,6 +600,18 @@ function App(){
   const SYNC_DEBOUNCE_MS = 900;
   const skipNextPutRef = useRef(false);
 
+  // Helper — does the local state appear to have meaningful user data
+  // beyond DEFAULT_STATE? Default has totalXP=0, exactly 3 demo tasks,
+  // and 4 default projects ('Inbox','Work','Personal','Learning'). Any
+  // deviation = the user has actually used this device.
+  function looksTouched(s){
+    if(!s) return false;
+    const xp = s.player && typeof s.player.totalXP === 'number' ? s.player.totalXP : 0;
+    const taskCount = Array.isArray(s.tasks) ? s.tasks.length : 0;
+    const projCount = Array.isArray(s.projects) ? s.projects.length : 0;
+    return xp > 0 || taskCount > 3 || projCount > 4;
+  }
+
   // Pull from cloud on mount.
   useEffect(()=>{
     let cancelled = false;
@@ -610,14 +622,57 @@ function App(){
         const serverAt = data.updated_at ? new Date(data.updated_at).getTime() : 0;
         let localAt = 0;
         try { localAt = parseInt(localStorage.getItem(SYNC_LAST_KEY) || '0', 10) || 0; } catch(_){}
-        // Adopt server iff strictly newer than what we've already
-        // acknowledged. (localAt = 0 on first sync ever for this
-        // device — any server data wins.)
-        if(serverAt > localAt){
+
+        // Re-read local state from localStorage (instead of trusting
+        // closed-over React state) — sturdier against effect ordering.
+        let localState = null;
+        try { localState = JSON.parse(localStorage.getItem('questlist.v1') || 'null'); } catch(_){}
+        const localTouched = looksTouched(localState);
+
+        // === SAFETY: when to adopt server state ===
+        //
+        //   (a) Subsequent syncs (localAt > 0): trust timestamps — adopt
+        //       if server is strictly newer than what we last
+        //       acknowledged.
+        //
+        //   (b) Very first sync on this device (localAt === 0): only
+        //       adopt if local state is UNTOUCHED. If the user has
+        //       built up tasks here before signing in, NEVER auto-
+        //       replace them — the next state-change PUT will push
+        //       their data up and become the new server baseline.
+        //
+        // The original v1 of this code skipped check (b) and unconditionally
+        // adopted on first sync, which silently nuked anyone whose local
+        // state predated their first sign-in. That's the bug that ate
+        // someone's tasks. Don't do it again.
+        const hasPriorSync = localAt > 0;
+        const shouldAdopt = hasPriorSync
+          ? serverAt > localAt
+          : !localTouched;
+
+        if(shouldAdopt){
+          // Belt-and-suspenders: snapshot the about-to-be-replaced local
+          // state to a recovery key so the user has a hand-restore path
+          // via dev tools if this adoption was still wrong. One slot —
+          // each adoption overwrites it.
+          try {
+            if(localState){
+              localStorage.setItem('questlist.v1.preSync', JSON.stringify({
+                savedAt: Date.now(),
+                reason: hasPriorSync ? 'newer-server-state' : 'fresh-device-adopt',
+                state: localState,
+              }));
+            }
+          } catch(_){}
           skipNextPutRef.current = true; // don't bounce server data back as a PUT
           setState({...DEFAULT_STATE, ...data.value, gmail: migrateGmailState(data.value.gmail)});
           try { localStorage.setItem(SYNC_LAST_KEY, String(serverAt)); } catch(_){}
         }
+        // If we DIDN'T adopt (local was touched + no prior sync), the
+        // debounced PUT effect below will push our local state up
+        // shortly, claiming this device's data as the new server
+        // baseline. That's the desired behavior for "I used the app
+        // offline, now I'm signing in for the first time."
       })
       .catch(()=>{ /* signed out / offline / network err — local-only mode */ });
     return ()=>{ cancelled = true; };
