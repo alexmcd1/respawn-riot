@@ -5,8 +5,9 @@ import { auth } from "../../../auth";
 //
 // Takes a free-form pasted recipe (potentially messy — title lines,
 // "Ingredients:" / "Directions:" headers, footer metadata, numbered or
-// bulleted steps, prose blocks, ad copy, you name it) and asks an LLM
-// to extract it into the same shape /api/parse-recipe returns.
+// bulleted steps, prose blocks, ad copy, you name it) and asks Google
+// Gemini Flash to extract it into the same shape /api/parse-recipe
+// returns.
 //
 // Why an LLM instead of regex: the heuristic in RecipeParser fails the
 // moment the pasted text has anything other than ingredient lines on
@@ -14,24 +15,23 @@ import { auth } from "../../../auth";
 // fallback rules; each one broke a different recipe. An LLM handles
 // the variation natively.
 //
-// Why Groq: free tier, no credit card, no regional restrictions
-// (Google AI Studio has both 18+ verification + country gating).
-// console.groq.com → API Keys → Create. Their endpoint is
-// OpenAI-compatible so swapping to OpenAI / Mistral / Cerebras later
-// is a one-line change.
+// Why Gemini: free tier (Flash: 15 RPM / 1,500 requests per day) is
+// generous, no credit card required. aistudio.google.com gives an
+// API key with one click after age verification.
 //
 // Body:   { text: string }
 // Result: { ok: true, recipe: ParsedRecipe } or { ok: false, error }
 //
 // Requires a session (must be signed in) so anonymous traffic can't
-// burn through the free-tier rate limit. Also requires GROQ_API_KEY
-// env var — without it the route returns a friendly error and the
+// burn through the free-tier quota. Also requires GOOGLE_API_KEY env
+// var — without it the route returns a friendly error and the
 // frontend falls back to the heuristic parser.
 
 export const dynamic = "force-dynamic";
 
-const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
-const MODEL = "llama-3.3-70b-versatile"; // Groq's flagship reasoning model
+const GEMINI_MODEL = "gemini-2.0-flash";
+const GEMINI_API_URL =
+  `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 const MAX_INPUT_CHARS = 12_000;
 const MAX_OUTPUT_TOKENS = 2_048;
 
@@ -69,52 +69,51 @@ Rules:
 
 Always call submit_recipe exactly once. Never reply with prose.`;
 
-// Groq uses the OpenAI tool-calling schema (which uses standard
-// JSON Schema property types — lowercase, unlike Gemini's
-// uppercase OpenAPI dialect).
-const SUBMIT_RECIPE_TOOL = {
-  type: "function" as const,
-  function: {
-    name: "submit_recipe",
-    description:
-      "Submit the cleaned, structured recipe extracted from the user's pasted text.",
-    parameters: {
-      type: "object",
-      properties: {
-        name: {
-          type: "string",
-          description: "The recipe's title/name. Required.",
-        },
-        yield: {
-          type: "string",
-          description:
-            "Servings or yield as written, e.g. '5 servings' or 'Makes 24 cookies'. Optional.",
-        },
-        ingredients: {
-          type: "array",
-          items: { type: "string" },
-          description:
-            "Each ingredient as ONE string with quantity + unit + item, e.g. '4 boneless skinless chicken breasts'. Do NOT include section headers.",
-        },
-        instructions: {
-          type: "array",
-          items: { type: "string" },
-          description:
-            "Each step as ONE string with the leading number STRIPPED, e.g. 'Preheat the oven to 375°F.'. Do NOT include section headers or meta footers.",
-        },
-        totalTimeMinutes: {
-          type: "number",
-          description:
-            "Total cooking time in minutes if mentioned in the text. Optional.",
-        },
-        caloriesPerServing: {
-          type: "number",
-          description:
-            "Calories per serving if mentioned in the text. Optional.",
-        },
+// Gemini's function-calling schema follows the OpenAPI subset they
+// document at https://ai.google.dev/api/caching#Schema . Strict-mode
+// types: STRING / NUMBER / INTEGER / BOOLEAN / ARRAY / OBJECT
+// (UPPERCASED — the lowercase JSON-Schema spelling is silently
+// ignored and you get a 400 with a confusing error).
+const SUBMIT_RECIPE_FUNCTION = {
+  name: "submit_recipe",
+  description:
+    "Submit the cleaned, structured recipe extracted from the user's pasted text.",
+  parameters: {
+    type: "OBJECT",
+    properties: {
+      name: {
+        type: "STRING",
+        description: "The recipe's title/name. Required.",
       },
-      required: ["name", "ingredients", "instructions"],
+      yield: {
+        type: "STRING",
+        description:
+          "Servings or yield as written, e.g. '5 servings' or 'Makes 24 cookies'. Optional.",
+      },
+      ingredients: {
+        type: "ARRAY",
+        items: { type: "STRING" },
+        description:
+          "Each ingredient as ONE string with quantity + unit + item, e.g. '4 boneless skinless chicken breasts'. Do NOT include section headers.",
+      },
+      instructions: {
+        type: "ARRAY",
+        items: { type: "STRING" },
+        description:
+          "Each step as ONE string with the leading number STRIPPED, e.g. 'Preheat the oven to 375°F.'. Do NOT include section headers or meta footers.",
+      },
+      totalTimeMinutes: {
+        type: "NUMBER",
+        description:
+          "Total cooking time in minutes if mentioned in the text. Optional.",
+      },
+      caloriesPerServing: {
+        type: "NUMBER",
+        description:
+          "Calories per serving if mentioned in the text. Optional.",
+      },
     },
+    required: ["name", "ingredients", "instructions"],
   },
 };
 
@@ -123,8 +122,9 @@ function badRequest(msg: string, status = 400) {
 }
 
 export async function POST(request: Request) {
-  // ── Auth: must be signed in. Free-tier quotas are real (Groq Llama
-  //    3.3 70B: 30 RPM, 6000 RPD on free tier) — block anonymous abuse.
+  // ── Auth: must be signed in. Free-tier quotas are real (Flash:
+  //    15 RPM / 1500 req/day) and we don't want anonymous traffic
+  //    burning through them.
   const session = await auth();
   if (!session?.user?.id) {
     return badRequest("Sign in to use AI cleanup.", 401);
@@ -149,43 +149,51 @@ export async function POST(request: Request) {
   }
 
   // ── Provider config
-  const apiKey = process.env.GROQ_API_KEY;
+  const apiKey = process.env.GOOGLE_API_KEY;
   if (!apiKey) {
     return NextResponse.json({
       ok: false,
       error:
-        "AI cleanup isn't configured. Add GROQ_API_KEY to Vercel env vars (get a free key at console.groq.com → API Keys) and redeploy. The basic parse-it-locally button still works in the meantime.",
+        "AI cleanup isn't configured. Add GOOGLE_API_KEY to Vercel env vars (get a free key at aistudio.google.com → Get API key) and redeploy. The basic parse-it-locally button still works in the meantime.",
     });
   }
 
-  // ── Groq call (OpenAI-compatible API)
+  // ── Gemini call
   //
-  // tool_choice with type:"function" + a specific function name forces
-  // the model to call exactly that function. This is the OpenAI
-  // equivalent of Anthropic's tool_choice or Gemini's
-  // toolConfig.functionCallingConfig — reliable structured JSON
-  // without a fragile "respond in JSON" prompt.
+  // tool_config.function_calling_config.mode = "ANY" forces the model
+  // to call a function instead of replying with prose. Combined with
+  // a single allowed function name, this is Gemini's equivalent of
+  // OpenAI's tool_choice — reliable structured output without a
+  // fragile "respond in JSON" prompt.
   let res: Response;
   try {
-    res = await fetch(GROQ_API_URL, {
+    res = await fetch(GEMINI_API_URL, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${apiKey}`,
+        "x-goog-api-key": apiKey,
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: MODEL,
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: text },
-        ],
-        tools: [SUBMIT_RECIPE_TOOL],
-        tool_choice: {
-          type: "function",
-          function: { name: "submit_recipe" },
+        systemInstruction: {
+          parts: [{ text: SYSTEM_PROMPT }],
         },
-        max_tokens: MAX_OUTPUT_TOKENS,
-        temperature: 0.2,
+        contents: [
+          {
+            role: "user",
+            parts: [{ text }],
+          },
+        ],
+        tools: [{ functionDeclarations: [SUBMIT_RECIPE_FUNCTION] }],
+        toolConfig: {
+          functionCallingConfig: {
+            mode: "ANY",
+            allowedFunctionNames: ["submit_recipe"],
+          },
+        },
+        generationConfig: {
+          maxOutputTokens: MAX_OUTPUT_TOKENS,
+          temperature: 0.2,
+        },
       }),
     });
   } catch (err) {
@@ -199,7 +207,7 @@ export async function POST(request: Request) {
   if (!res.ok) {
     const detail = await res.text().catch(() => "<no body>");
     console.error(
-      `[clean-recipe] Groq HTTP ${res.status} — ${detail.slice(0, 400)}`
+      `[clean-recipe] Gemini HTTP ${res.status} — ${detail.slice(0, 400)}`
     );
     const friendly =
       res.status === 429
@@ -208,19 +216,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: friendly });
   }
 
-  // ── Parse Groq response — pull the forced tool_call.
-  type GroqResponse = {
-    choices?: Array<{
-      message?: {
-        tool_calls?: Array<{
-          function?: { name?: string; arguments?: string };
-        }>;
+  // ── Parse Gemini response — find the functionCall block we forced.
+  type GeminiResponse = {
+    candidates?: Array<{
+      content?: {
+        parts?: Array<
+          | { text: string }
+          | { functionCall: { name: string; args: unknown } }
+        >;
       };
+      finishReason?: string;
     }>;
+    promptFeedback?: unknown;
   };
-  let data: GroqResponse;
+  let data: GeminiResponse;
   try {
-    data = (await res.json()) as GroqResponse;
+    data = (await res.json()) as GeminiResponse;
   } catch {
     return NextResponse.json({
       ok: false,
@@ -228,26 +239,22 @@ export async function POST(request: Request) {
     });
   }
 
-  const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
-  if (toolCall?.function?.name !== "submit_recipe" || !toolCall.function.arguments) {
+  const parts = data.candidates?.[0]?.content?.parts ?? [];
+  const fc = parts.find(
+    (p): p is { functionCall: { name: string; args: unknown } } =>
+      "functionCall" in p
+  );
+  if (!fc || fc.functionCall?.name !== "submit_recipe") {
     return NextResponse.json({
       ok: false,
       error: "AI didn't return structured data. Try again.",
     });
   }
 
-  // OpenAI-compatible APIs return tool arguments as a JSON STRING
-  // (Anthropic returns a parsed object). Parse it here.
-  let args: Partial<CleanedRecipe>;
-  try {
-    args = JSON.parse(toolCall.function.arguments) as Partial<CleanedRecipe>;
-  } catch {
-    return NextResponse.json({
-      ok: false,
-      error: "AI returned malformed JSON. Try again.",
-    });
-  }
-
+  // ── Validate the function args match our expected shape.
+  // Gemini returns args as a parsed object (unlike OpenAI-style APIs
+  // which return a JSON string).
+  const args = fc.functionCall.args as Partial<CleanedRecipe> | null;
   if (
     !args ||
     !Array.isArray(args.ingredients) ||
