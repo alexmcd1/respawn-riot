@@ -5,8 +5,9 @@ import { auth } from "../../../auth";
 //
 // Takes a free-form pasted recipe (potentially messy — title lines,
 // "Ingredients:" / "Directions:" headers, footer metadata, numbered or
-// bulleted steps, prose blocks, ad copy, you name it) and asks Claude
-// Haiku to extract it into the same shape /api/parse-recipe returns.
+// bulleted steps, prose blocks, ad copy, you name it) and asks Google
+// Gemini Flash to extract it into the same shape /api/parse-recipe
+// returns.
 //
 // Why an LLM instead of regex: the heuristic in RecipeParser fails the
 // moment the pasted text has anything other than ingredient lines on
@@ -14,20 +15,25 @@ import { auth } from "../../../auth";
 // fallback rules; each one broke a different recipe. An LLM handles
 // the variation natively.
 //
+// Why Gemini: free tier (15 RPM / 1,500 requests per day on Flash) is
+// more than enough for personal use. No credit card required —
+// aistudio.google.com gives you an API key with one click.
+//
 // Body:   { text: string }
 // Result: { ok: true, recipe: ParsedRecipe } or { ok: false, error }
 //
-// Requires a session (must be signed in). Also requires the
-// ANTHROPIC_API_KEY env var — without it the route returns
-// { ok: false, error: "AI cleanup not configured" } and the frontend
-// falls back to the heuristic.
+// Requires a session (must be signed in) so anonymous traffic can't
+// burn through the free-tier quota. Also requires GOOGLE_API_KEY env
+// var — without it the route returns a friendly error and the
+// frontend falls back to the heuristic parser.
 
 export const dynamic = "force-dynamic";
 
-const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
-const MODEL = "claude-haiku-4-5";
-const MAX_INPUT_CHARS = 12_000; // a generous-but-finite cap on pasted text
-const MAX_TOKENS = 2_048;
+const GEMINI_MODEL = "gemini-2.0-flash";
+const GEMINI_API_URL =
+  `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+const MAX_INPUT_CHARS = 12_000;
+const MAX_OUTPUT_TOKENS = 2_048;
 
 type CleanedRecipe = {
   name?: string;
@@ -38,9 +44,9 @@ type CleanedRecipe = {
   caloriesPerServing?: number;
 };
 
-// System prompt is stable across calls — mark it for prompt caching so
-// repeated cleanups (same user typing several recipes in a session)
-// only bill the user text token-count, not the instructions.
+// System instructions — stable across calls. (Gemini's free tier
+// doesn't include prompt-caching like Anthropic's, but the system
+// instructions are small enough that this doesn't matter at our scale.)
 const SYSTEM_PROMPT = `You extract structured recipe data from messy pasted text.
 
 The text may contain any combination of:
@@ -52,7 +58,7 @@ The text may contain any combination of:
 - Numbered or bulleted steps. The leading "1." / "2." / "•" should be STRIPPED.
 - A footer with cooking time, servings, calories, nutrition facts.
 
-Your job: call the submit_recipe tool with the cleaned data.
+Your job: call the submit_recipe function with the cleaned data.
 
 Rules:
 1. Do NOT include section headers ("Ingredients:", "Directions:", etc.) as ingredients or steps.
@@ -66,39 +72,48 @@ Rules:
 
 Always call submit_recipe exactly once. Never reply with prose.`;
 
-const SUBMIT_RECIPE_TOOL = {
+// Gemini's function-calling schema follows the OpenAPI subset they
+// document at https://ai.google.dev/api/caching#Schema . Strict-mode
+// types: STRING / NUMBER / INTEGER / BOOLEAN / ARRAY / OBJECT
+// (uppercased — the lowercase JSON-Schema spelling is silently
+// ignored and you get a 400 with a confusing error).
+const SUBMIT_RECIPE_FUNCTION = {
   name: "submit_recipe",
-  description: "Submit the cleaned, structured recipe extracted from the user's pasted text.",
-  input_schema: {
-    type: "object",
+  description:
+    "Submit the cleaned, structured recipe extracted from the user's pasted text.",
+  parameters: {
+    type: "OBJECT",
     properties: {
       name: {
-        type: "string",
+        type: "STRING",
         description: "The recipe's title/name. Required.",
       },
       yield: {
-        type: "string",
-        description: "Servings or yield as written, e.g. '5 servings' or 'Makes 24 cookies'. Optional.",
+        type: "STRING",
+        description:
+          "Servings or yield as written, e.g. '5 servings' or 'Makes 24 cookies'. Optional.",
       },
       ingredients: {
-        type: "array",
-        items: { type: "string" },
+        type: "ARRAY",
+        items: { type: "STRING" },
         description:
           "Each ingredient as ONE string with quantity + unit + item, e.g. '4 boneless skinless chicken breasts'. Do NOT include section headers.",
       },
       instructions: {
-        type: "array",
-        items: { type: "string" },
+        type: "ARRAY",
+        items: { type: "STRING" },
         description:
           "Each step as ONE string with the leading number STRIPPED, e.g. 'Preheat the oven to 375°F.'. Do NOT include section headers or meta footers.",
       },
       totalTimeMinutes: {
-        type: "number",
-        description: "Total cooking time in minutes if mentioned in the text. Optional.",
+        type: "NUMBER",
+        description:
+          "Total cooking time in minutes if mentioned in the text. Optional.",
       },
       caloriesPerServing: {
-        type: "number",
-        description: "Calories per serving if mentioned in the text. Optional.",
+        type: "NUMBER",
+        description:
+          "Calories per serving if mentioned in the text. Optional.",
       },
     },
     required: ["name", "ingredients", "instructions"],
@@ -110,8 +125,9 @@ function badRequest(msg: string, status = 400) {
 }
 
 export async function POST(request: Request) {
-  // ── Auth: must be signed in. AI calls cost real money, so we don't
-  //    want anonymous abuse.
+  // ── Auth: must be signed in. Free-tier quotas are real (Flash:
+  //    15 RPM / 1500 req/day) and we don't want anonymous traffic
+  //    burning through them.
   const session = await auth();
   if (!session?.user?.id) {
     return badRequest("Sign in to use AI cleanup.", 401);
@@ -136,43 +152,51 @@ export async function POST(request: Request) {
   }
 
   // ── Provider config
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.GOOGLE_API_KEY;
   if (!apiKey) {
     return NextResponse.json({
       ok: false,
       error:
-        "AI cleanup isn't configured. Add ANTHROPIC_API_KEY to Vercel env vars and redeploy. The basic parse-it-locally button still works in the meantime.",
+        "AI cleanup isn't configured. Add GOOGLE_API_KEY to Vercel env vars (get a free key at aistudio.google.com → Get API key) and redeploy. The basic parse-it-locally button still works in the meantime.",
     });
   }
 
-  // ── Anthropic call
+  // ── Gemini call
+  //
+  // tool_config.function_calling_config.mode = "ANY" forces the model
+  // to call a function instead of replying with prose. Combined with
+  // a single allowed function name, this is Gemini's equivalent of
+  // Anthropic's tool_choice: { type: "tool", name: "..." } — reliable
+  // structured output without a fragile "respond in JSON" prompt.
   let res: Response;
   try {
-    res = await fetch(ANTHROPIC_API_URL, {
+    res = await fetch(GEMINI_API_URL, {
       method: "POST",
       headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
+        "x-goog-api-key": apiKey,
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: MODEL,
-        max_tokens: MAX_TOKENS,
-        // Tool-use forced: model MUST call submit_recipe — no other
-        // output paths. This is what gets us reliable structured JSON
-        // without a fragile "please respond in JSON" instruction.
-        tools: [SUBMIT_RECIPE_TOOL],
-        tool_choice: { type: "tool", name: "submit_recipe" },
-        // System prompt marked for prompt caching — the user-visible
-        // recipe text varies, but the instructions are reused.
-        system: [
+        systemInstruction: {
+          parts: [{ text: SYSTEM_PROMPT }],
+        },
+        contents: [
           {
-            type: "text",
-            text: SYSTEM_PROMPT,
-            cache_control: { type: "ephemeral" },
+            role: "user",
+            parts: [{ text }],
           },
         ],
-        messages: [{ role: "user", content: text }],
+        tools: [{ functionDeclarations: [SUBMIT_RECIPE_FUNCTION] }],
+        toolConfig: {
+          functionCallingConfig: {
+            mode: "ANY",
+            allowedFunctionNames: ["submit_recipe"],
+          },
+        },
+        generationConfig: {
+          maxOutputTokens: MAX_OUTPUT_TOKENS,
+          temperature: 0.2,
+        },
       }),
     });
   } catch (err) {
@@ -186,24 +210,32 @@ export async function POST(request: Request) {
   if (!res.ok) {
     const detail = await res.text().catch(() => "<no body>");
     console.error(
-      `[clean-recipe] Anthropic HTTP ${res.status} — ${detail.slice(0, 400)}`
+      `[clean-recipe] Gemini HTTP ${res.status} — ${detail.slice(0, 400)}`
     );
-    return NextResponse.json({
-      ok: false,
-      error: `AI provider returned ${res.status}. Try again or use the basic parser.`,
-    });
+    // 429 = quota hit; surface a useful message
+    const friendly =
+      res.status === 429
+        ? "AI quota hit for the day. Try again later or use the basic parser."
+        : `AI provider returned ${res.status}. Try again or use the basic parser.`;
+    return NextResponse.json({ ok: false, error: friendly });
   }
 
-  // ── Parse Anthropic response — grab the tool_use block we forced.
-  type AnthropicResponse = {
-    content?: Array<
-      | { type: "text"; text: string }
-      | { type: "tool_use"; name: string; input: unknown }
-    >;
+  // ── Parse Gemini response — find the functionCall block we forced.
+  type GeminiResponse = {
+    candidates?: Array<{
+      content?: {
+        parts?: Array<
+          | { text: string }
+          | { functionCall: { name: string; args: unknown } }
+        >;
+      };
+      finishReason?: string;
+    }>;
+    promptFeedback?: unknown;
   };
-  let data: AnthropicResponse;
+  let data: GeminiResponse;
   try {
-    data = (await res.json()) as AnthropicResponse;
+    data = (await res.json()) as GeminiResponse;
   } catch {
     return NextResponse.json({
       ok: false,
@@ -211,23 +243,24 @@ export async function POST(request: Request) {
     });
   }
 
-  const toolUse = (data.content ?? []).find(
-    (b): b is { type: "tool_use"; name: string; input: unknown } =>
-      b.type === "tool_use" && b.name === "submit_recipe"
+  const parts = data.candidates?.[0]?.content?.parts ?? [];
+  const fc = parts.find(
+    (p): p is { functionCall: { name: string; args: unknown } } =>
+      "functionCall" in p
   );
-  if (!toolUse) {
+  if (!fc || fc.functionCall?.name !== "submit_recipe") {
     return NextResponse.json({
       ok: false,
       error: "AI didn't return structured data. Try again.",
     });
   }
 
-  // ── Validate the tool input matches our expected shape.
-  const input = toolUse.input as Partial<CleanedRecipe> | null;
+  // ── Validate the function args match our expected shape.
+  const args = fc.functionCall.args as Partial<CleanedRecipe> | null;
   if (
-    !input ||
-    !Array.isArray(input.ingredients) ||
-    !Array.isArray(input.instructions)
+    !args ||
+    !Array.isArray(args.ingredients) ||
+    !Array.isArray(args.instructions)
   ) {
     return NextResponse.json({
       ok: false,
@@ -236,23 +269,23 @@ export async function POST(request: Request) {
   }
 
   const recipe = {
-    name: typeof input.name === "string" ? input.name.trim() : "Pasted recipe",
-    yield: typeof input.yield === "string" ? input.yield.trim() : undefined,
-    ingredients: input.ingredients
+    name: typeof args.name === "string" ? args.name.trim() : "Pasted recipe",
+    yield: typeof args.yield === "string" ? args.yield.trim() : undefined,
+    ingredients: args.ingredients
       .filter((s): s is string => typeof s === "string")
       .map((s) => s.trim())
       .filter(Boolean),
-    instructions: input.instructions
+    instructions: args.instructions
       .filter((s): s is string => typeof s === "string")
       .map((s) => s.trim())
       .filter(Boolean),
     totalTimeMinutes:
-      typeof input.totalTimeMinutes === "number"
-        ? input.totalTimeMinutes
+      typeof args.totalTimeMinutes === "number"
+        ? args.totalTimeMinutes
         : undefined,
     caloriesPerServing:
-      typeof input.caloriesPerServing === "number"
-        ? input.caloriesPerServing
+      typeof args.caloriesPerServing === "number"
+        ? args.caloriesPerServing
         : undefined,
   };
 
