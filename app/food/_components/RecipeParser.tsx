@@ -62,6 +62,51 @@ export default function RecipeParser() {
     setScale(1)
   }
 
+  // AI cleanup — calls /api/clean-recipe (Claude Haiku w/ tool use)
+  // which handles the messy cases the heuristic chokes on (title lines,
+  // section headers, footer metadata, prose between sections, etc.).
+  // Falls back to the local heuristic on any failure so the button is
+  // never a dead-end.
+  async function aiCleanPasted() {
+    setError('')
+    const text = pasted.trim()
+    if (!text) {
+      setError('Paste a recipe first')
+      return
+    }
+    setLoading(true)
+    try {
+      const res = await fetch('/api/clean-recipe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!data.ok) {
+        // Show the AI's error message AND silently run the heuristic
+        // so the user always lands on something usable. The error
+        // surface tells them why AI didn't run; the recipe section
+        // shows the best-effort heuristic result.
+        setError(
+          typeof data.error === 'string'
+            ? `${data.error} Showing basic parse below.`
+            : 'AI cleanup unavailable — showing basic parse below.'
+        )
+        setRecipe(parsePastedRecipe(text))
+        setScale(1)
+        return
+      }
+      setRecipe(data.recipe)
+      setScale(1)
+    } catch {
+      setError('Network error — showing basic parse below.')
+      setRecipe(parsePastedRecipe(text))
+      setScale(1)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   function clearAll() {
     setRecipe(null)
     setError('')
@@ -136,13 +181,26 @@ export default function RecipeParser() {
             rows={8}
             className="w-full rounded-xl border border-white/15 bg-black/40 px-4 py-3 text-sm text-white outline-none placeholder:text-white/35 focus:border-red-400"
           />
-          <div className="flex gap-2">
+          {/* Primary: AI cleanup. Secondary: heuristic parse (the
+              old behavior, kept as a no-cost / no-auth fallback for
+              well-formed pastes). Clear lives on the right. */}
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={aiCleanPasted}
+              disabled={loading}
+              className="flex-1 min-w-[200px] rounded-xl bg-gradient-to-r from-fuchsia-500 to-red-500 px-6 py-3 font-display text-sm tracking-[0.2em] text-white shadow-[0_0_24px_-6px_rgba(255,46,179,0.6)] transition hover:brightness-110 disabled:opacity-60"
+            >
+              {loading ? 'CLEANING…' : '✨ CLEAN WITH AI'}
+            </button>
             <button
               type="button"
               onClick={parsePasted}
-              className="flex-1 rounded-xl bg-red-500 px-6 py-3 font-display text-sm tracking-[0.2em] text-white transition hover:bg-red-400"
+              disabled={loading}
+              title="Skip AI and use the simple line-splitter (good for already-clean text)."
+              className="rounded-xl border border-white/20 bg-black/30 px-4 py-3 font-display text-xs tracking-[0.2em] text-white/70 hover:border-white/40 hover:bg-white/5 disabled:opacity-60"
             >
-              BREAK IT DOWN
+              BASIC PARSE
             </button>
             <button
               type="button"
@@ -150,11 +208,15 @@ export default function RecipeParser() {
                 setPasted('')
                 clearAll()
               }}
-              className="rounded-xl border border-white/20 px-4 py-3 font-display text-sm tracking-[0.2em] text-white/70 hover:bg-white/5"
+              disabled={loading}
+              className="rounded-xl border border-white/20 px-4 py-3 font-display text-xs tracking-[0.2em] text-white/70 hover:bg-white/5 disabled:opacity-60"
             >
               CLEAR
             </button>
           </div>
+          <p className="font-mono text-[10px] tracking-[0.2em] text-white/35">
+            ✨ AI handles titles, headers, footers, and messy formatting. Sign-in required.
+          </p>
         </div>
       )}
 
