@@ -29,7 +29,13 @@ import { auth } from "../../../auth";
 
 export const dynamic = "force-dynamic";
 
-const GEMINI_MODEL = "gemini-2.0-flash";
+// gemini-1.5-flash has the most reliable free-tier limits across
+// brand-new API keys (15 RPM / 1M TPM / 1500 RPD, no preview-tier
+// gating). The 2.x line technically has higher published limits but
+// new accounts sometimes get throttled to a low "preview" cap. Switch
+// via the optional GEMINI_MODEL env var if you want to test a newer
+// model after you've established account history.
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-1.5-flash";
 const GEMINI_API_URL =
   `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 const MAX_INPUT_CHARS = 12_000;
@@ -206,12 +212,14 @@ export async function POST(request: Request) {
 
   if (!res.ok) {
     const detail = await res.text().catch(() => "<no body>");
+    // Full body in logs — the previous 400-char truncation cut error
+    // messages mid-sentence and made debugging quota issues harder.
     console.error(
-      `[clean-recipe] Gemini HTTP ${res.status} — ${detail.slice(0, 400)}`
+      `[clean-recipe] Gemini HTTP ${res.status} (model=${GEMINI_MODEL}) — ${detail.slice(0, 2000)}`
     );
     const friendly =
       res.status === 429
-        ? "AI quota hit for the day. Try again later or use the basic parser."
+        ? `AI quota hit on model "${GEMINI_MODEL}". Either wait a minute (per-minute cap) or try a different model — set GEMINI_MODEL in Vercel env vars (gemini-1.5-flash, gemini-2.0-flash, gemini-2.5-flash-lite all support free tier). Check your usage at https://ai.dev/rate-limit.`
         : `AI provider returned ${res.status}. Try again or use the basic parser.`;
     return NextResponse.json({ ok: false, error: friendly });
   }
