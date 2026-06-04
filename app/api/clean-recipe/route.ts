@@ -29,24 +29,37 @@ import { auth } from "../../../auth";
 
 export const dynamic = "force-dynamic";
 
-// Default to gemini-flash-lite-latest — a moving alias that always
-// points to Google's current "high-volume free tier" model. The
-// regular "flash" line keeps slapping new accounts with low
-// probationary quotas (we hit 429 on both 2.0-flash and 2.5-flash
-// on a brand-new key); the lite line is explicitly tuned for free
-// users and uses the latest-alias so future Google model rotations
-// don't break us.
+// Default to gemini-3.1-flash-lite — chosen after the user shared
+// their actual ai.dev/rate-limit dashboard, which showed an
+// unusually restrictive new-account tier:
 //
-// Override via the optional GEMINI_MODEL env var if you want to pin
-// a specific version. Hit /api/gemini-debug to see every model your
-// key can call.
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-flash-lite-latest";
+//   model                       RPM   TPM     RPD
+//   gemini-2.5-flash             5    250K    20    ← 20/day is a typo? No.
+//   gemini-2.5-flash-lite        10   250K    20    ← same tiny cap
+//   gemini-3-flash               5    250K    20
+//   gemini-3.5-flash             5    250K    20
+//   gemini-3.1-flash-lite        15   250K    500   ← 25× more headroom
+//   gemma-4-26b / 31b            15   ∞       1500  ← even more, but I'd
+//                                                    rather stay on a
+//                                                    Gemini model for
+//                                                    reliable function
+//                                                    calling
+//
+// So 500 RPD is the practical ceiling we can hit on Gemini models
+// for this account today. Plenty for personal recipe parsing — you'd
+// have to use it ~21 times an hour, every hour of the day, to run out.
+//
+// Override via GEMINI_MODEL env var. Hit /api/gemini-debug to see
+// every model your key can call, and ai.dev/rate-limit to see the
+// per-model RPD allowance.
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.1-flash-lite";
 
-// Automatic 429 fallback. If the configured model returns a quota
-// error (probationary-tier or per-minute), we transparently retry
-// once with this pinned lite model — guaranteed to be on every key
-// with the most generous free quota. Pinned name (not alias) so the
-// fallback can't ALSO break if Google moves the latest pointer.
+// Automatic 429 fallback. If primary hits its quota, retry once
+// with a different model (different bucket = independent quota).
+// We pick gemini-2.5-flash-lite as the fallback even though it has
+// the tiny 20 RPD cap — because it's a different bucket from the
+// 3.1-flash-lite primary, those 20 are 20 EXTRA requests on top of
+// 500. Combined effective ceiling: ~520 cleanups per day.
 const FALLBACK_MODEL = "gemini-2.5-flash-lite";
 
 const MAX_INPUT_CHARS = 12_000;
