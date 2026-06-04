@@ -29,13 +29,20 @@ import { auth } from "../../../auth";
 
 export const dynamic = "force-dynamic";
 
-// gemini-1.5-flash has the most reliable free-tier limits across
-// brand-new API keys (15 RPM / 1M TPM / 1500 RPD, no preview-tier
-// gating). The 2.x line technically has higher published limits but
-// new accounts sometimes get throttled to a low "preview" cap. Switch
-// via the optional GEMINI_MODEL env var if you want to test a newer
-// model after you've established account history.
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-1.5-flash";
+// gemini-2.5-flash is the current canonical free-tier model on
+// v1beta. The bare "gemini-1.5-flash" alias was removed (you'd need
+// "gemini-1.5-flash-latest" or a pinned 001/002 to use 1.5), and
+// "gemini-2.0-flash" puts new accounts onto a low-cap probationary
+// tier. 2.5-flash gives the standard new-account free tier
+// (10 RPM / 250k TPM / 250 RPD) on v1beta from day one.
+//
+// If 2.5-flash also rate-limits, options in order of recommendation:
+//   gemini-2.5-flash-lite  — designed for high-volume free use
+//   gemini-2.0-flash-lite  — same idea on the 2.0 line
+//   gemini-1.5-flash-latest — older but very stable
+// Set GEMINI_MODEL in Vercel env vars to override without a redeploy.
+// Hit /api/gemini-debug to list every model your key can actually use.
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 const GEMINI_API_URL =
   `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 const MAX_INPUT_CHARS = 12_000;
