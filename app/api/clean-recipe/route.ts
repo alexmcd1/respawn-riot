@@ -29,22 +29,26 @@ import { auth } from "../../../auth";
 
 export const dynamic = "force-dynamic";
 
-// gemini-2.5-flash is the current canonical free-tier model on
-// v1beta. The bare "gemini-1.5-flash" alias was removed (you'd need
-// "gemini-1.5-flash-latest" or a pinned 001/002 to use 1.5), and
-// "gemini-2.0-flash" puts new accounts onto a low-cap probationary
-// tier. 2.5-flash gives the standard new-account free tier
-// (10 RPM / 250k TPM / 250 RPD) on v1beta from day one.
+// Default to gemini-flash-lite-latest — a moving alias that always
+// points to Google's current "high-volume free tier" model. The
+// regular "flash" line keeps slapping new accounts with low
+// probationary quotas (we hit 429 on both 2.0-flash and 2.5-flash
+// on a brand-new key); the lite line is explicitly tuned for free
+// users and uses the latest-alias so future Google model rotations
+// don't break us.
 //
-// If 2.5-flash also rate-limits, options in order of recommendation:
-//   gemini-2.5-flash-lite  — designed for high-volume free use
-//   gemini-2.0-flash-lite  — same idea on the 2.0 line
-//   gemini-1.5-flash-latest — older but very stable
-// Set GEMINI_MODEL in Vercel env vars to override without a redeploy.
-// Hit /api/gemini-debug to list every model your key can actually use.
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
-const GEMINI_API_URL =
-  `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+// Override via the optional GEMINI_MODEL env var if you want to pin
+// a specific version. Hit /api/gemini-debug to see every model your
+// key can call.
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-flash-lite-latest";
+
+// Automatic 429 fallback. If the configured model returns a quota
+// error (probationary-tier or per-minute), we transparently retry
+// once with this pinned lite model — guaranteed to be on every key
+// with the most generous free quota. Pinned name (not alias) so the
+// fallback can't ALSO break if Google moves the latest pointer.
+const FALLBACK_MODEL = "gemini-2.5-flash-lite";
+
 const MAX_INPUT_CHARS = 12_000;
 const MAX_OUTPUT_TOKENS = 2_048;
 
@@ -178,37 +182,42 @@ export async function POST(request: Request) {
   // a single allowed function name, this is Gemini's equivalent of
   // OpenAI's tool_choice — reliable structured output without a
   // fragile "respond in JSON" prompt.
+  //
+  // Extracted as a helper so we can retry on 429 with the fallback
+  // model (see below).
+  async function callGemini(modelName: string): Promise<Response> {
+    return fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`,
+      {
+        method: "POST",
+        headers: {
+          "x-goog-api-key": apiKey!,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+          contents: [{ role: "user", parts: [{ text }] }],
+          tools: [{ functionDeclarations: [SUBMIT_RECIPE_FUNCTION] }],
+          toolConfig: {
+            functionCallingConfig: {
+              mode: "ANY",
+              allowedFunctionNames: ["submit_recipe"],
+            },
+          },
+          generationConfig: {
+            maxOutputTokens: MAX_OUTPUT_TOKENS,
+            temperature: 0.2,
+          },
+        }),
+      }
+    );
+  }
+
+  // Primary attempt — configured model.
   let res: Response;
+  let modelUsed = GEMINI_MODEL;
   try {
-    res = await fetch(GEMINI_API_URL, {
-      method: "POST",
-      headers: {
-        "x-goog-api-key": apiKey,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        systemInstruction: {
-          parts: [{ text: SYSTEM_PROMPT }],
-        },
-        contents: [
-          {
-            role: "user",
-            parts: [{ text }],
-          },
-        ],
-        tools: [{ functionDeclarations: [SUBMIT_RECIPE_FUNCTION] }],
-        toolConfig: {
-          functionCallingConfig: {
-            mode: "ANY",
-            allowedFunctionNames: ["submit_recipe"],
-          },
-        },
-        generationConfig: {
-          maxOutputTokens: MAX_OUTPUT_TOKENS,
-          temperature: 0.2,
-        },
-      }),
-    });
+    res = await callGemini(GEMINI_MODEL);
   } catch (err) {
     console.error("[clean-recipe] fetch threw:", err);
     return NextResponse.json({
@@ -217,17 +226,39 @@ export async function POST(request: Request) {
     });
   }
 
+  // 429 fallback — if the configured model hit its quota AND the
+  // fallback is a different name, transparently retry once with the
+  // pinned lite model. Logs the fallback so we can see in Vercel
+  // when it kicks in (telltale of a low probationary tier on the
+  // configured model).
+  if (res.status === 429 && GEMINI_MODEL !== FALLBACK_MODEL) {
+    const primaryDetail = await res.text().catch(() => "<no body>");
+    console.warn(
+      `[clean-recipe] ${GEMINI_MODEL} returned 429, retrying with ${FALLBACK_MODEL} — ${primaryDetail.slice(0, 500)}`
+    );
+    try {
+      res = await callGemini(FALLBACK_MODEL);
+      modelUsed = FALLBACK_MODEL;
+    } catch (err) {
+      console.error("[clean-recipe] fallback fetch threw:", err);
+      return NextResponse.json({
+        ok: false,
+        error: "Couldn't reach the AI provider. Try the basic parser instead.",
+      });
+    }
+  }
+
   if (!res.ok) {
     const detail = await res.text().catch(() => "<no body>");
     // Full body in logs — the previous 400-char truncation cut error
     // messages mid-sentence and made debugging quota issues harder.
     console.error(
-      `[clean-recipe] Gemini HTTP ${res.status} (model=${GEMINI_MODEL}) — ${detail.slice(0, 2000)}`
+      `[clean-recipe] Gemini HTTP ${res.status} (model=${modelUsed}) — ${detail.slice(0, 2000)}`
     );
     const friendly =
       res.status === 429
-        ? `AI quota hit on model "${GEMINI_MODEL}". Either wait a minute (per-minute cap) or try a different model — set GEMINI_MODEL in Vercel env vars (gemini-1.5-flash, gemini-2.0-flash, gemini-2.5-flash-lite all support free tier). Check your usage at https://ai.dev/rate-limit.`
-        : `AI provider returned ${res.status}. Try again or use the basic parser.`;
+        ? `AI quota hit on both "${GEMINI_MODEL}" and the fallback "${FALLBACK_MODEL}". Wait a minute (per-minute cap usually resets fast) or check https://ai.dev/rate-limit. Basic parse shown below.`
+        : `AI provider returned ${res.status} (model=${modelUsed}). Try again or use the basic parser.`;
     return NextResponse.json({ ok: false, error: friendly });
   }
 
