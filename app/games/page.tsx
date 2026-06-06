@@ -5,6 +5,7 @@ import GamesApp from "./_components/GamesApp";
 import GamesNewsPanel from "./_components/GamesNewsPanel";
 import GamesHotPanel from "./_components/GamesHotPanel";
 import GamesForumPanel from "./_components/GamesForumPanel";
+import GamesDevlogPanel from "./_components/GamesDevlogPanel";
 import ChannelBanner from "../_components/ChannelBanner";
 
 export const metadata: Metadata = {
@@ -34,11 +35,11 @@ type Tile = {
 const TILES: Tile[] = [
   {
     href: "/gaming",
-    tag: "▌ NEWS & DEVLOG",
-    title: "Gaming News + Devlog",
+    tag: "▌ BEHIND THE SCENES",
+    title: "What We're Building",
     blurb:
-      "Hand-curated headlines, plus an inside look at what we're building this week.",
-    emoji: "📰",
+      "Deeper showcase for RC: Respawn Creatures, the ZOKU21 creator drops, and the in-house QuestList app.",
+    emoji: "🛠",
     border: "border-fuchsia-400/50",
     text: "text-fuchsia-200",
     ring: "rgba(217,70,239,0.30)",
@@ -193,12 +194,13 @@ export default function GamesPage() {
         </div>
       </section>
 
-      {/* ─── Tabbed content: News / Hot / Now Playing ─────────────── */}
+      {/* ─── Tabbed content: News / Hot / Now Playing / Build Log ── */}
       <Suspense fallback={<TabsFallback />}>
         <GamesApp
           news={<GamesNewsPanel />}
           hot={<GamesHotPanel />}
           nowPlaying={<GamesForumPanel />}
+          devlog={<GamesDevlogPanel />}
         />
       </Suspense>
 

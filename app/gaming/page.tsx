@@ -59,18 +59,15 @@ export default function GamingPage() {
               </div>
             </div>
 
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            {/* Just the one CTA — the build log is no longer tied
+                specifically to RC; it lives at /devlog as a site-wide
+                log and gets its own card at the bottom of this page. */}
+            <div className="mt-8">
               <Link
                 href="/game"
-                className="rounded-xl bg-lime-400 px-6 py-3 font-black uppercase tracking-widest text-black transition hover:scale-105"
+                className="inline-block rounded-xl bg-lime-400 px-6 py-3 font-black uppercase tracking-widest text-black transition hover:scale-105"
               >
                 Play the demo
-              </Link>
-              <Link
-                href="/devlog"
-                className="rounded-xl border border-white/30 px-6 py-3 font-black uppercase tracking-widest text-white transition hover:bg-white/10"
-              >
-                Read the build log
               </Link>
             </div>
           </div>
