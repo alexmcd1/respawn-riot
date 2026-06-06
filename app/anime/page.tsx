@@ -5,6 +5,7 @@ import {
   displayTitle,
   fetchTopCharacters,
   fetchTrendingAiringAnime,
+  fetchTrendingManga,
   fetchUpcomingAnime,
   formatSeason,
   shortDescription,
@@ -43,9 +44,9 @@ const findCool = [
 ];
 
 export default async function AnimePage() {
-  // All four data fetches in parallel — each has its own try/catch so a
-  // single failed fetch can't take down the page.
-  const [news, trending, upcoming, characters] = await Promise.all([
+  // All five data fetches in parallel — each has its own try/catch so
+  // a single failed fetch can't take down the page.
+  const [news, trending, upcoming, manga, characters] = await Promise.all([
     fetchManyRss(ANIME_FEEDS, {
       perFeedMax: 6,
       totalMax: 9,
@@ -54,6 +55,7 @@ export default async function AnimePage() {
     }),
     fetchTrendingAiringAnime(5),
     fetchUpcomingAnime(6),
+    fetchTrendingManga(6),
     fetchTopCharacters(8),
   ]);
 
@@ -134,6 +136,39 @@ export default async function AnimePage() {
               {upcoming.map((a) => (
                 <li key={a.id}>
                   <UpcomingCard media={a} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </section>
+
+      {/* ─── Manga Updates ─────────────────────────────────────── */}
+      <section className="border-t border-white/10 bg-zinc-950 px-6 py-16">
+        <div className="mx-auto max-w-7xl">
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-black uppercase sm:text-3xl">
+                Manga Updates
+              </h2>
+              <p className="mt-2 text-white/60">
+                Currently serializing — sorted by AniList&apos;s real-time
+                trending signal. Includes ongoing series and ones on hiatus
+                (HxH, Berserk, etc.) so the flagships aren&apos;t excluded.
+              </p>
+            </div>
+            <span className="hidden font-display text-[10px] tracking-[0.3em] text-white/40 sm:block">
+              LIVE · UPDATES HOURLY
+            </span>
+          </div>
+
+          {manga.length === 0 ? (
+            <EmptyAniListState area="manga" />
+          ) : (
+            <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {manga.map((m) => (
+                <li key={m.id}>
+                  <MangaCard media={m} />
                 </li>
               ))}
             </ul>
@@ -348,6 +383,86 @@ function UpcomingCard({ media }: { media: AnilistMedia }) {
         {blurb && (
           <p className="mt-2 line-clamp-3 text-sm leading-snug text-white/70">{blurb}</p>
         )}
+      </div>
+    </Link>
+  );
+}
+
+function MangaCard({ media }: { media: AnilistMedia }) {
+  const title = displayTitle(media.title);
+  const blurb = shortDescription(media.description, 160);
+  const score = media.averageScore ?? media.meanScore;
+  // Status pill text: AniList returns RELEASING / HIATUS / FINISHED /
+  // NOT_YET_RELEASED / CANCELLED. We only ever query RELEASING+HIATUS
+  // so those are the two that need friendly labels.
+  const statusLabel =
+    media.status === "RELEASING"
+      ? "ONGOING"
+      : media.status === "HIATUS"
+        ? "ON HIATUS"
+        : media.status?.replace(/_/g, " ") ?? "";
+  const isHiatus = media.status === "HIATUS";
+  return (
+    <Link
+      href={media.siteUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="group block overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-cyan-500/10 to-transparent transition hover:border-cyan-400/60"
+    >
+      {/* Banner or cover used as the top image — manga banners are rare
+          on AniList, so we mostly fall back to the cover art. */}
+      <div className="relative aspect-video w-full overflow-hidden bg-black">
+        {media.bannerImage || media.coverImage.extraLarge ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={media.bannerImage ?? media.coverImage.extraLarge ?? ""}
+            alt={title}
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover opacity-90 transition group-hover:scale-105 group-hover:opacity-100"
+          />
+        ) : (
+          <div className="h-full w-full bg-gradient-to-br from-cyan-500/30 via-fuchsia-500/15 to-black" />
+        )}
+        {statusLabel && (
+          <span
+            className={`absolute right-2 top-2 rounded border bg-black/70 px-2 py-0.5 font-display text-[9px] tracking-[0.3em] ${
+              isHiatus
+                ? "border-amber-400/50 text-amber-300"
+                : "border-cyan-400/50 text-cyan-300"
+            }`}
+          >
+            {statusLabel}
+          </span>
+        )}
+      </div>
+      <div className="p-4">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <p className="text-xs uppercase tracking-[0.25em] text-cyan-300">
+            {media.genres.slice(0, 2).join(" / ") || "Manga"}
+          </p>
+          {score != null && (
+            <span className="rounded bg-cyan-500/15 px-2 py-0.5 font-mono text-[10px] tracking-widest text-cyan-200">
+              ★ {score / 10}
+            </span>
+          )}
+          {media.chapters != null && media.chapters > 0 ? (
+            <span className="font-mono text-[10px] text-white/45">
+              {media.chapters} ch.
+            </span>
+          ) : (
+            <span className="font-mono text-[10px] text-white/45">
+              ongoing
+            </span>
+          )}
+        </div>
+        <h3 className="mt-1 text-base font-black uppercase leading-snug">{title}</h3>
+        {blurb && (
+          <p className="mt-2 line-clamp-3 text-sm leading-snug text-white/70">{blurb}</p>
+        )}
+        <p className="mt-3 text-xs uppercase tracking-widest text-cyan-300/80 group-hover:text-cyan-300">
+          Read on AniList ↗
+        </p>
       </div>
     </Link>
   );

@@ -34,9 +34,13 @@ export type AnilistMedia = {
   siteUrl: string;
   genres: string[];
   description?: string | null;
+  // Anime-only:
   episodes: number | null;
   season?: string | null;        // "SPRING" | "SUMMER" | "FALL" | "WINTER"
   seasonYear?: number | null;
+  // Manga-only (null on anime, populated on manga queries):
+  chapters?: number | null;
+  volumes?: number | null;
   status?: string | null;
 };
 
@@ -99,6 +103,8 @@ const MEDIA_FRAGMENT = `
   episodes
   season
   seasonYear
+  chapters
+  volumes
   status
 `;
 
@@ -126,6 +132,25 @@ export async function fetchUpcomingAnime(limit = 6): Promise<AnilistMedia[]> {
     `query ($perPage: Int!) {
        Page(perPage: $perPage) {
          media(type: ANIME, sort: POPULARITY_DESC, status: NOT_YET_RELEASED) {
+           ${MEDIA_FRAGMENT}
+         }
+       }
+     }`,
+    { perPage: limit }
+  );
+  return data?.Page.media ?? [];
+}
+
+/** Currently-serializing manga sorted by AniList's real-time trending
+ *  signal — drives the "Manga Updates" section. We include HIATUS in
+ *  the status filter so flagships like Hunter x Hunter / Berserk / etc.
+ *  on temporary breaks aren't excluded just because the author is
+ *  catching their breath. */
+export async function fetchTrendingManga(limit = 6): Promise<AnilistMedia[]> {
+  const data = await anilistQuery<{ Page: { media: AnilistMedia[] } }>(
+    `query ($perPage: Int!) {
+       Page(perPage: $perPage) {
+         media(type: MANGA, sort: TRENDING_DESC, status_in: [RELEASING, HIATUS]) {
            ${MEDIA_FRAGMENT}
          }
        }
