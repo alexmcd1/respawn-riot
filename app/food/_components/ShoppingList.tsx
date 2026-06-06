@@ -18,6 +18,7 @@ import {
   type ShoppingItem,
 } from '../_lib/shopping'
 import { RECIPES_EVENT, loadRecipes, type SavedRecipe } from '../_lib/recipes'
+import { transformIngredient } from '../_lib/units'
 
 export default function ShoppingList() {
   const [items, setItems] = useState<ShoppingItem[]>([])
@@ -82,14 +83,27 @@ export default function ShoppingList() {
     // one section (e.g. multiple produce items)
   }
 
-  function importFromRecipe(recipe: SavedRecipe) {
-    const parsed = recipe.ingredients.map((line) => splitQty(line))
+  // Import a recipe's ingredients into the shopping list, optionally
+  // scaled. scale = 1 means "as-written"; 2/3/4 multiply every numeric
+  // quantity in each ingredient line. transformIngredient handles the
+  // fraction + Unicode glyph math we already use in the recipe parser,
+  // so "1¾ cups heavy cream" at 3× becomes "5¼ cups heavy cream" — not
+  // "1¾ × 3 cups heavy cream".
+  function importFromRecipe(recipe: SavedRecipe, scale: number = 1) {
+    const lines =
+      scale === 1
+        ? recipe.ingredients
+        : recipe.ingredients.map((line) =>
+            transformIngredient(line, scale, 'as-written')
+          )
+    const parsed = lines.map((line) => splitQty(line))
     const n = addManyItems(parsed)
     setImportOpen(false)
+    const tag = scale === 1 ? '' : ` (${scale}×)`
     setImportMsg(
       n === 0
-        ? `Nothing new — all of "${recipe.name}" already on your list.`
-        : `Added ${n} item${n === 1 ? '' : 's'} from "${recipe.name}".`
+        ? `Nothing new — all of "${recipe.name}"${tag} already on your list.`
+        : `Added ${n} item${n === 1 ? '' : 's'} from "${recipe.name}"${tag}.`
     )
   }
 
@@ -244,22 +258,36 @@ export default function ShoppingList() {
               {recipes.map((r) => (
                 <li
                   key={r.id}
-                  className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-black/40 p-2.5"
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white/10 bg-black/40 p-2.5"
                 >
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="truncate text-sm text-white">{r.name}</p>
                     <p className="truncate text-[11px] text-white/55">
                       {r.ingredients.length} ingredient
                       {r.ingredients.length === 1 ? '' : 's'}
+                      <span className="ml-2 text-white/40">· batches:</span>
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => importFromRecipe(r)}
-                    className="shrink-0 rounded-md border border-red-400/60 bg-red-500/10 px-3 py-1.5 text-xs text-red-100 hover:bg-red-500/20"
-                  >
-                    + ADD
-                  </button>
+                  {/* Batch picker — 1× through 4×. Each button does the
+                      whole add: scale every numeric qty in every ingredient
+                      line, then push the result to the shopping list. */}
+                  <div className="flex shrink-0 gap-1">
+                    {[1, 2, 3, 4].map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => importFromRecipe(r, n)}
+                        title={
+                          n === 1
+                            ? `Add "${r.name}" ingredients to your list`
+                            : `Add ${n}× "${r.name}" — every quantity scaled ${n} times`
+                        }
+                        className="rounded-md border border-red-400/60 bg-red-500/10 px-2.5 py-1.5 font-display text-xs tracking-widest text-red-100 transition hover:bg-red-500/25 hover:text-white"
+                      >
+                        {n}×
+                      </button>
+                    ))}
+                  </div>
                 </li>
               ))}
             </ul>

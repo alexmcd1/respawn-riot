@@ -22,7 +22,7 @@ const links: NavLink[] = [
   { href: '/orlando',       label: 'Orlando',  text: 'text-orange-300',    glow: 'hover:border-orange-400 hover:text-orange-300 shadow-orange-500/40', num: '04' },
   { href: '/quest-list',    label: 'Quests',   text: 'text-violet-300',    glow: 'hover:border-violet-400 hover:text-violet-300 shadow-violet-500/40', num: '05' },
   { href: '/food',          label: 'Food',     text: 'text-red-300',       glow: 'hover:border-red-400 hover:text-red-300 shadow-red-500/40',          num: '06' },
-  { href: '/math',          label: 'Math',     text: 'text-emerald-300',   glow: 'hover:border-emerald-400 hover:text-emerald-300 shadow-emerald-500/40', num: '07' },
+  { href: '/cram',          label: 'Cram',     text: 'text-emerald-300',   glow: 'hover:border-emerald-400 hover:text-emerald-300 shadow-emerald-500/40', num: '07' },
   { href: '/creativity',    label: 'Create',   text: 'text-fuchsia-300',   glow: 'hover:border-fuchsia-400 hover:text-fuchsia-300 shadow-fuchsia-500/40', num: '08' },
   { href: '/buddies',       label: 'Buddies',  text: 'text-cyan-300',      glow: 'hover:border-cyan-400 hover:text-cyan-300 shadow-cyan-500/40',       num: '09' },
 ]
@@ -34,7 +34,7 @@ const tickerItems = [
   '🍴 FOOD: RECIPES · EAT OUT · IN HOUSE · SHOPPING',
   '☼ ORLANDO LIVE WEATHER + PARK NEWS',
   '⚔ QUESTLIST BY KID_GHOST',
-  '➕ MATH FLASHCARDS · GRADES 5–8',
+  '➕ CRAM · LATE-NIGHT STUDY HALL · GRADES 5–8',
   '⚡ JOIN THE RIOT',
 ]
 
