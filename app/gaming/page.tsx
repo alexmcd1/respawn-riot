@@ -1,71 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { devlogPosts } from "./_devlog";
 
 export const metadata: Metadata = {
   title: "Gaming — Respawn Riot",
   description:
-    "Gaming news and an inside look at the games we're building.",
+    "An inside look at the games we're building, hosted creator drops, and links into the gaming hub.",
 };
-
-const news = [
-  {
-    headline: "The Biggest New Game Releases Of May 2026",
-    body: "GameSpot's full rundown of the month's heaviest hitters.",
-    href: "https://www.gamespot.com/gallery/the-biggest-new-game-releases-of-may-2026/2900-7667/",
-    source: "GameSpot",
-    tag: "Releases",
-  },
-  {
-    headline: "Forza Horizon 6 hits Game Pass — 550 cars across Japan",
-    body: "Microsoft's racing flagship goes open-world Japan in its biggest map yet.",
-    href: "https://news.xbox.com/en-us/2026/05/05/xbox-game-pass-may-2026-wave-1/",
-    source: "Xbox Wire",
-    tag: "Releases",
-  },
-  {
-    headline: "Subnautica 2 launches in Game Preview May 14",
-    body: "Underwater survival adventure on a new alien world from Unknown Worlds.",
-    href: "https://news.xbox.com/en-us/2026/05/05/xbox-game-pass-may-2026-wave-1/",
-    source: "Xbox Wire",
-    tag: "Indie",
-  },
-  {
-    headline: "007 First Light finally launches this month",
-    body: "IO Interactive's young Bond game hits after a long ramp.",
-    href: "https://www.gamespot.com/gallery/the-biggest-new-game-releases-of-may-2026/2900-7667/",
-    source: "GameSpot",
-    tag: "AAA",
-  },
-  {
-    headline: "PC Gamer's full May 2026 release calendar",
-    body: "Forza, Subnautica 2, and a stack of early-access launches.",
-    href: "https://www.pcgamer.com/games/pc-game-release-dates-may-2026/",
-    source: "PC Gamer",
-    tag: "PC",
-  },
-  {
-    headline: "Insider Gaming's full May 2026 schedule",
-    body: "Every notable release on every platform, day by day.",
-    href: "https://insider-gaming.com/may-2026-video-game-releases-full-schedule-and-biggest-games/",
-    source: "Insider Gaming",
-    tag: "Schedule",
-  },
-  {
-    headline: "Steam's calendar for May 2026",
-    body: "Live-updating list of every Steam release this month.",
-    href: "https://steamdb.info/calendar/2026-05/",
-    source: "SteamDB",
-    tag: "PC",
-  },
-  {
-    headline: "2026 Upcoming Games Release Schedule",
-    body: "Year-long view from GameSpot — what's still on the calendar.",
-    href: "https://www.gamespot.com/articles/2026-upcoming-games-release-schedule/1100-6534941/",
-    source: "GameSpot",
-    tag: "Calendar",
-  },
-];
 
 export default function GamingPage() {
   return (
@@ -127,89 +67,12 @@ export default function GamingPage() {
                 Play the demo
               </Link>
               <Link
-                href="#devlog"
+                href="/devlog"
                 className="rounded-xl border border-white/30 px-6 py-3 font-black uppercase tracking-widest text-white transition hover:bg-white/10"
               >
-                Read the devlog
+                Read the build log
               </Link>
             </div>
-          </div>
-
-          {/* ───────── RC DEVLOG ───────── */}
-          <div id="devlog" className="scroll-mt-24 rounded-3xl border border-lime-400/30 bg-gradient-to-br from-lime-500/10 via-cyan-500/5 to-transparent p-6 sm:p-10">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="font-display text-xs tracking-[0.3em] text-lime-400">
-                  ▌ DEVLOG
-                </p>
-                <h2 className="mt-2 font-display text-3xl tracking-[0.04em] sm:text-4xl">
-                  RC // BUILD NOTES
-                </h2>
-              </div>
-              <span className="rounded-md border border-lime-400/40 bg-black px-3 py-1 font-display text-xs tracking-[0.25em] text-lime-300">
-                {devlogPosts.length} ENTRIES
-              </span>
-            </div>
-
-            <ol className="mt-8 space-y-6">
-              {devlogPosts.map((post) => {
-                const id = post.source === "manual" ? `m-${post.issue}` : `g-${post.sha}`;
-                return (
-                  <li
-                    key={id}
-                    className="grid gap-4 rounded-2xl border border-white/10 bg-black/40 p-5 sm:grid-cols-[140px_1fr] sm:p-6"
-                  >
-                    <div className="flex items-baseline gap-3 sm:flex-col sm:items-start sm:gap-1">
-                      {post.source === "manual" ? (
-                        <span className="font-display text-3xl tracking-wider text-lime-300">
-                          #{post.issue}
-                        </span>
-                      ) : (
-                        <a
-                          href={post.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="font-mono text-base text-lime-300 underline-offset-2 hover:underline"
-                        >
-                          {post.sha}
-                        </a>
-                      )}
-                      <span className="font-mono text-xs text-white/50">
-                        {post.date}
-                      </span>
-                      <span
-                        className={`ml-auto rounded border px-2 py-0.5 font-display text-[10px] tracking-[0.2em] sm:ml-0 ${
-                          post.source === "manual"
-                            ? "border-lime-400/40 text-lime-300"
-                            : "border-cyan-400/40 text-cyan-300"
-                        }`}
-                      >
-                        {post.source === "manual" ? post.tag : "GIT"}
-                      </span>
-                    </div>
-                    <div>
-                      <h3 className="font-display text-xl tracking-wide text-white">
-                        {post.title}
-                      </h3>
-                      <div className="mt-3 space-y-2 text-sm leading-6 text-white/75">
-                        {post.body.length > 0 ? (
-                          post.body.map((p, i) => <p key={i}>{p}</p>)
-                        ) : (
-                          <p className="text-white/40">{"(no body)"}</p>
-                        )}
-                      </div>
-                    </div>
-                  </li>
-                );
-              })}
-            </ol>
-
-            <p className="mt-6 text-xs text-white/45">
-              {"Devlog updates land here. Want them in your inbox? "}
-              <Link href="/#join" className="text-lime-300 underline-offset-2 hover:underline">
-                Join the riot.
-              </Link>
-            </p>
           </div>
 
           {/* ───────── ZOKU21 CREATOR DROPS ───────── */}
@@ -325,39 +188,49 @@ export default function GamingPage() {
         </div>
       </section>
 
-      <section className="border-t border-white/10 bg-zinc-950 px-6 py-16">
-        <div className="mx-auto max-w-7xl">
-          <h2 className="text-2xl font-black uppercase sm:text-3xl">
-            Gaming News
-          </h2>
-          <p className="mt-2 text-white/60">
-            Live links — not summaries. Click through to the source.
-          </p>
+      {/* CTAs to the related hubs — live gaming news now lives at
+          /games (the actual hub), site-wide build notes at /devlog. */}
+      <section className="border-t border-white/10 bg-zinc-950 px-6 py-12">
+        <div className="mx-auto grid max-w-4xl gap-4 sm:grid-cols-2">
+          <Link
+            href="/games"
+            className="group rounded-2xl border border-cyan-400/30 bg-gradient-to-br from-cyan-500/10 to-transparent p-6 transition hover:border-cyan-400/60"
+          >
+            <p className="font-display text-[11px] tracking-[0.3em] text-cyan-300">
+              ▌ CHANNEL 03 / GAMES
+            </p>
+            <h3 className="mt-2 font-display text-xl tracking-wide text-white">
+              Live news, hot lists, forum
+            </h3>
+            <p className="mt-2 text-sm text-white/65">
+              Video game + card game + tabletop news that auto-refreshes,
+              what&apos;s currently hot, and posts about what people are
+              playing.
+            </p>
+            <p className="mt-3 font-display text-xs tracking-[0.25em] text-cyan-300 group-hover:text-cyan-200">
+              ▸ ENTER THE HUB
+            </p>
+          </Link>
 
-          <div className="mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {news.map((n) => (
-              <Link
-                key={n.headline}
-                href={n.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group rounded-2xl border border-white/10 bg-white/[0.03] p-5 transition hover:border-cyan-400/50 hover:bg-white/[0.05]"
-              >
-                <div className="flex items-center justify-between">
-                  <p className="text-xs uppercase tracking-[0.25em] text-cyan-300">
-                    {n.tag}
-                  </p>
-                  <span className="text-xs uppercase tracking-widest text-white/40">
-                    {n.source}
-                  </span>
-                </div>
-                <h3 className="mt-3 text-lg font-black uppercase leading-snug group-hover:text-white">
-                  {n.headline} ↗
-                </h3>
-                <p className="mt-2 text-sm leading-6 text-white/70">{n.body}</p>
-              </Link>
-            ))}
-          </div>
+          <Link
+            href="/devlog"
+            className="group rounded-2xl border border-fuchsia-400/30 bg-gradient-to-br from-fuchsia-500/10 to-transparent p-6 transition hover:border-fuchsia-400/60"
+          >
+            <p className="font-display text-[11px] tracking-[0.3em] text-fuchsia-300">
+              ▌ THE BUILD LOG
+            </p>
+            <h3 className="mt-2 font-display text-xl tracking-wide text-white">
+              Site-wide build log
+            </h3>
+            <p className="mt-2 text-sm text-white/65">
+              Devlog for the whole site — every meaningful shipment across
+              every channel, not just games. Used to live here; now it has
+              its own page.
+            </p>
+            <p className="mt-3 font-display text-xs tracking-[0.25em] text-fuchsia-300 group-hover:text-fuchsia-200">
+              ▸ READ THE LOG
+            </p>
+          </Link>
         </div>
       </section>
     </main>
