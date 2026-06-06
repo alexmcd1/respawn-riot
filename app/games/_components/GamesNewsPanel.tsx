@@ -20,9 +20,26 @@ const VIDEO_GAME_FEEDS: Feed[] = [
   { url: "https://www.eurogamer.net/?format=rss", source: "Eurogamer" },
 ];
 
+// Dicebreaker shut down in early 2024 (RIP). BGG's /rss/news endpoint
+// also 404s now. The replacements below are what actually returns
+// items as of 2026:
+//   • Tabletop Gaming (UK magazine) — strong industry coverage
+//   • Meeple Mountain — reviews + previews + community angle
 const TABLETOP_FEEDS: Feed[] = [
-  { url: "https://www.dicebreaker.com/feed.rss", source: "Dicebreaker" },
-  { url: "https://boardgamegeek.com/rss/news", source: "BoardGameGeek News" },
+  { url: "https://www.tabletopgaming.co.uk/feed", source: "Tabletop Gaming" },
+  { url: "https://meeplemountain.com/feed/", source: "Meeple Mountain" },
+];
+
+// Tabletop-specific Google News query — used as a fallback when the
+// primary RSS feeds are slow or empty. Scoped to "board game / tabletop
+// game / TTRPG" with the last-14-days window so we don't get evergreen
+// review pieces from 2019.
+const TABLETOP_FALLBACK_FEEDS: Feed[] = [
+  {
+    url:
+      "https://news.google.com/rss/search?q=%22board+game%22+OR+%22tabletop+game%22+OR+TTRPG+release+OR+kickstarter&hl=en-US&gl=US&ceid=US:en&when=14d",
+    source: "Google News (tabletop)",
+  },
 ];
 
 const FALLBACK_FEEDS: Feed[] = [
@@ -56,6 +73,8 @@ export default async function GamesNewsPanel() {
     fetchManyRss(TABLETOP_FEEDS, {
       perFeedMax: 5,
       totalMax: 8,
+      fallbacks: TABLETOP_FALLBACK_FEEDS,
+      minBeforeFallback: 3,
       revalidate: REVALIDATE_HOURLY,
     }),
   ]);
@@ -121,7 +140,8 @@ export default async function GamesNewsPanel() {
               Tabletop News
             </h2>
             <p className="mt-2 text-white/60">
-              Board games, card games, TTRPGs. From Dicebreaker + BoardGameGeek.
+              Board games, card games, TTRPGs. From Tabletop Gaming magazine
+              and Meeple Mountain, with a Google News backstop.
             </p>
           </div>
           <span className="hidden font-display text-[10px] tracking-[0.3em] text-white/40 sm:block">
