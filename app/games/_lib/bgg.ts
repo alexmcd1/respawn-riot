@@ -55,20 +55,55 @@ function parseBggHot(xml: string): BggHotGame[] {
   return items.sort((a, b) => a.rank - b.rank);
 }
 
-export async function fetchBggHot(limit = 8): Promise<BggHotGame[]> {
-  try {
-    const res = await fetch(BGG_HOT_URL, {
-      next: { revalidate: CACHE_SECONDS },
-      headers: { accept: "application/xml" },
-    });
-    if (!res.ok) {
-      console.warn(`[bgg] HTTP ${res.status}`);
-      return [];
+/** Combined fetcher: tries the live BGG endpoint first, falls back to
+ *  a curated list if anything goes wrong (their server 503s under
+ *  load, sometimes returns 202 "request queued", and Vercel edge
+ *  fetches occasionally time out — without a fallback the Tabletop
+ *  section would just show "couldn't reach BGG" until the next cache
+ *  bust). Returns whether the result was live so the UI can label it. */
+export async function fetchBggHotWithFallback(
+  limit = 8
+): Promise<{ games: BggHotGame[]; source: "live" | "fallback" }> {
+  // Lazy-import the fallback so the curated list isn't bundled if BGG
+  // is reliably up.
+  const tryLive = async () => {
+    try {
+      const res = await fetch(BGG_HOT_URL, {
+        next: { revalidate: CACHE_SECONDS },
+        headers: {
+          accept: "application/xml",
+          // BGG's WAF is sensitive to missing User-Agents — some
+          // requests get 403'd without one. Match a regular browser.
+          "user-agent":
+            "Mozilla/5.0 (compatible; respawn-riot-bgg/1.0; +https://respawnriot.io)",
+        },
+      });
+      if (!res.ok) {
+        console.warn(`[bgg] HTTP ${res.status}`);
+        return null;
+      }
+      const xml = await res.text();
+      const parsed = parseBggHot(xml);
+      if (parsed.length === 0) {
+        console.warn("[bgg] empty parse result");
+        return null;
+      }
+      return parsed.slice(0, limit);
+    } catch (err) {
+      console.warn("[bgg] fetch threw:", err);
+      return null;
     }
-    const xml = await res.text();
-    return parseBggHot(xml).slice(0, limit);
-  } catch (err) {
-    console.warn("[bgg] fetch threw:", err);
-    return [];
-  }
+  };
+
+  const live = await tryLive();
+  if (live) return { games: live, source: "live" };
+
+  const { TABLETOP_FALLBACK } = await import("./tabletopFallback");
+  return { games: TABLETOP_FALLBACK.slice(0, limit), source: "fallback" };
+}
+
+/** Legacy alias for code that only wants the games array. */
+export async function fetchBggHot(limit = 8): Promise<BggHotGame[]> {
+  const { games } = await fetchBggHotWithFallback(limit);
+  return games;
 }

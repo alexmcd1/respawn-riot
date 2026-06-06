@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { fetchBggHot, type BggHotGame } from "../_lib/bgg";
+import { fetchBggHotWithFallback, type BggHotGame } from "../_lib/bgg";
 import { VIDEO_GAMES_HOT, type VideoGame } from "../_lib/videoGames";
+import { CARD_GAMES_HOT, type CardGame } from "../_lib/cardGames";
 import {
   fetchTopGoogleNews,
   formatRelative,
@@ -8,18 +9,24 @@ import {
   type NewsItem,
 } from "../../_lib/rss";
 
-// "Currently Hot" — two subsections, each pulled live from different
-// sources:
+// "Currently Hot" — three subsections, each pulled live from
+// different sources:
 //
-//   Video Games: a hand-curated lineup (see _lib/videoGames.ts) where
-//     each game gets a per-title Google News search so the card shows
-//     recent headlines. Same pattern as the pop-punk band cards.
+//   Video Games: hand-curated lineup (see _lib/videoGames.ts) where
+//     each title gets a per-game Google News search so the card
+//     shows recent headlines.
+//
+//   Card Games (TCGs): same pattern as video games, but with the
+//     trading card games people are actually following — Magic,
+//     Pokémon, Lorcana, One Piece, DBS, Yu-Gi-Oh!. See
+//     _lib/cardGames.ts.
 //
 //   Tabletop: BoardGameGeek's "hot games" XML endpoint (no auth, no
-//     key) returns the top 50 games people are actually playing right
-//     now. We surface the top 8 with their BGG thumbnails. This also
-//     covers TCGs since BGG categorizes Magic / Pokémon / Yu-Gi-Oh
-//     under boardgame for hot-list purposes.
+//     key) returns the top 50 board games people are playing right
+//     now. Wrapped in fetchBggHotWithFallback so if BGG is down (which
+//     it sometimes is — their server load is real), we surface a
+//     curated list instead. Section gets a "FROM CACHE" label when
+//     the fallback fires so the UX is honest.
 
 const FRESH_MAX_AGE_DAYS = 60;
 
@@ -31,15 +38,24 @@ async function fetchVideoGameNews(name: string): Promise<NewsItem | null> {
   );
 }
 
+async function fetchCardGameNews(g: CardGame): Promise<NewsItem | null> {
+  return fetchTopGoogleNews(
+    `"${g.name}" ${g.searchTopic}`,
+    REVALIDATE_HOURLY,
+    { whenDays: 60, maxAgeDays: FRESH_MAX_AGE_DAYS }
+  );
+}
+
 export default async function GamesHotPanel() {
-  const [videoNews, bggHot] = await Promise.all([
+  const [videoNews, cardNews, bgg] = await Promise.all([
     Promise.all(VIDEO_GAMES_HOT.map((g) => fetchVideoGameNews(g.name))),
-    fetchBggHot(8),
+    Promise.all(CARD_GAMES_HOT.map(fetchCardGameNews)),
+    fetchBggHotWithFallback(8),
   ]);
 
   return (
     <div className="space-y-12 px-4 py-10 sm:px-6 sm:py-12">
-      {/* Video games — currently popular */}
+      {/* ─── Video Games ────────────────────────────────────────── */}
       <section className="mx-auto max-w-7xl">
         <div className="flex items-end justify-between gap-4">
           <div>
@@ -63,7 +79,31 @@ export default async function GamesHotPanel() {
         </div>
       </section>
 
-      {/* Tabletop — BGG hot list */}
+      {/* ─── Card Games (TCGs) ─────────────────────────────────── */}
+      <section className="mx-auto max-w-7xl border-t border-white/10 pt-12">
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-black uppercase sm:text-3xl">
+              Card Games — Hot Right Now
+            </h2>
+            <p className="mt-2 text-white/60">
+              Trading card games people are actually following. Expansions,
+              banlists, tournament wins.
+            </p>
+          </div>
+          <span className="hidden font-display text-[10px] tracking-[0.3em] text-white/40 sm:block">
+            CURATED · NEWS LIVE
+          </span>
+        </div>
+
+        <div className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+          {CARD_GAMES_HOT.map((g, i) => (
+            <CardGameCard key={g.name} game={g} news={cardNews[i]} />
+          ))}
+        </div>
+      </section>
+
+      {/* ─── Tabletop (BGG hot list with fallback) ─────────────── */}
       <section className="mx-auto max-w-7xl border-t border-white/10 pt-12">
         <div className="flex items-end justify-between gap-4">
           <div>
@@ -71,23 +111,29 @@ export default async function GamesHotPanel() {
               Tabletop — Hot Right Now
             </h2>
             <p className="mt-2 text-white/60">
-              Top of BoardGameGeek&apos;s hot list — board games, card games,
-              TCGs.
+              Top of BoardGameGeek&apos;s hot list — board games and heavier
+              tabletop.
             </p>
           </div>
-          <span className="hidden font-display text-[10px] tracking-[0.3em] text-white/40 sm:block">
-            BGG · UPDATES 4×/DAY
+          <span
+            className={`hidden font-display text-[10px] tracking-[0.3em] sm:block ${
+              bgg.source === "live" ? "text-white/40" : "text-amber-400/70"
+            }`}
+          >
+            {bgg.source === "live"
+              ? "BGG · UPDATES 4×/DAY"
+              : "BGG OFFLINE · SHOWING CURATED"}
           </span>
         </div>
 
-        {bggHot.length === 0 ? (
+        {bgg.games.length === 0 ? (
           <div className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-center text-sm text-white/60">
-            Couldn&apos;t reach BoardGameGeek&apos;s hot list right now. Try
-            again in a bit.
+            Couldn&apos;t reach BoardGameGeek&apos;s hot list AND the fallback
+            list is empty — something has gone unusually wrong. Try refreshing.
           </div>
         ) : (
           <ol className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {bggHot.map((g) => (
+            {bgg.games.map((g) => (
               <li key={g.id}>
                 <BggHotCard game={g} />
               </li>
@@ -98,6 +144,8 @@ export default async function GamesHotPanel() {
     </div>
   );
 }
+
+/* ─── Card components ─────────────────────────────────────────── */
 
 function VideoGameCard({
   game,
@@ -114,15 +162,19 @@ function VideoGameCard({
       rel="noopener noreferrer"
       className="group flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] transition hover:border-fuchsia-400/60 hover:bg-white/[0.05]"
     >
-      <div className="relative aspect-[16/9] w-full overflow-hidden bg-black">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={game.coverImg}
-          alt={game.name}
-          loading="lazy"
-          decoding="async"
-          className="h-full w-full object-cover opacity-90 transition group-hover:scale-105 group-hover:opacity-100"
-        />
+      <div className="relative aspect-[16/9] w-full overflow-hidden">
+        {game.coverImg ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={game.coverImg}
+            alt={game.name}
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover opacity-90 transition group-hover:scale-105 group-hover:opacity-100"
+          />
+        ) : (
+          <GameCoverFallback name={game.name} accent="fuchsia" />
+        )}
         {news && (
           <span className="absolute right-2 top-2 rounded border border-fuchsia-400/50 bg-black/70 px-2 py-0.5 font-display text-[9px] tracking-[0.3em] text-fuchsia-300">
             LIVE
@@ -149,6 +201,49 @@ function VideoGameCard({
   );
 }
 
+function CardGameCard({
+  game,
+  news,
+}: {
+  game: CardGame;
+  news: NewsItem | null;
+}) {
+  const rel = formatRelative(news?.pubDate);
+  return (
+    <Link
+      href={news?.link ?? game.href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="group flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] transition hover:border-cyan-400/60 hover:bg-white/[0.05]"
+    >
+      <div className="relative aspect-[16/9] w-full overflow-hidden">
+        <GameCoverFallback name={game.name} accent="cyan" />
+        {news && (
+          <span className="absolute right-2 top-2 rounded border border-cyan-400/50 bg-black/70 px-2 py-0.5 font-display text-[9px] tracking-[0.3em] text-cyan-300">
+            LIVE
+          </span>
+        )}
+      </div>
+      <div className="p-5">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs uppercase tracking-[0.3em] text-cyan-300">
+            {game.name}
+          </p>
+          {rel && (
+            <span className="font-mono text-[10px] text-white/40">{rel}</span>
+          )}
+        </div>
+        <h3 className="mt-2 text-lg font-black uppercase leading-snug">
+          {news ? news.title : game.blurb}
+        </h3>
+        <p className="mt-3 text-xs uppercase tracking-widest text-cyan-300/80">
+          {news?.publisher ?? news?.source ?? game.publisher} ↗
+        </p>
+      </div>
+    </Link>
+  );
+}
+
 function BggHotCard({ game }: { game: BggHotGame }) {
   return (
     <Link
@@ -168,7 +263,7 @@ function BggHotCard({ game }: { game: BggHotGame }) {
             className="h-full w-full object-cover opacity-90 transition group-hover:scale-105 group-hover:opacity-100"
           />
         ) : (
-          <div className="h-full w-full bg-gradient-to-br from-amber-500/30 via-orange-500/15 to-black" />
+          <GameCoverFallback name={game.name} accent="amber" />
         )}
         <span className="absolute left-2 top-2 rounded bg-black/75 px-1.5 py-0.5 font-display text-[10px] tracking-widest text-amber-200">
           #{game.rank}
@@ -186,5 +281,62 @@ function BggHotCard({ game }: { game: BggHotGame }) {
         </p>
       </div>
     </Link>
+  );
+}
+
+/* ─── Gradient + name cover placeholder ───────────────────────
+   Used whenever an image source is missing or unreliable (every
+   video game card, every card-game card, BGG fallback entries).
+   Always renders cleanly — no external dependency, no broken-
+   image icon. Hue is derived from the game name so cards in the
+   same row look different. */
+function GameCoverFallback({
+  name,
+  accent,
+}: {
+  name: string;
+  accent: "fuchsia" | "cyan" | "amber";
+}) {
+  // Tiny deterministic hash for hue variety across cards.
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  const hue1 = h % 360;
+  const hue2 = (hue1 + 50) % 360;
+
+  // Accent dictates the secondary stroke color (subtle).
+  const stroke =
+    accent === "fuchsia"
+      ? "rgba(255, 46, 179, 0.7)"
+      : accent === "cyan"
+        ? "rgba(34, 211, 238, 0.7)"
+        : "rgba(245, 158, 11, 0.7)";
+
+  return (
+    <div
+      className="relative h-full w-full"
+      style={{
+        background: `
+          linear-gradient(135deg,
+            hsl(${hue1}, 70%, 18%) 0%,
+            hsl(${hue2}, 60%, 8%) 100%)`,
+      }}
+    >
+      {/* Diagonal scanline overlay */}
+      <div className="pointer-events-none absolute inset-0 opacity-30 [background:repeating-linear-gradient(-45deg,rgba(255,255,255,0.08)_0px,rgba(255,255,255,0.08)_1px,transparent_1px,transparent_10px)]" />
+      {/* Faint accent vignette */}
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background: `radial-gradient(circle at 30% 30%, ${stroke}, transparent 60%)`,
+          opacity: 0.35,
+        }}
+      />
+      {/* Title text */}
+      <div className="absolute inset-0 flex items-center justify-center p-4 text-center">
+        <span className="font-display text-base uppercase tracking-wider text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)] sm:text-lg md:text-xl">
+          {name}
+        </span>
+      </div>
+    </div>
   );
 }
