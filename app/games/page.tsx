@@ -5,6 +5,7 @@ import GamesApp from "./_components/GamesApp";
 import GamesNewsPanel from "./_components/GamesNewsPanel";
 import GamesHotPanel from "./_components/GamesHotPanel";
 import GamesForumPanel from "./_components/GamesForumPanel";
+import ChannelBanner from "../_components/ChannelBanner";
 
 export const metadata: Metadata = {
   title: "Games — Respawn Riot",
@@ -114,6 +115,10 @@ const TILES: Tile[] = [
 export default function GamesPage() {
   return (
     <main className="bg-black text-white">
+      <ChannelBanner
+        src="/banners/games.png"
+        alt="Games channel banner — Kid Ghost perched on a glowing arcade machine"
+      />
       {/* ─── Hero ─────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden border-b border-fuchsia-500/30 scanlines">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(217,70,239,0.30),transparent_55%)]" />

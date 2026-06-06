@@ -11,6 +11,7 @@ import {
   type AnilistMedia,
   type AnilistCharacter,
 } from "../_lib/anilist";
+import ChannelBanner from "../_components/ChannelBanner";
 
 export const metadata: Metadata = {
   title: "Anime — Respawn Riot",
@@ -58,6 +59,10 @@ export default async function AnimePage() {
 
   return (
     <main className="bg-black text-white">
+      <ChannelBanner
+        src="/banners/anime.png"
+        alt="Anime channel banner — Kid Ghost in dramatic shonen-OP anime style"
+      />
       {/* ─── Hero ─────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden border-b border-white/10">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(217,70,239,0.25),transparent_50%)]" />

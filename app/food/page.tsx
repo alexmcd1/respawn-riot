@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import FoodApp from "./_components/FoodApp";
+import ChannelBanner from "../_components/ChannelBanner";
 
 export const metadata: Metadata = {
   title: "Food — Respawn Riot",
@@ -11,6 +12,10 @@ export const metadata: Metadata = {
 export default function FoodPage() {
   return (
     <main className="bg-black text-white">
+      <ChannelBanner
+        src="/banners/food.png"
+        alt="Food channel banner — Kid Ghost holding a slice in a punk diner"
+      />
       {/* Hero — compact so the tabs land just below the fold on mobile */}
       <section className="relative overflow-hidden border-b border-red-500/30 scanlines">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(239,68,68,0.25),transparent_55%)]" />

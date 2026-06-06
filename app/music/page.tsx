@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import MusicApp from "./_components/MusicApp";
 import PopPunkPanel from "./_components/PopPunkPanel";
 import ConcertSearch from "./_components/ConcertSearch";
+import ChannelBanner from "../_components/ChannelBanner";
 
 export const metadata: Metadata = {
   title: "Music — Respawn Riot",
@@ -31,6 +32,10 @@ export const revalidate = 3600;
 export default function MusicPage() {
   return (
     <main className="bg-black text-white">
+      <ChannelBanner
+        src="/banners/music.png"
+        alt="Music channel banner — Kid Ghost mid-jump on a basement punk stage"
+      />
       <section className="relative overflow-hidden border-b border-white/10">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(244,114,182,0.25),transparent_50%)]" />
         <div className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-12">
