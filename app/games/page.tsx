@@ -1,11 +1,21 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
+import GamesApp from "./_components/GamesApp";
+import GamesNewsPanel from "./_components/GamesNewsPanel";
+import GamesHotPanel from "./_components/GamesHotPanel";
+import GamesForumPanel from "./_components/GamesForumPanel";
 
 export const metadata: Metadata = {
   title: "Games — Respawn Riot",
   description:
-    "The whole arcade in one place: RC, TDC, Jujutsu Shenanigans, PC Builder, Stars Brawl, and the devlog where it all gets built.",
+    "The whole arcade plus what's hot right now — video game news, tabletop hot list, and what people are actually playing.",
 };
+
+// Daily revalidate covers the curated lineup that doesn't change
+// often; the panels themselves set tighter cache windows on their
+// individual data fetches (RSS hourly, BGG every 4h, etc.).
+export const revalidate = 86400;
 
 type Tile = {
   href: string;
@@ -13,7 +23,6 @@ type Tile = {
   title: string;
   blurb: string;
   emoji: string;
-  // Tailwind utility chunks for the tile's accent
   border: string;
   text: string;
   ring: string;
@@ -105,7 +114,7 @@ const TILES: Tile[] = [
 export default function GamesPage() {
   return (
     <main className="bg-black text-white">
-      {/* Hero */}
+      {/* ─── Hero ─────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden border-b border-fuchsia-500/30 scanlines">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(217,70,239,0.30),transparent_55%)]" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_right,rgba(34,211,238,0.22),transparent_55%)]" />
@@ -119,55 +128,79 @@ export default function GamesPage() {
             GAMES <span className="text-fuchsia-400">{"//"}</span> THE WHOLE ARCADE
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-white/75 sm:text-base">
-            Everything we&apos;re playing, building, and hosting — in one tile
-            grid. Click in.
+            Everything we&apos;re playing, building, hosting, and reading
+            about. In-house arcade below, plus headlines, the hot list, and
+            a forum to post what you&apos;re playing.
           </p>
         </div>
       </section>
 
-      {/* Tile grid */}
-      <section className="px-4 py-8 sm:px-6 sm:py-12">
-        <ul className="mx-auto grid max-w-6xl gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {TILES.map((t) => (
-            <li key={t.href}>
-              <Link
-                href={t.href}
-                className={`group relative block h-full overflow-hidden rounded-2xl border bg-gradient-to-br ${t.gradient} ${t.border} p-5 transition hover:scale-[1.015]`}
-                style={{ boxShadow: `0 0 28px -8px ${t.ring}` }}
-              >
-                <div className="flex items-start gap-4">
-                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-black/60 text-3xl">
-                    {t.emoji}
+      {/* ─── Arcade tiles (existing in-house + creator games) ────── */}
+      <section className="px-4 py-6 sm:px-6 sm:py-8">
+        <div className="mx-auto max-w-6xl">
+          <p className="font-display text-[11px] tracking-[0.3em] text-fuchsia-300">
+            ▌ THE ARCADE
+          </p>
+          <p className="mt-1 text-xs text-white/55">
+            Built in-house + by creator partners. Click into any tile to
+            play directly in your browser.
+          </p>
+          <ul className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {TILES.map((t) => (
+              <li key={t.href}>
+                <Link
+                  href={t.href}
+                  className={`group relative block h-full overflow-hidden rounded-2xl border bg-gradient-to-br ${t.gradient} ${t.border} p-5 transition hover:scale-[1.015]`}
+                  style={{ boxShadow: `0 0 28px -8px ${t.ring}` }}
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-black/60 text-3xl">
+                      {t.emoji}
+                    </div>
+                    <div className="min-w-0">
+                      <p className={`font-display text-[10px] tracking-[0.3em] ${t.text}`}>
+                        {t.tag}
+                      </p>
+                      <h2 className="mt-1 font-display text-lg leading-tight tracking-wide text-white sm:text-xl">
+                        {t.title}
+                      </h2>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <p className={`font-display text-[10px] tracking-[0.3em] ${t.text}`}>
-                      {t.tag}
-                    </p>
-                    <h2 className="mt-1 font-display text-lg leading-tight tracking-wide text-white sm:text-xl">
-                      {t.title}
-                    </h2>
+                  <p className="mt-3 text-sm leading-6 text-white/70">{t.blurb}</p>
+                  <div className="mt-4 flex items-center justify-between">
+                    <span
+                      className={`inline-flex items-center rounded-lg px-4 py-2 font-display text-xs tracking-[0.25em] text-black transition group-hover:scale-[1.04] ${t.ctaBg}`}
+                    >
+                      ▶ ENTER
+                    </span>
+                    <span className="font-mono text-[10px] tracking-widest text-white/30">
+                      {t.href}
+                    </span>
                   </div>
-                </div>
-                <p className="mt-3 text-sm leading-6 text-white/70">{t.blurb}</p>
-                <div className="mt-4 flex items-center justify-between">
-                  <span
-                    className={`inline-flex items-center rounded-lg px-4 py-2 font-display text-xs tracking-[0.25em] text-black transition group-hover:scale-[1.04] ${t.ctaBg}`}
-                  >
-                    ▶ ENTER
-                  </span>
-                  <span className="font-mono text-[10px] tracking-widest text-white/30">
-                    {t.href}
-                  </span>
-                </div>
-              </Link>
-            </li>
-          ))}
-        </ul>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
       </section>
 
+      {/* ─── Tabbed content: News / Hot / Now Playing ─────────────── */}
+      <Suspense fallback={<TabsFallback />}>
+        <GamesApp
+          news={<GamesNewsPanel />}
+          hot={<GamesHotPanel />}
+          nowPlaying={<GamesForumPanel />}
+        />
+      </Suspense>
+
       <footer className="border-t border-white/10 px-6 py-8 text-center text-xs text-white/45">
-        Hosted creator games run in your browser. Devlog updates run weekly.
+        Headlines via RSS · Tabletop hot list via BoardGameGeek ·
+        Forum runs on the Creativity Corner.
       </footer>
     </main>
   );
+}
+
+function TabsFallback() {
+  return <div className="h-16 border-b border-white/10 bg-black/85" aria-hidden />;
 }
