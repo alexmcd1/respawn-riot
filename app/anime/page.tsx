@@ -1,14 +1,25 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { fetchManyRss, formatRelative, type Feed } from "../_lib/rss";
+import {
+  displayTitle,
+  fetchTopCharacters,
+  fetchTrendingAiringAnime,
+  fetchUpcomingAnime,
+  formatSeason,
+  shortDescription,
+  type AnilistMedia,
+  type AnilistCharacter,
+} from "../_lib/anilist";
 
 export const metadata: Metadata = {
   title: "Anime — Respawn Riot",
   description:
-    "Top tier characters, the five anime everyone is watching right now, and where to find more.",
+    "What's actually trending in anime right now, what's coming next, and the news beat. Auto-refreshed via AniList every hour.",
 };
 
-// Auto-refresh news every hour
+// Hourly revalidation. AniList recommends 5-minute minimum; we go an
+// hour because "what's hot" doesn't shift faster than that.
 export const revalidate = 3600;
 
 const ANIME_FEEDS: Feed[] = [
@@ -21,60 +32,6 @@ const ANIME_FALLBACKS: Feed[] = [
   { url: "https://news.google.com/rss/search?q=anime+news&hl=en-US&gl=US&ceid=US:en", source: "Google News (anime)" },
 ];
 
-const characters = [
-  { name: "Gojo Satoru", from: "Jujutsu Kaisen", vibe: "Infinity. Cursed swagger.", mal: "https://myanimelist.net/character/164471/Satoru_Gojou" },
-  { name: "Frieren", from: "Frieren: Beyond Journey's End", vibe: "Quiet elf, devastating spells.", mal: "https://myanimelist.net/character/180420/Frieren" },
-  { name: "Sung Jinwoo", from: "Solo Leveling", vibe: "Shadow monarch energy.", mal: "https://myanimelist.net/character/183009/Jinwoo_Sung" },
-  { name: "Power", from: "Chainsaw Man", vibe: "Chaos goblin supreme.", mal: "https://myanimelist.net/character/169825/Power" },
-  { name: "Makima", from: "Chainsaw Man", vibe: "Ultimate red-flag boss.", mal: "https://myanimelist.net/character/169827/Makima" },
-  { name: "Yor Forger", from: "Spy x Family", vibe: "Wholesome assassin mom.", mal: "https://myanimelist.net/character/175071/Yor_Forger" },
-  { name: "Levi Ackerman", from: "Attack on Titan", vibe: "Humanity's strongest gremlin.", mal: "https://myanimelist.net/character/45627/Levi_Ackerman" },
-  { name: "Denji", from: "Chainsaw Man", vibe: "Devil-powered disaster boy.", mal: "https://myanimelist.net/character/169821/Denji" },
-];
-
-const top5 = [
-  {
-    rank: 1,
-    title: "Witch Hat Atelier",
-    blurb:
-      "Top of the Spring 2026 charts. The most highly anticipated show of the season opened with a two-episode premiere and hasn't slowed down.",
-    tag: "Fantasy / Adventure",
-    mal: "https://myanimelist.net/anime/52173/Tongari_Boushi_no_Atelier",
-  },
-  {
-    rank: 2,
-    title: "Daemons of the Shadow Realm",
-    blurb:
-      "From Hiromu Arakawa (Fullmetal Alchemist). One of the season's must-watches — already winning audiences with its early episodes.",
-    tag: "Fantasy / Action",
-    mal: "https://myanimelist.net/anime/56964/Yomi_no_Tsugai",
-  },
-  {
-    rank: 3,
-    title: "Nippon Sangoku",
-    blurb:
-      "Arguably the most unique new anime airing this season. Historical with a sharp visual identity.",
-    tag: "Historical / Drama",
-    mal: "https://myanimelist.net/search/all?q=nippon%20sangoku&cat=all",
-  },
-  {
-    rank: 4,
-    title: "One Piece",
-    blurb:
-      "Still going. The Egghead arc keeps the fandom locked in twenty-five years deep.",
-    tag: "Adventure / Shonen",
-    mal: "https://myanimelist.net/anime/21/One_Piece",
-  },
-  {
-    rank: 5,
-    title: "Hell's Paradise: Jigokuraku",
-    blurb:
-      "Back from an overlong hiatus and immediately back in rotation.",
-    tag: "Action / Supernatural",
-    mal: "https://myanimelist.net/anime/46569/Jigokuraku",
-  },
-];
-
 const findCool = [
   { title: "Crunchyroll", body: "Where most current-season anime stream subbed and dubbed.", href: "https://www.crunchyroll.com" },
   { title: "Netflix Anime", body: "Solo Leveling lives here, plus a deep back catalog.", href: "https://www.netflix.com/browse/genre/7424" },
@@ -85,14 +42,23 @@ const findCool = [
 ];
 
 export default async function AnimePage() {
-  const news = await fetchManyRss(ANIME_FEEDS, {
-    perFeedMax: 6,
-    totalMax: 9,
-    fallbacks: ANIME_FALLBACKS,
-    minBeforeFallback: 4,
-  });
+  // All four data fetches in parallel — each has its own try/catch so a
+  // single failed fetch can't take down the page.
+  const [news, trending, upcoming, characters] = await Promise.all([
+    fetchManyRss(ANIME_FEEDS, {
+      perFeedMax: 6,
+      totalMax: 9,
+      fallbacks: ANIME_FALLBACKS,
+      minBeforeFallback: 4,
+    }),
+    fetchTrendingAiringAnime(5),
+    fetchUpcomingAnime(6),
+    fetchTopCharacters(8),
+  ]);
+
   return (
     <main className="bg-black text-white">
+      {/* ─── Hero ─────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden border-b border-white/10">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(217,70,239,0.25),transparent_50%)]" />
         <div className="relative mx-auto max-w-7xl px-6 py-16 sm:py-20">
@@ -103,87 +69,98 @@ export default async function AnimePage() {
             Anime <span className="text-fuchsia-500">{"//"}</span> Hype Floor
           </h1>
           <p className="mt-4 max-w-2xl text-white/70">
-            {"The characters everyone's drawing fanart of, the five shows you can't dodge on the timeline, and the best places to actually watch them."}
+            What&apos;s actually trending right now, what&apos;s coming next, and the headline beat — auto-refreshed via AniList + news feeds.
           </p>
         </div>
       </section>
 
-      <section className="px-6 py-16">
+      {/* ─── Trending Now (currently airing, sorted by AniList trending) ─── */}
+      <section className="border-t border-white/10 bg-zinc-950 px-6 py-16">
         <div className="mx-auto max-w-7xl">
-          <div className="flex items-end justify-between">
-            <h2 className="text-2xl font-black uppercase sm:text-3xl">
-              Most Popular Characters
-            </h2>
-            <span className="hidden text-xs uppercase tracking-[0.3em] text-white/40 sm:block">
-              Click for official profile
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-black uppercase sm:text-3xl">
+                Trending Now
+              </h2>
+              <p className="mt-2 text-white/60">
+                Currently airing, ranked by AniList&apos;s real-time activity signal.
+              </p>
+            </div>
+            <span className="hidden font-display text-[10px] tracking-[0.3em] text-white/40 sm:block">
+              LIVE · UPDATES HOURLY
             </span>
           </div>
 
-          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {characters.map((c) => (
-              <Link
-                key={c.name}
-                href={c.mal}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group rounded-2xl border border-white/10 bg-gradient-to-br from-fuchsia-500/10 to-transparent p-5 transition hover:border-fuchsia-400/60"
-              >
-                <p className="text-xs uppercase tracking-[0.25em] text-fuchsia-300">
-                  {c.from}
-                </p>
-                <h3 className="mt-2 text-xl font-black uppercase">{c.name}</h3>
-                <p className="mt-3 text-sm text-white/70">{c.vibe}</p>
-                <p className="mt-4 text-xs uppercase tracking-widest text-fuchsia-300/80 group-hover:text-fuchsia-300">
-                  Profile on MAL ↗
-                </p>
-              </Link>
-            ))}
-          </div>
+          {trending.length === 0 ? (
+            <EmptyAniListState area="trending" />
+          ) : (
+            <ol className="mt-8 space-y-4">
+              {trending.map((a, i) => (
+                <li key={a.id}>
+                  <TrendingRow rank={i + 1} media={a} />
+                </li>
+              ))}
+            </ol>
+          )}
         </div>
       </section>
 
+      {/* ─── Coming Soon ─────────────────────────────────────────── */}
+      <section className="px-6 py-16">
+        <div className="mx-auto max-w-7xl">
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-black uppercase sm:text-3xl">
+                Coming Soon
+              </h2>
+              <p className="mt-2 text-white/60">
+                Highly anticipated anime that haven&apos;t aired yet.
+              </p>
+            </div>
+            <span className="hidden font-display text-[10px] tracking-[0.3em] text-white/40 sm:block">
+              SORTED BY HYPE
+            </span>
+          </div>
+
+          {upcoming.length === 0 ? (
+            <EmptyAniListState area="upcoming" />
+          ) : (
+            <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {upcoming.map((a) => (
+                <li key={a.id}>
+                  <UpcomingCard media={a} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </section>
+
+      {/* ─── Most-favorited characters ─────────────────────────── */}
       <section className="border-t border-white/10 bg-zinc-950 px-6 py-16">
         <div className="mx-auto max-w-7xl">
-          <h2 className="text-2xl font-black uppercase sm:text-3xl">
-            Top 5 Anime Right Now
-          </h2>
-          <p className="mt-2 text-white/60">
-            {"What's actually charting this Spring 2026 season."}
-          </p>
+          <div className="flex items-end justify-between">
+            <h2 className="text-2xl font-black uppercase sm:text-3xl">
+              Most-Favorited Characters
+            </h2>
+            <span className="hidden text-xs uppercase tracking-[0.3em] text-white/40 sm:block">
+              All-time on AniList
+            </span>
+          </div>
 
-          <ol className="mt-8 space-y-4">
-            {top5.map((a) => (
-              <li key={a.rank}>
-                <Link
-                  href={a.mal}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex gap-5 rounded-2xl border border-white/10 bg-white/[0.03] p-5 transition hover:border-fuchsia-400/40 hover:bg-white/[0.05]"
-                >
-                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-fuchsia-500/15 text-2xl font-black text-fuchsia-300">
-                    {a.rank}
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.25em] text-white/50">
-                      {a.tag}
-                    </p>
-                    <h3 className="mt-1 text-xl font-black uppercase">
-                      {a.title}
-                    </h3>
-                    <p className="mt-2 text-sm leading-6 text-white/70">
-                      {a.blurb}
-                    </p>
-                    <p className="mt-3 text-xs uppercase tracking-widest text-fuchsia-300/80">
-                      View on MAL ↗
-                    </p>
-                  </div>
-                </Link>
-              </li>
-            ))}
-          </ol>
+          {characters.length === 0 ? (
+            <EmptyAniListState area="characters" />
+          ) : (
+            <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {characters.map((c) => (
+                <CharacterCard key={c.id} character={c} />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
+      {/* ─── News / RSS — unchanged ─────────────────────────────── */}
       <section className="px-6 py-16">
         <div className="mx-auto max-w-7xl">
           <div className="flex items-end justify-between gap-4">
@@ -235,6 +212,7 @@ export default async function AnimePage() {
         </div>
       </section>
 
+      {/* ─── Find Cool Stuff — unchanged ────────────────────────── */}
       <section className="border-t border-white/10 bg-zinc-950 px-6 py-16">
         <div className="mx-auto max-w-7xl">
           <h2 className="text-2xl font-black uppercase sm:text-3xl">
@@ -266,5 +244,165 @@ export default async function AnimePage() {
         </div>
       </section>
     </main>
+  );
+}
+
+// ─── Sub-components ──────────────────────────────────────────────────
+
+function TrendingRow({ rank, media }: { rank: number; media: AnilistMedia }) {
+  const title = displayTitle(media.title);
+  const blurb = shortDescription(media.description, 220);
+  const score = media.averageScore ?? media.meanScore;
+  return (
+    <Link
+      href={media.siteUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex gap-5 rounded-2xl border border-white/10 bg-white/[0.03] p-5 transition hover:border-fuchsia-400/40 hover:bg-white/[0.05]"
+    >
+      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-fuchsia-500/15 text-2xl font-black text-fuchsia-300">
+        {rank}
+      </div>
+      {/* Cover thumbnail — plain <img> to avoid Next/Image remote-patterns
+          setup for AniList's CDN. */}
+      {media.coverImage.large && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={media.coverImage.large}
+          alt={title}
+          loading="lazy"
+          decoding="async"
+          className="hidden h-24 w-16 shrink-0 rounded-md object-cover sm:block"
+        />
+      )}
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <p className="text-xs uppercase tracking-[0.25em] text-white/50">
+            {media.genres.slice(0, 3).join(" / ") || "Anime"}
+          </p>
+          {score != null && (
+            <span className="rounded bg-fuchsia-500/15 px-2 py-0.5 font-mono text-[10px] tracking-widest text-fuchsia-200">
+              ★ {score / 10}
+            </span>
+          )}
+          {media.episodes != null && (
+            <span className="font-mono text-[10px] text-white/45">
+              {media.episodes} eps
+            </span>
+          )}
+        </div>
+        <h3 className="mt-1 text-xl font-black uppercase">{title}</h3>
+        {blurb && (
+          <p className="mt-2 line-clamp-3 text-sm leading-6 text-white/70">{blurb}</p>
+        )}
+        <p className="mt-3 text-xs uppercase tracking-widest text-fuchsia-300/80">
+          View on AniList ↗
+        </p>
+      </div>
+    </Link>
+  );
+}
+
+function UpcomingCard({ media }: { media: AnilistMedia }) {
+  const title = displayTitle(media.title);
+  const blurb = shortDescription(media.description, 160);
+  const season = formatSeason(media.season, media.seasonYear);
+  return (
+    <Link
+      href={media.siteUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="group block overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-fuchsia-500/10 to-transparent transition hover:border-fuchsia-400/60"
+    >
+      {/* Banner or cover used as the top image. Fall back to a tiny
+          gradient header when no banner exists. */}
+      <div className="relative aspect-video w-full overflow-hidden bg-black">
+        {media.bannerImage || media.coverImage.extraLarge ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={media.bannerImage ?? media.coverImage.extraLarge ?? ""}
+            alt={title}
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover opacity-90 transition group-hover:scale-105 group-hover:opacity-100"
+          />
+        ) : (
+          <div className="h-full w-full bg-gradient-to-br from-fuchsia-500/30 via-pink-500/15 to-black" />
+        )}
+        {season && (
+          <span className="absolute right-2 top-2 rounded border border-fuchsia-400/50 bg-black/70 px-2 py-0.5 font-display text-[9px] tracking-[0.3em] text-fuchsia-300">
+            {season}
+          </span>
+        )}
+      </div>
+      <div className="p-4">
+        <p className="text-xs uppercase tracking-[0.25em] text-fuchsia-300">
+          {media.genres.slice(0, 2).join(" / ") || "Anime"}
+        </p>
+        <h3 className="mt-1 text-base font-black uppercase leading-snug">{title}</h3>
+        {blurb && (
+          <p className="mt-2 line-clamp-3 text-sm leading-snug text-white/70">{blurb}</p>
+        )}
+      </div>
+    </Link>
+  );
+}
+
+function CharacterCard({ character }: { character: AnilistCharacter }) {
+  const fromTitle = character.media.nodes[0]?.title
+    ? displayTitle(character.media.nodes[0].title)
+    : "";
+  return (
+    <Link
+      href={character.siteUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="group flex gap-4 rounded-2xl border border-white/10 bg-gradient-to-br from-fuchsia-500/10 to-transparent p-4 transition hover:border-fuchsia-400/60"
+    >
+      {character.image.large && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={character.image.large}
+          alt={character.name.full}
+          loading="lazy"
+          decoding="async"
+          className="h-24 w-20 shrink-0 rounded-lg object-cover"
+        />
+      )}
+      <div className="min-w-0 flex-1">
+        {fromTitle && (
+          <p className="truncate text-[10px] uppercase tracking-[0.25em] text-fuchsia-300">
+            {fromTitle}
+          </p>
+        )}
+        <h3 className="mt-1 text-lg font-black uppercase leading-tight">
+          {character.name.full}
+        </h3>
+        <p className="mt-2 font-mono text-[10px] text-white/45">
+          ♥ {character.favourites.toLocaleString()} faves
+        </p>
+        <p className="mt-2 text-xs uppercase tracking-widest text-fuchsia-300/80 group-hover:text-fuchsia-300">
+          Profile on AniList ↗
+        </p>
+      </div>
+    </Link>
+  );
+}
+
+function EmptyAniListState({ area }: { area: string }) {
+  return (
+    <div className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-center text-sm text-white/60">
+      Couldn&apos;t reach AniList for {area} right now. Refresh in a bit, or
+      hit{" "}
+      <Link
+        href="https://anilist.co"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-fuchsia-300 hover:underline"
+      >
+        anilist.co
+      </Link>{" "}
+      directly.
+    </div>
   );
 }
