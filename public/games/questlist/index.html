@@ -1356,24 +1356,57 @@ function App(){
 }
 
 /* -------------------------------- HUD ------------------------------------- */
+// Tiny hook: returns an incrementing key every time `value` changes. We use
+// it as a React `key` on a span so it remounts on each update — that
+// remount restarts the `animate-pop` CSS animation, giving the pill a
+// quick scale pulse whenever its underlying number changes. Without
+// this, the HUD numbers update silently and the user can't tell that
+// their last task completion did anything to streak/coins/level.
+function usePopKey(value){
+  const [key, setKey] = useState(0);
+  const prevRef = useRef(value);
+  useEffect(()=>{
+    if(prevRef.current !== value){
+      prevRef.current = value;
+      setKey(k => k + 1);
+    }
+  }, [value]);
+  return key;
+}
+
 function PlayerHUD({ player, levelInfo, stats }){
   const pct = Math.min(100, Math.round((levelInfo.inLevel/levelInfo.need)*100));
+  const streakKey = usePopKey(player.streak);
+  const coinsKey  = usePopKey(player.coins);
+  const levelKey  = usePopKey(levelInfo.level);
+  // The XP bar pulses on any XP gain — coarser than coins/streak which
+  // only change at task-completion thresholds, but XP changes feel
+  // like the most expected "I just did a thing" signal.
+  const xpKey     = usePopKey(player.xp);
   return (
     <div className="flex items-center gap-3">
       <div className="hidden sm:flex items-center gap-2 glass-lite rounded-xl px-3 py-1.5">
         <span className="text-amber-300">🔥</span>
-        <span className="text-sm"><b>{player.streak}</b><span className="text-white/50"> streak</span></span>
+        <span className="text-sm">
+          <b key={streakKey} className="inline-block animate-pop">{player.streak}</b>
+          <span className="text-white/50"> streak</span>
+        </span>
       </div>
       <div className="hidden sm:flex items-center gap-2 glass-lite rounded-xl px-3 py-1.5">
         <span className="text-yellow-300">🪙</span>
-        <span className="text-sm"><b>{player.coins}</b></span>
+        <span className="text-sm">
+          <b key={coinsKey} className="inline-block animate-pop">{player.coins}</b>
+        </span>
       </div>
       <div className="flex items-center gap-3 glass-lite rounded-xl px-3 py-1.5 min-w-[170px]">
-        <div className="w-8 h-8 rounded-lg grid place-items-center bg-gradient-to-br from-violet-500 to-fuchsia-500 shadow-md shadow-fuchsia-500/30 text-[11px] font-bold">
+        <div
+          key={levelKey}
+          className="w-8 h-8 rounded-lg grid place-items-center bg-gradient-to-br from-violet-500 to-fuchsia-500 shadow-md shadow-fuchsia-500/30 text-[11px] font-bold animate-pop"
+        >
           Lv{levelInfo.level}
         </div>
         <div className="flex-1">
-          <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+          <div key={xpKey} className="h-2 rounded-full bg-white/10 overflow-hidden animate-pop">
             <div className="h-full gradient-bar animate-shimmer" style={{width:`${pct}%`}}/>
           </div>
           <div className="text-[10px] text-white/50 mt-0.5">{levelInfo.inLevel}/{levelInfo.need} XP</div>
