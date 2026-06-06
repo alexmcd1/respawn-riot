@@ -6,7 +6,7 @@ import ChannelBanner from "../_components/ChannelBanner";
 export const metadata: Metadata = {
   title: "Food — Respawn Riot",
   description:
-    "Parse a recipe, scale ingredients, find restaurants, cook from what's in your fridge, and keep a running shopping list — all in one mini-app.",
+    "Add a recipe and scale it up or down, turn it into a shopping list, cook from what's already in your fridge, or find a restaurant — all in one mini-app.",
 };
 
 export default function FoodPage() {
@@ -30,8 +30,9 @@ export default function FoodPage() {
             FOOD <span className="text-red-400">{"//"}</span> COOK OR GO OUT
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-white/75 sm:text-base">
-            Parse a recipe, scale it, find a restaurant, cook from what&apos;s
-            in the house, or build a shopping list — pick a tab.
+            Add a recipe, scale it up or down, turn it into a shopping list,
+            cook from what&apos;s already in the house, or just go find a
+            restaurant — pick a tab.
           </p>
         </div>
       </section>
