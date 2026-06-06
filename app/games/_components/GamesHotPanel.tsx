@@ -217,7 +217,16 @@ function CardGameCard({
       className="group flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] transition hover:border-cyan-400/60 hover:bg-white/[0.05]"
     >
       <div className="relative aspect-[16/9] w-full overflow-hidden">
-        <GameCoverFallback name={game.name} accent="cyan" />
+        {/* Per-TCG brand colors instead of the generic cyan accent —
+            Pokémon is red/yellow, Lorcana is purple/teal, Magic is
+            red/black, etc. Makes the row visually scannable instead
+            of six identical cyan cards. */}
+        <GameCoverFallback
+          name={game.name}
+          accent="cyan"
+          fromColor={game.accentFrom}
+          toColor={game.accentTo}
+        />
         {news && (
           <span className="absolute right-2 top-2 rounded border border-cyan-400/50 bg-black/70 px-2 py-0.5 font-display text-[9px] tracking-[0.3em] text-cyan-300">
             LIVE
@@ -293,15 +302,29 @@ function BggHotCard({ game }: { game: BggHotGame }) {
 function GameCoverFallback({
   name,
   accent,
+  fromColor,
+  toColor,
 }: {
   name: string;
   accent: "fuchsia" | "cyan" | "amber";
+  /** Optional explicit brand-color pair. When set, overrides the
+   *  name-hash-derived hues — used by card games so each TCG gets its
+   *  own visual identity (Magic = red+black, Pokémon = red+yellow,
+   *  Lorcana = purple+teal, etc). */
+  fromColor?: string;
+  toColor?: string;
 }) {
-  // Tiny deterministic hash for hue variety across cards.
+  // Tiny deterministic hash for hue variety across cards when no
+  // explicit color pair was passed.
   let h = 0;
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
   const hue1 = h % 360;
   const hue2 = (hue1 + 50) % 360;
+
+  const gradientCss =
+    fromColor && toColor
+      ? `linear-gradient(135deg, ${fromColor} 0%, ${toColor} 100%)`
+      : `linear-gradient(135deg, hsl(${hue1}, 70%, 18%) 0%, hsl(${hue2}, 60%, 8%) 100%)`;
 
   // Accent dictates the secondary stroke color (subtle).
   const stroke =
@@ -314,12 +337,7 @@ function GameCoverFallback({
   return (
     <div
       className="relative h-full w-full"
-      style={{
-        background: `
-          linear-gradient(135deg,
-            hsl(${hue1}, 70%, 18%) 0%,
-            hsl(${hue2}, 60%, 8%) 100%)`,
-      }}
+      style={{ background: gradientCss }}
     >
       {/* Diagonal scanline overlay */}
       <div className="pointer-events-none absolute inset-0 opacity-30 [background:repeating-linear-gradient(-45deg,rgba(255,255,255,0.08)_0px,rgba(255,255,255,0.08)_1px,transparent_1px,transparent_10px)]" />
