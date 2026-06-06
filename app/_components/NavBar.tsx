@@ -52,8 +52,12 @@ export default function NavBar() {
 
   return (
     <header className="sticky top-0 z-50">
-      {/* Top bar */}
-      <div className="relative border-b border-fuchsia-500/40 bg-black/85 backdrop-blur-md">
+      {/* Top bar — z-20 vs the ticker's z-10 so the UserMenu dropdown
+          (which is trapped inside the top bar's backdrop-blur stacking
+          context) paints above the ticker. Without explicit z-indices
+          on these two sibling stacking contexts, source order wins and
+          the ticker hides the top of the dropdown. */}
+      <div className="relative z-20 border-b border-fuchsia-500/40 bg-black/85 backdrop-blur-md">
         {/* faint scanlines */}
         <div className="pointer-events-none absolute inset-0 opacity-30 [background:repeating-linear-gradient(to_bottom,rgba(255,255,255,0.04)_0px,rgba(255,255,255,0.04)_1px,transparent_1px,transparent_3px)]" />
         {/* edge glow */}
@@ -178,7 +182,7 @@ export default function NavBar() {
           marquee text unreadable. The colored gradient + diagonal hatch
           layer on top for the channel-glow vibe without compromising
           legibility. */}
-      <div className="relative border-b border-white/10 bg-black/90 backdrop-blur-md">
+      <div className="relative z-10 border-b border-white/10 bg-black/90 backdrop-blur-md">
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-fuchsia-500/15 via-pink-500/10 to-cyan-500/15" />
         <div className="pointer-events-none absolute inset-0 opacity-40 [background:repeating-linear-gradient(-45deg,rgba(255,0,128,0.10)_0,rgba(255,0,128,0.10)_10px,transparent_10px,transparent_20px)]" />
         <div className="marquee relative py-1.5 font-display text-[12px] tracking-[0.35em] text-white/85">
