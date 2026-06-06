@@ -24,7 +24,11 @@ const links: NavLink[] = [
   { href: '/food',          label: 'Food',     text: 'text-red-300',       glow: 'hover:border-red-400 hover:text-red-300 shadow-red-500/40',          num: '06' },
   { href: '/cram',          label: 'Cram',     text: 'text-emerald-300',   glow: 'hover:border-emerald-400 hover:text-emerald-300 shadow-emerald-500/40', num: '07' },
   { href: '/creativity',    label: 'Create',   text: 'text-fuchsia-300',   glow: 'hover:border-fuchsia-400 hover:text-fuchsia-300 shadow-fuchsia-500/40', num: '08' },
-  { href: '/buddies',       label: 'Buddies',  text: 'text-cyan-300',      glow: 'hover:border-cyan-400 hover:text-cyan-300 shadow-cyan-500/40',       num: '09' },
+  // Buddies/chat used to live here as channel 09, but it didn't pull
+  // its weight as a top-level destination — the floating buddy list
+  // surfaces the feature on every page, and dedicated management now
+  // lives at /account. The route still exists so the floating widget's
+  // "open full view" link continues to work.
 ]
 
 const tickerItems = [
@@ -169,8 +173,13 @@ export default function NavBar() {
         )}
       </div>
 
-      {/* Ticker strip */}
-      <div className="relative border-b border-white/10 bg-gradient-to-r from-fuchsia-500/15 via-pink-500/10 to-cyan-500/15">
+      {/* Ticker strip — sits on a solid-black base with backdrop blur so
+          scrolling content underneath doesn't bleed through and make the
+          marquee text unreadable. The colored gradient + diagonal hatch
+          layer on top for the channel-glow vibe without compromising
+          legibility. */}
+      <div className="relative border-b border-white/10 bg-black/90 backdrop-blur-md">
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-fuchsia-500/15 via-pink-500/10 to-cyan-500/15" />
         <div className="pointer-events-none absolute inset-0 opacity-40 [background:repeating-linear-gradient(-45deg,rgba(255,0,128,0.10)_0,rgba(255,0,128,0.10)_10px,transparent_10px,transparent_20px)]" />
         <div className="marquee relative py-1.5 font-display text-[12px] tracking-[0.35em] text-white/85">
           <div className="marquee-track">

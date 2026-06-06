@@ -544,16 +544,23 @@ export default function DadJokeSkull() {
           style={{
             top: 'calc(42% - 90px)',
             [side === 'right' ? 'right' : 'left']: 140,
-            maxWidth: 260,
+            // Clamp width to the available space so on narrow mobile the
+            // bubble doesn't shoot past the opposite edge of the viewport
+            // (which used to put the close X off-screen). The 156px term =
+            // 140px skull + ~16px breathing room past the bubble's far edge.
+            maxWidth: 'min(260px, calc(100vw - 156px))',
             pointerEvents: 'auto',
           }}
         >
-          <div className="relative rounded-2xl border-2 border-fuchsia-400 bg-black/95 px-4 py-3 shadow-[0_0_24px_-4px_rgba(255,46,179,0.7)]">
+          <div className="relative rounded-2xl border-2 border-fuchsia-400 bg-black/95 px-4 py-3 pr-9 shadow-[0_0_24px_-4px_rgba(255,46,179,0.7)]">
+            {/* Close X sits INSIDE the bubble's top-right corner — used to
+                hang at -right-2.5 -top-2.5 for a sticker look but that put
+                it off-screen on narrow mobile widths. */}
             <button
               type="button"
               onClick={dismiss}
               aria-label="Dismiss"
-              className="absolute -right-2.5 -top-2.5 flex h-6 w-6 items-center justify-center rounded-full border-2 border-fuchsia-400 bg-black text-xs text-fuchsia-200 transition hover:bg-fuchsia-500 hover:text-black"
+              className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full border border-fuchsia-400/60 bg-black/70 text-xs text-fuchsia-200 transition hover:bg-fuchsia-500 hover:text-black"
             >
               ✕
             </button>

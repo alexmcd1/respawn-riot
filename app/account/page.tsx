@@ -115,6 +115,39 @@ export default async function AccountPage() {
           {/* Username form */}
           <UsernameForm initialUsername={me.username ?? ""} />
 
+          {/* Buddies & Chat — used to live as its own top-level nav
+              tab (channel 09), but the floating buddy list surfaces the
+              feature on every page, so its dedicated home now lives
+              here as an account-level setting. The /buddies route still
+              exists and renders the full-page management view. */}
+          <div className="rounded-2xl border border-cyan-400/30 bg-gradient-to-br from-cyan-500/[0.08] via-fuchsia-500/[0.04] to-transparent p-5">
+            <p className="font-display text-[10px] tracking-[0.3em] text-cyan-300">
+              ▌ BUDDIES &amp; CHAT
+            </p>
+            <h2 className="mt-2 font-display text-xl tracking-wide text-white">
+              AIM-style screen name + buddy list
+            </h2>
+            <p className="mt-2 text-sm text-white/70">
+              The floating buddy list in the bottom corner is the day-to-day
+              surface — sign on / off, set a status, open chats. The full-page
+              view is where you search for new buddies by screenname, manage
+              incoming requests, and see everyone&apos;s away messages at a glance.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <Link
+                href="/buddies"
+                className="rounded-md border border-cyan-400/60 bg-cyan-500/10 px-4 py-2 font-display text-xs tracking-[0.25em] text-cyan-100 hover:bg-cyan-500/20"
+              >
+                ✦ MANAGE BUDDIES →
+              </Link>
+              <p className="self-center text-[11px] text-white/45">
+                Your screenname is {me.username
+                  ? <span className="font-mono text-cyan-300">{me.username}</span>
+                  : "not set yet — pick one above"}.
+              </p>
+            </div>
+          </div>
+
           {/* About / how-it-works */}
           <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-5 text-sm text-white/65">
             <p className="font-display text-[10px] tracking-[0.3em] text-cyan-300">
