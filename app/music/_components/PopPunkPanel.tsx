@@ -360,28 +360,24 @@ function pickUnusedImage(
   return { url: MUSIC_PLACEHOLDER, trusted: true };
 }
 
-async function buildBandCard(
+/** Build a band tile from pre-fetched candidate images. Synchronous —
+ *  used to be async + did its own OG fetch, but that turned out to be
+ *  the panel's bottleneck (~21 serial fetches across all sections,
+ *  each 1-3s). OG images don't add much for tile cards anyway since
+ *  the Spotify photo is a perfectly good "what does this band look
+ *  like" signal. The hero strip still gets full OG fetches for the
+ *  top 3 stories, where article-specific imagery matters. */
+function buildBandCard(
   cfg: BandConfig,
   item: NewsItem | null,
+  spotifyImg: string | null,
   usedImages: Set<string>
-): Promise<BandCardData> {
-  // Promote to live ONLY if pubDate is within FRESH_MAX_AGE_DAYS.
-  // (We no longer skip the article when it's already featured in the
-  // hero — repeating a band across sections is fine, the image-dedup
-  // via pickUnusedImage makes sure the visual doesn't repeat.)
+): BandCardData {
   const liveItem = item && isFreshEnough(item.pubDate) ? item : null;
-
-  // Gather all image candidates in parallel.
-  const [ogImg, spotifyImg] = await Promise.all([
-    liveItem ? fetchOgImage(liveItem.link) : Promise.resolve(null),
-    fetchArtistImage(cfg.name),
-  ]);
-  // Image-dedup: pick the first not-already-used option from the chain.
-  // og:image is the freshest signal (current article), then Spotify
-  // (auto-current artist photo), then the hardcoded Wikipedia fallback.
-  // If they're ALL claimed by earlier cards, pickUnusedImage falls
-  // through to the local /music/placeholder.svg.
-  const choice = pickUnusedImage([ogImg, spotifyImg, cfg.fallbackImg], usedImages);
+  // Image chain: Spotify → hardcoded Wikipedia fallback → placeholder.
+  // pickUnusedImage falls through to /music/placeholder.svg if every
+  // candidate is already claimed by an earlier card.
+  const choice = pickUnusedImage([spotifyImg, cfg.fallbackImg], usedImages);
 
   if (liveItem) {
     return {
@@ -408,17 +404,15 @@ async function buildBandCard(
   };
 }
 
-/** Festivals: like bands, but Spotify lookups don't help (festivals
- *  aren't artists) so the candidate chain is shorter: og:image →
- *  hardcoded fallback (usually the shared placeholder). */
-async function buildFestivalCard(
+/** Festivals: synchronous version. Same reasoning as buildBandCard —
+ *  OG fetches got dropped to fix the serial-await bottleneck. */
+function buildFestivalCard(
   cfg: FestivalConfig,
   item: NewsItem | null,
   usedImages: Set<string>
-): Promise<BandCardData> {
+): BandCardData {
   const liveItem = item && isFreshEnough(item.pubDate) ? item : null;
-  const ogImg = liveItem ? await fetchOgImage(liveItem.link) : null;
-  const choice = pickUnusedImage([ogImg, cfg.fallbackImg], usedImages);
+  const choice = pickUnusedImage([cfg.fallbackImg], usedImages);
 
   if (liveItem) {
     return {
@@ -751,25 +745,38 @@ export default async function PopPunkPanel() {
     };
   });
 
-  // ─── Tile cards: built sequentially so image picks don't race ─────────
+  // ─── Tile cards: pre-fetch Spotify in one parallel batch ─────────────
   //
-  // Each builder mutates `usedImages` as it picks. Doing this in a
-  // for-loop (not Promise.all) keeps the picks deterministic and
-  // ordered top-to-bottom on the page. The fetches INSIDE each builder
-  // still run in parallel — and the relevant data is cached — so the
-  // wall-clock impact is minimal.
-  const tourCards: BandCardData[] = [];
-  for (let i = 0; i < TOUR_BANDS.length; i++) {
-    tourCards.push(await buildBandCard(TOUR_BANDS[i], tourResults[i], usedImages));
-  }
-  const albumCards: BandCardData[] = [];
-  for (let i = 0; i < ALBUM_BANDS.length; i++) {
-    albumCards.push(await buildBandCard(ALBUM_BANDS[i], albumResults[i], usedImages));
-  }
-  const festivalCards: BandCardData[] = [];
-  for (let i = 0; i < FESTIVALS.length; i++) {
-    festivalCards.push(await buildFestivalCard(FESTIVALS[i], festivalResults[i], usedImages));
-  }
+  // The previous version awaited buildBandCard sequentially for each
+  // tour/album/festival band, and each call internally did an OG image
+  // fetch (1-3s of external HTML scraping) plus a Spotify fetch. That
+  // serialized ~21 network round-trips on the critical path — the main
+  // cause of the 15-20s cold render the user reported.
+  //
+  // Fix: gather ALL Spotify images for tour + album bands in ONE
+  // parallel batch (one Promise.all, ~1s wall clock for all of them
+  // since they're cached after the first hit). buildBandCard is now
+  // synchronous and just reads from those pre-fetched candidates,
+  // picking the first not-yet-used image. The image-dedup ordering
+  // is preserved by iterating top-to-bottom over the .map() call.
+  //
+  // OG fetches got dropped from the tile builders entirely — the
+  // hero strip still does them for its top 3 stories (where article-
+  // specific imagery actually matters).
+  const [tourSpotify, albumSpotify] = await Promise.all([
+    Promise.all(TOUR_BANDS.map((b) => fetchArtistImage(b.name))),
+    Promise.all(ALBUM_BANDS.map((b) => fetchArtistImage(b.name))),
+  ]);
+
+  const tourCards: BandCardData[] = TOUR_BANDS.map((cfg, i) =>
+    buildBandCard(cfg, tourResults[i], tourSpotify[i], usedImages)
+  );
+  const albumCards: BandCardData[] = ALBUM_BANDS.map((cfg, i) =>
+    buildBandCard(cfg, albumResults[i], albumSpotify[i], usedImages)
+  );
+  const festivalCards: BandCardData[] = FESTIVALS.map((cfg, i) =>
+    buildFestivalCard(cfg, festivalResults[i], usedImages)
+  );
 
   // Same dedup for the New Wave artists (rendered inline below — we
   // build the choices here so the dedup state stays in one place).

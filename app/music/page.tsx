@@ -10,16 +10,23 @@ export const metadata: Metadata = {
     "Pop punk tour news, comeback albums, and live tour dates for the bands you actually listen to.",
 };
 
-// Render dynamically at request time. The underlying data fetches
-// (RSS feeds, Google News per-band, Spotify, OG-image scrapes) are
-// each individually cached via Next's fetch revalidate (1h to 1w
-// depending on source), so the page is still fast — it just doesn't
-// bake HTML at build time the way static generation does. The
-// difference shows up when env vars (e.g. SPOTIFY_*) change after a
-// build: under static caching the page kept serving the build-time
-// snapshot for up to an hour; force-dynamic picks up the new state
-// on the very next request.
-export const dynamic = "force-dynamic";
+// ISR — page is rendered once per hour, served as static HTML in
+// between. The first visitor after each hourly window triggers a
+// background regeneration but is NOT blocked by it — they get the
+// cached HTML instantly and the fresh version goes to the NEXT
+// visitor. Combined with the per-fetch caches inside PopPunkPanel
+// (1w for Spotify, 1h for RSS, etc.), this means subsequent loads
+// are sub-second.
+//
+// Previously this was force-dynamic (renders fresh on every request),
+// which meant every visitor paid the full latency of ~21 sequential
+// per-band OG scrapes — 15-20s cold render. ISR + Suspense streaming
+// (see below) makes that a non-issue.
+//
+// If you ever need to force an immediate refresh (e.g. just added a
+// new band), bump this value or trigger a redeploy. New Vercel deploys
+// always start fresh, so deploys also invalidate this cache.
+export const revalidate = 3600;
 
 export default function MusicPage() {
   return (
@@ -40,10 +47,19 @@ export default function MusicPage() {
         </div>
       </section>
 
-      {/* Suspense is required because MusicApp uses useSearchParams. */}
+      {/* Outer Suspense covers MusicApp's useSearchParams. */}
       <Suspense fallback={<TabsFallback />}>
         <MusicApp
-          popPunk={<PopPunkPanel />}
+          // Inner Suspense around PopPunkPanel specifically — it's the
+          // heavy panel (RSS + ~25 per-band Google News fetches + ~21
+          // Spotify lookups). Wrapping it here means the tab nav and
+          // page shell render INSTANTLY on cold loads; the panel
+          // streams in with PopPunkLoading as its skeleton.
+          popPunk={
+            <Suspense fallback={<PopPunkLoading />}>
+              <PopPunkPanel />
+            </Suspense>
+          }
           concerts={
             <section className="px-4 py-8 sm:px-6 sm:py-12">
               <div className="mx-auto max-w-3xl">
@@ -72,4 +88,41 @@ export default function MusicPage() {
 
 function TabsFallback() {
   return <div className="h-16 border-b border-white/10 bg-black/85" aria-hidden />;
+}
+
+/** Skeleton shown while PopPunkPanel resolves on cold loads. Mimics
+ *  the section heights so the page doesn't jump when the real panel
+ *  streams in. The pulse animation makes the wait feel intentional. */
+function PopPunkLoading() {
+  return (
+    <div className="animate-pulse">
+      {/* Hero placeholder */}
+      <section className="border-b border-pink-500/20 bg-gradient-to-br from-pink-500/10 to-transparent">
+        <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-14">
+          <div className="h-4 w-40 rounded bg-white/10" />
+          <div className="mt-5 grid gap-5 lg:grid-cols-3">
+            <div className="aspect-[16/9] rounded-2xl bg-white/5 lg:col-span-2" />
+            <div className="flex flex-col gap-5">
+              <div className="h-32 rounded-2xl bg-white/5" />
+              <div className="h-32 rounded-2xl bg-white/5" />
+            </div>
+          </div>
+        </div>
+      </section>
+      {/* Tour News placeholder */}
+      <section className="px-4 py-10 sm:px-6 sm:py-14">
+        <div className="mx-auto max-w-7xl">
+          <div className="h-6 w-48 rounded bg-white/10" />
+          <div className="mt-8 grid gap-5 md:grid-cols-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="h-72 rounded-2xl bg-white/5" />
+            ))}
+          </div>
+        </div>
+      </section>
+      <p className="px-6 pb-10 text-center font-mono text-[11px] tracking-widest text-white/35">
+        ▌ TUNING IN…
+      </p>
+    </div>
+  );
 }
