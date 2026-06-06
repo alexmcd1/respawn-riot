@@ -35,6 +35,9 @@ export default function MusicPage() {
       <ChannelBanner
         src="/banners/music.png"
         alt="Music channel banner — Kid Ghost mid-jump on a basement punk stage"
+        // Aggressive top-bias because Kid Ghost is mid-jump with his
+        // head near the top edge of the source image.
+        position="50% 10%"
       />
       <section className="relative overflow-hidden border-b border-white/10">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(244,114,182,0.25),transparent_50%)]" />

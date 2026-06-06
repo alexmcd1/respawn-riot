@@ -118,6 +118,10 @@ export default function GamesPage() {
       <ChannelBanner
         src="/banners/games.png"
         alt="Games channel banner — Kid Ghost perched on a glowing arcade machine"
+        // Aggressive top-bias because Kid Ghost is perched on top of
+        // the cabinet — his head sits near the top edge of the
+        // source image.
+        position="50% 12%"
       />
       {/* ─── Hero ─────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden border-b border-fuchsia-500/30 scanlines">

@@ -8,13 +8,18 @@ import Image from "next/image";
 // every visitor hits on cold load.
 //
 // Sizing strategy:
-//   - mobile: 180px tall (banner-ish strip, doesn't dominate)
-//   - sm:    240px
-//   - md:    280px
-//   - lg+:   320px
+//   - mobile: 200px tall (slim banner strip)
+//   - sm:    260px
+//   - md:    320px
+//   - lg:    400px
+//   - xl:    460px
 // All breakpoints use object-cover so the source 16:9 (1792×1024)
-// crops cinematically — the mascot was prompted to sit in the left/
-// center area so center-cover keeps him visible at every size.
+// crops to fit. Default object-position is biased toward the top
+// ("50% 22%") because the generated mascot images all place Kid
+// Ghost's head in the upper portion of the frame, and a centered
+// crop on a wide-and-short banner chops his head off. Override with
+// the `position` prop on a per-page basis if a particular banner
+// needs different framing.
 //
 // A subtle bottom-fade gradient blends the banner into the channel
 // hero section below it.
@@ -22,9 +27,12 @@ import Image from "next/image";
 export default function ChannelBanner({
   src,
   alt,
-  /** Optional CSS object-position. Defaults to "center"; pass e.g.
-   *  "30% 50%" to nudge the crop toward the mascot when needed. */
-  position = "center",
+  /** CSS object-position. Defaults to "50% 22%" (top-biased) which
+   *  keeps the mascot's head in frame for the four generated banners.
+   *  Override per page if a specific image needs different framing —
+   *  e.g. position="50% 10%" for an image where the head is near
+   *  the top edge, or position="center" for a centered subject. */
+  position = "50% 22%",
 }: {
   src: string;
   alt: string;
@@ -42,12 +50,12 @@ export default function ChannelBanner({
         height={1024}
         priority
         sizes="100vw"
-        className="block h-[180px] w-full object-cover sm:h-[240px] md:h-[280px] lg:h-[320px]"
+        className="block h-[200px] w-full object-cover sm:h-[260px] md:h-[320px] lg:h-[400px] xl:h-[460px]"
         style={{ objectPosition: position }}
       />
       {/* Bottom fade — blends the banner into the channel hero below
           so there's no hard seam between art and page content. */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-b from-transparent via-black/40 to-black" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-b from-transparent via-black/30 to-black" />
     </section>
   );
 }
