@@ -35,15 +35,27 @@
 
   body {
     font-family: 'Geist', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-    background: var(--bg);
+    /* Transparent background so when the page is embedded inside the
+       Respawn Riot /cram page, the parent's gradient background bleeds
+       through and the iframe seam disappears. Standalone visits to
+       /games/math.html still see the same vibe because the radial
+       gradients sit on top — they just need a real backdrop to
+       layer onto. Hardcoded black covers that case. */
+    background: transparent;
     background-image:
       radial-gradient(900px 600px at 90% -10%, rgba(255, 46, 179, 0.14), transparent 60%),
-      radial-gradient(700px 600px at -10% 110%, rgba(34, 211, 238, 0.10), transparent 60%);
+      radial-gradient(700px 600px at -10% 110%, rgba(34, 211, 238, 0.10), transparent 60%),
+      linear-gradient(180deg, #050007 0%, #0a0512 100%);
     background-attachment: fixed;
     min-height: 100vh; padding: 16px;
     color: var(--text);
     transition: background 0.3s;
   }
+  /* When embedded inside the Respawn Riot /cram page (detected via the
+     ?embed=1 query param the parent passes), drop the page's own
+     backdrop so the parent's background shows through unobstructed. */
+  body.embed { background: transparent !important; }
+  body.embed { padding-top: 0; }
 
   /* Streak intensifies the fuchsia glow instead of cycling random hues. */
   body.streak-5 {
@@ -608,6 +620,12 @@
 <div class="streak-toast" id="streakToast"></div>
 
 <script>
+// When loaded inside the Respawn Riot /cram page, the parent appends
+// ?embed=1 to this URL. Flip body.embed so the dark backdrop drops out
+// and the parent page's gradient shows through — kills the iframe seam.
+if (new URLSearchParams(location.search).get('embed') === '1') {
+  document.body.classList.add('embed');
+}
 // =================== UTIL ===================
 const rand = (a,b) => Math.floor(Math.random()*(b-a+1))+a;
 const randFloat = (a,b,dp) => +(Math.random()*(b-a)+a).toFixed(dp);

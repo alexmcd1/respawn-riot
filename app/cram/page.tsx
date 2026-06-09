@@ -50,16 +50,20 @@ export default function CramPage() {
         </div>
       </section>
 
-      {/* Iframe takes the remaining viewport. Same setup as the
-          original math page — 100dvh handles iOS Safari's collapsing
-          toolbar; on mobile the math app gets the full screen below
-          the hero so there's only one scrollbar (the math app's own). */}
-      <section className="px-0 sm:px-6 sm:py-8">
-        <div className="mx-auto max-w-5xl overflow-hidden border-y border-emerald-400/30 bg-black sm:rounded-2xl sm:border sm:shadow-[0_0_40px_rgba(16,185,129,0.15)]">
+      {/* Iframe runs edge-to-edge with NO container chrome (no rounded
+          corners, no border, no shadow) and the inner body is made
+          transparent via the ?embed=1 query param — math.html's <body>
+          flips to `class="embed"` which drops its gradient backdrop, so
+          the parent's black bleeds through and the seam disappears.
+          The end result reads as a native section of the page, not an
+          iframe pasted in. */}
+      <section className="px-0">
+        <div className="mx-auto max-w-5xl">
           <iframe
-            src="/games/math.html"
+            src="/games/math.html?embed=1"
             title="Math Flashcards — Grades 5–8"
-            className="block w-full h-[calc(100dvh-104px)] sm:h-[80vh] sm:min-h-[640px]"
+            className="block w-full border-0 bg-transparent h-[calc(100dvh-104px)] sm:h-[80vh] sm:min-h-[640px]"
+            style={{ colorScheme: 'dark' }}
           />
         </div>
       </section>

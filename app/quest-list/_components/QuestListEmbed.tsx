@@ -19,12 +19,17 @@
 
 export default function QuestListEmbed() {
   return (
-    <section className="px-0 sm:px-6 sm:py-6">
-      <div className="mx-auto max-w-5xl overflow-hidden border-y border-violet-400/30 bg-black sm:rounded-2xl sm:border sm:shadow-[0_0_40px_rgba(139,92,246,0.18)]">
+    // No container chrome — the iframe runs edge-to-edge with no
+    // border, no rounded corners, no shadow. The inner body goes
+    // transparent (via ?embed=1 flipping body.embed inside
+    // public/games/questlist/index.html) so the parent's gradient
+    // bleeds through. Reads as a native section, not an iframe pasted in.
+    <section className="px-0">
+      <div className="mx-auto max-w-5xl">
         <iframe
-          src="/games/questlist/index.html"
+          src="/games/questlist/index.html?embed=1"
           title="QuestList by kid_ghost"
-          className="block w-full"
+          className="block w-full bg-transparent"
           style={{
             // 100dvh handles iOS Safari's collapsing toolbar correctly.
             // 160px reserves space for the parent page's NavBar +
@@ -33,6 +38,7 @@ export default function QuestListEmbed() {
             height: 'calc(100dvh - 160px)',
             minHeight: '600px',
             border: 0,
+            colorScheme: 'dark',
           }}
         />
       </div>

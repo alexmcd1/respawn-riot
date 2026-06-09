@@ -65,6 +65,10 @@
       color:#e5e7eb;
       font-family: Inter, system-ui, sans-serif;
     }
+    /* When embedded inside the Respawn Riot /quest-list page (parent
+       passes ?embed=1), drop the page's own gradient so the parent's
+       background shows through and the iframe seam disappears. */
+    body.embed { background: transparent !important; }
     .glass{ background:rgba(17,24,39,0.55); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); border:1px solid rgba(255,255,255,0.06);}
     .glass-lite{ background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.06);}
     /* Solid modal pane — used for full-screen dialogs where backdrop-filter
@@ -155,6 +159,14 @@
 </head>
 <body class="no-tap-highlight">
   <div id="root"></div>
+  <script>
+    // Flip body.embed when the parent /quest-list page mounts us with
+    // ?embed=1 — drops the inner gradient so the parent's bleeds through
+    // and the iframe seam disappears.
+    if (new URLSearchParams(location.search).get('embed') === '1') {
+      document.body.classList.add('embed');
+    }
+  </script>
   <script type="text/babel" data-presets="env,react">
 /* =========================================================================
    QuestList — single-file React prototype
