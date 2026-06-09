@@ -1,0 +1,44 @@
+/* Small scoped CSS for the math flashcards — just the animations and
+ * fine-grained scrollbar styling that don't translate cleanly to
+ * Tailwind utilities. Everything else uses Tailwind directly inside
+ * MathFlashcards.tsx. */
+
+@keyframes streakPop {
+  0%   { transform: translate(-50%, -50%) scale(0) rotate(-6deg); opacity: 0; }
+  20%  { transform: translate(-50%, -50%) scale(1.08) rotate(2deg); opacity: 1; }
+  35%  { transform: translate(-50%, -50%) scale(1) rotate(0); }
+  80%  { transform: translate(-50%, -50%) scale(1) rotate(0); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1.18) rotate(0); opacity: 0; }
+}
+.streakPop { animation: streakPop 1500ms cubic-bezier(0.22, 1.4, 0.36, 1) forwards; }
+
+/* Workspace textarea — kept as a CSS rule because of the multi-stop
+ * background-image (lined paper effect). Painful as a Tailwind class. */
+.scratchPaper {
+  background-color: rgba(0, 0, 0, 0.5);
+  background-image: repeating-linear-gradient(
+    rgba(255, 255, 255, 0.025),
+    rgba(255, 255, 255, 0.025) 23px,
+    rgba(255, 46, 179, 0.10) 24px
+  );
+}
+.scratchPaper:focus { outline: none; }
+
+/* Review list scrollbar — restrained, fuchsia thumb. */
+.reviewList::-webkit-scrollbar { width: 8px; }
+.reviewList::-webkit-scrollbar-thumb {
+  background: rgba(255, 46, 179, 0.2);
+  border-radius: 8px;
+}
+.reviewList::-webkit-scrollbar-thumb:hover { background: rgba(255, 46, 179, 0.35); }
+
+/* Particle dots used by the streak celebration. Animated inline via
+ * Element.animate() but the base styling is here. */
+.particle {
+  position: fixed;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 50;
+}
