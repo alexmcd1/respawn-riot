@@ -4,6 +4,7 @@ import BooksApp from "./_components/BooksApp";
 import SeriesPanel from "./_components/SeriesPanel";
 import ThrillersPanel from "./_components/ThrillersPanel";
 import BooksNewsPanel from "./_components/BooksNewsPanel";
+import ChannelBanner from "../_components/ChannelBanner";
 
 export const metadata: Metadata = {
   title: "Books — Respawn Riot",
@@ -19,6 +20,10 @@ export const revalidate = 86400;
 export default function BooksPage() {
   return (
     <main className="bg-black text-white">
+      <ChannelBanner
+        src="/banners/books.png"
+        alt="Books channel banner — Kid Ghost reading on a tablet in a golden-hour hammock"
+      />
       {/* ─── Hero ─────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden border-b border-amber-500/30 scanlines">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.22),transparent_55%)]" />

@@ -4,6 +4,7 @@ import NerdApp from "./_components/NerdApp";
 import NerdNewsPanel from "./_components/NerdNewsPanel";
 import LegoPanel from "./_components/LegoPanel";
 import ComicConPanel from "./_components/ComicConPanel";
+import ChannelBanner from "../_components/ChannelBanner";
 
 export const metadata: Metadata = {
   title: "Nerd — Respawn Riot",
@@ -16,6 +17,10 @@ export const revalidate = 86400;
 export default function NerdPage() {
   return (
     <main className="bg-black text-white">
+      <ChannelBanner
+        src="/banners/nerd.png"
+        alt="Nerd channel banner — Kid Ghost cosplaying as Spider-Punk mid-leap"
+      />
       {/* ─── Hero ─────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden border-b border-fuchsia-500/30 scanlines">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(217,70,239,0.25),transparent_55%)]" />

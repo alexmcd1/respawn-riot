@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import QuestListEmbed from "./_components/QuestListEmbed";
+import ChannelBanner from "../_components/ChannelBanner";
 
 export const metadata: Metadata = {
   title: "QuestList — kid_ghost | Respawn Riot",
@@ -11,6 +12,14 @@ export const metadata: Metadata = {
 export default function QuestListPage() {
   return (
     <main className="bg-black text-white">
+      {/* Banner hidden on mobile so the QuestList iframe keeps the full
+          viewport below the NavBar — the app needs that vertical space. */}
+      <div className="hidden sm:block">
+        <ChannelBanner
+          src="/banners/quests.png"
+          alt="Quests channel banner — Kid Ghost in a violet-lit punk tavern checking off a glowing scroll"
+        />
+      </div>
       {/* Compact hero — matches the channel/cyberpunk pattern used across
           the rest of the site, so the QuestList page reads as part of
           Respawn Riot instead of a bolted-on iframe demo. */}

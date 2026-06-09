@@ -5,6 +5,7 @@ import Link from "next/link";
 import { fetchManyRss, formatRelative, type Feed } from "../_lib/rss";
 import { fetchParkDeals } from "../_lib/parkDeals";
 import OrlandoTabs from "./_components/OrlandoTabs";
+import ChannelBanner from "../_components/ChannelBanner";
 
 const DISNEY_FEEDS: Feed[] = [
   { url: "https://wdwnt.com/feed/", source: "WDW News Today" },
@@ -481,6 +482,10 @@ export default async function OrlandoPage() {
 
   return (
     <main className="bg-black text-white">
+      <ChannelBanner
+        src="/banners/orlando.png"
+        alt="Orlando channel banner — Kid Ghost on a neon rollercoaster at sunset"
+      />
       {/* Hero */}
       <section className="relative overflow-hidden border-b border-orange-500/40 scanlines">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(251,146,60,0.30),transparent_55%)]" />

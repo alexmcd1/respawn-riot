@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import ChannelBanner from "../_components/ChannelBanner";
 
 export const metadata: Metadata = {
   title: "Cram — Respawn Riot",
@@ -17,6 +18,14 @@ export const metadata: Metadata = {
 export default function CramPage() {
   return (
     <main className="bg-black text-white">
+      {/* Banner hidden on mobile: the iframe needs every pixel of vertical
+          space below the NavBar on small screens. Desktop has room. */}
+      <div className="hidden sm:block">
+        <ChannelBanner
+          src="/banners/cram.png"
+          alt="Cram channel banner — Kid Ghost grinding flashcards in a late-night punk library"
+        />
+      </div>
       {/* Compact hero — kept small on mobile so the iframe gets the
           remaining viewport without a second scroll bar. */}
       <section className="border-b border-white/10 px-4 py-4 sm:px-6 sm:py-8">
