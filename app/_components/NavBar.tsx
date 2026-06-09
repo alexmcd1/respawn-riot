@@ -24,11 +24,11 @@ const links: NavLink[] = [
   { href: '/food',          label: 'Food',     text: 'text-red-300',       glow: 'hover:border-red-400 hover:text-red-300 shadow-red-500/40',          num: '06' },
   { href: '/cram',          label: 'Cram',     text: 'text-emerald-300',   glow: 'hover:border-emerald-400 hover:text-emerald-300 shadow-emerald-500/40', num: '07' },
   { href: '/creativity',    label: 'Create',   text: 'text-fuchsia-300',   glow: 'hover:border-fuchsia-400 hover:text-fuchsia-300 shadow-fuchsia-500/40', num: '08' },
-  // Buddies/chat used to live here as channel 09, but it didn't pull
-  // its weight as a top-level destination — the floating buddy list
-  // surfaces the feature on every page, and dedicated management now
-  // lives at /account. The route still exists so the floating widget's
-  // "open full view" link continues to work.
+  { href: '/books',         label: 'Books',    text: 'text-amber-300',     glow: 'hover:border-amber-400 hover:text-amber-300 shadow-amber-500/40',    num: '09' },
+  { href: '/nerd',          label: 'Nerd',     text: 'text-fuchsia-300',   glow: 'hover:border-fuchsia-400 hover:text-fuchsia-300 shadow-fuchsia-500/40', num: '10' },
+  // Buddies/chat used to live in nav slot 09 — now lives as an account
+  // setting (/account). The /buddies route still exists so the floating
+  // widget's "open full view" link continues to work.
 ]
 
 const tickerItems = [
@@ -39,6 +39,8 @@ const tickerItems = [
   '☼ ORLANDO LIVE WEATHER + PARK NEWS',
   '⚔ QUESTLIST BY KID_GHOST',
   '➕ CRAM · LATE-NIGHT STUDY HALL · GRADES 5–8',
+  '📖 NEW — BOOKS · SCI-FI / FANTASY + PSYCH THRILLERS',
+  '🦸 NEW — NERD HUB · MARVEL / SW / LEGO / COMIC CON / CROCHET',
   '✦ DEVLOG · WHAT SHIPPED SITE-WIDE',
   '⚡ JOIN THE RIOT',
 ]
