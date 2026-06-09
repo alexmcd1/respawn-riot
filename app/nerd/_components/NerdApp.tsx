@@ -7,12 +7,13 @@
 
 import MiniAppNav, { useTabFromUrl, type MiniAppTab } from '../../_components/MiniAppNav'
 import CrochetPanel from './CrochetPanel'
+import { IconNews, IconBrick, IconBurst, IconYarn } from '../../_components/icons'
 
 const TABS: MiniAppTab[] = [
-  { id: 'news',     label: 'News',         icon: '📰' },
-  { id: 'lego',     label: 'LEGO Drops',   icon: '🧱' },
-  { id: 'comicon',  label: 'Comic Con',    icon: '🦸' },
-  { id: 'crochet',  label: 'Crochet',      icon: '🧶' },
+  { id: 'news',     label: 'News',         icon: <IconNews /> },
+  { id: 'lego',     label: 'LEGO Drops',   icon: <IconBrick /> },
+  { id: 'comicon',  label: 'Comic Con',    icon: <IconBurst /> },
+  { id: 'crochet',  label: 'Crochet',      icon: <IconYarn /> },
 ]
 
 const TAB_IDS = TABS.map((t) => t.id)

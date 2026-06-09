@@ -6,11 +6,12 @@
 // flips between tabs (matches the /games and /food pattern).
 
 import MiniAppNav, { useTabFromUrl, type MiniAppTab } from '../../_components/MiniAppNav'
+import { IconBook, IconCrescent, IconNews } from '../../_components/icons'
 
 const TABS: MiniAppTab[] = [
-  { id: 'series',    label: 'Sci-Fi & Fantasy', icon: '✦' },
-  { id: 'thrillers', label: 'Psych Thrillers',  icon: '◐' },
-  { id: 'news',      label: 'Book News',        icon: '📰' },
+  { id: 'series',    label: 'Sci-Fi & Fantasy', icon: <IconBook /> },
+  { id: 'thrillers', label: 'Psych Thrillers',  icon: <IconCrescent /> },
+  { id: 'news',      label: 'Book News',        icon: <IconNews /> },
 ]
 
 const TAB_IDS = TABS.map((t) => t.id)

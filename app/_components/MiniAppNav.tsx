@@ -26,7 +26,10 @@ import { useEffect, useState } from 'react'
 export type MiniAppTab = {
   id: string
   label: string
-  icon?: string
+  /** Optional icon. Pass a small SVG component (see _components/icons.tsx)
+   *  for the proper line-art treatment, or a single-character string for
+   *  legacy emoji/glyph callers. ReactNode keeps both forms valid. */
+  icon?: React.ReactNode
 }
 
 export type MiniAppNavColor =
@@ -158,7 +161,13 @@ export default function MiniAppNav({
                       {num}
                     </span>
                     {t.icon && (
-                      <span className="text-base sm:text-lg" aria-hidden>
+                      // For SVG-component icons (the modern path) the
+                      // wrapper just sets sizing context; for legacy
+                      // string glyphs the text- sizing still applies.
+                      <span
+                        className="inline-flex items-center text-base [&_svg]:h-4 [&_svg]:w-4 sm:text-lg sm:[&_svg]:h-[18px] sm:[&_svg]:w-[18px]"
+                        aria-hidden
+                      >
                         {t.icon}
                       </span>
                     )}

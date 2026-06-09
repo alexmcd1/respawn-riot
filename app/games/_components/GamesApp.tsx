@@ -6,12 +6,13 @@
 // so server-fetched data stays warm when the user flips between tabs.
 
 import MiniAppNav, { useTabFromUrl, type MiniAppTab } from '../../_components/MiniAppNav'
+import { IconNews, IconFlame, IconGamepad, IconWrench } from '../../_components/icons'
 
 const TABS: MiniAppTab[] = [
-  { id: 'news',        label: 'News',        icon: '📰' },
-  { id: 'hot',         label: 'Hot Now',     icon: '🔥' },
-  { id: 'now-playing', label: 'Now Playing', icon: '🎮' },
-  { id: 'devlog',      label: 'Build Log',   icon: '✦' },
+  { id: 'news',        label: 'News',        icon: <IconNews /> },
+  { id: 'hot',         label: 'Hot Now',     icon: <IconFlame /> },
+  { id: 'now-playing', label: 'Now Playing', icon: <IconGamepad /> },
+  { id: 'devlog',      label: 'Build Log',   icon: <IconWrench /> },
 ]
 
 const TAB_IDS = TABS.map((t) => t.id)

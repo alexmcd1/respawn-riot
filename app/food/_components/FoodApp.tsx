@@ -11,13 +11,20 @@ import IngredientFinder from './IngredientFinder'
 import MyRecipes from './MyRecipes'
 import ShoppingList from './ShoppingList'
 import BackupPanel from './BackupPanel'
+import {
+  IconClipboard,
+  IconFork,
+  IconHouse,
+  IconCart,
+  IconSparkle,
+} from '../../_components/icons'
 
 const TABS: MiniAppTab[] = [
-  { id: 'recipes',   label: 'Recipes',  icon: '📋' },
-  { id: 'eat-out',   label: 'Eat Out',  icon: '🍴' },
-  { id: 'house',     label: 'In House', icon: '🏠' },
-  { id: 'shopping',  label: 'Shopping', icon: '🛒' },
-  { id: 'my',        label: 'My Stuff', icon: '★' },
+  { id: 'recipes',   label: 'Recipes',  icon: <IconClipboard /> },
+  { id: 'eat-out',   label: 'Eat Out',  icon: <IconFork /> },
+  { id: 'house',     label: 'In House', icon: <IconHouse /> },
+  { id: 'shopping',  label: 'Shopping', icon: <IconCart /> },
+  { id: 'my',        label: 'My Stuff', icon: <IconSparkle /> },
 ]
 
 const TAB_IDS = TABS.map((t) => t.id)
