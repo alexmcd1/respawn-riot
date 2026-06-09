@@ -66,8 +66,12 @@ export default async function AnimePage() {
         alt="Anime channel banner — Kid Ghost in dramatic shonen-OP anime style"
       />
       {/* ─── Hero ─────────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden border-b border-white/10">
+      <section className="relative overflow-hidden border-b border-fuchsia-500/30 scanlines">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(217,70,239,0.25),transparent_50%)]" />
+        {/* Hazard-tape band at the top of the hero — same diagonal-stripe
+            pattern the other channel heroes use. Visually reads as the
+            bottom edge of the banner above. */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-2 stripe-band" />
         <div className="relative mx-auto max-w-7xl px-6 py-16 sm:py-20">
           <p className="text-xs uppercase tracking-[0.3em] text-fuchsia-400">
             Channel 01

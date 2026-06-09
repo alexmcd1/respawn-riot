@@ -39,8 +39,10 @@ export default function MusicPage() {
         // head near the top edge of the source image.
         position="50% 10%"
       />
-      <section className="relative overflow-hidden border-b border-white/10">
+      <section className="relative overflow-hidden border-b border-pink-500/30 scanlines">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(244,114,182,0.25),transparent_50%)]" />
+        {/* Hazard-tape band — reads as the bottom edge of the banner. */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-2 stripe-band" />
         <div className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-12">
           <p className="text-xs uppercase tracking-[0.3em] text-pink-400">
             Channel 02

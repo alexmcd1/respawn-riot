@@ -25,7 +25,9 @@ export default function QuestListPage() {
           iframe app still lives at /games/questlist/index.html for any
           legacy bookmarks and for the Gmail integration that didn't ship
           in this native port yet. */}
-      <section className="border-b border-white/10 px-4 py-4 sm:px-6 sm:py-8">
+      <section className="relative border-b border-violet-500/30 px-4 py-4 sm:px-6 sm:py-8">
+        {/* Hazard-tape band — reads as the bottom edge of the banner. */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-2 stripe-band" />
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="font-display text-[10px] tracking-[0.3em] text-violet-300 sm:text-xs">

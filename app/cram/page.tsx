@@ -29,7 +29,9 @@ export default function CramPage() {
           standalone math.html still lives at /games/math.html for
           anyone who has it bookmarked, but the canonical experience
           is now this native React port. */}
-      <section className="border-b border-white/10 px-4 py-4 sm:px-6 sm:py-8">
+      <section className="relative border-b border-emerald-500/30 px-4 py-4 sm:px-6 sm:py-8">
+        {/* Hazard-tape band — reads as the bottom edge of the banner. */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-2 stripe-band" />
         <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="font-display text-[10px] tracking-[0.3em] text-emerald-400 sm:text-xs">
