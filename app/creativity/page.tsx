@@ -14,6 +14,7 @@ import type { Session } from "next-auth";
 import { auth } from "../../auth";
 import PostCard from "./_components/PostCard";
 import NewPostForm from "./_components/NewPostForm";
+import ChannelBanner from "../_components/ChannelBanner";
 
 export const metadata: Metadata = {
   title: "Creativity Corner — Respawn Riot",
@@ -159,6 +160,10 @@ export default async function CreativityPage({
 
   return (
     <main className="bg-black text-white">
+      <ChannelBanner
+        src="/banners/creativity.png"
+        alt="Creativity channel banner — Kid Ghost at a DIY workbench with creative output radiating outward"
+      />
       {/* Hero */}
       <section className="relative overflow-hidden border-b border-fuchsia-500/30 scanlines">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(217,70,239,0.25),transparent_55%)]" />
