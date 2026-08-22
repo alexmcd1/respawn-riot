@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import Countdown from "./_components/Countdown";
 import PlanningChecklist from "./_components/PlanningChecklist";
 import {
@@ -42,58 +43,76 @@ export default function WeddingPage() {
 
   return (
     <main className="bg-black text-white">
-      {/* ─── Hero ─────────────────────────────────────────────────────
-          Banner slot: once you save the art to public/banners/wedding.png,
-          swap the gradient block below for:
-            <ChannelBanner src="/banners/wedding.png" alt="…" />
-          (import ChannelBanner from "../_components/ChannelBanner"). Until
-          then this stylized gradient hero stands in. */}
-      <section className="relative overflow-hidden border-b border-fuchsia-500/30 scanlines">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(217,70,239,0.28),transparent_55%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_right,rgba(34,211,238,0.18),transparent_55%)]" />
+      {/* ─── Hero — features the Kid Ghost & Marlinda wedding illustration.
+          The art is a tall B&W portrait (1122×1402), not a wide banner, so
+          it gets a framed "zine print" treatment beside the text rather
+          than the object-cover crop the channel ChannelBanner uses (which
+          would slice the couple in half). White art background sits on a
+          white mat + rose frame so it reads as an intentional print. */}
+      <section className="relative overflow-hidden border-b border-rose-500/30 scanlines">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(244,63,94,0.25),transparent_55%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_right,rgba(217,70,239,0.16),transparent_55%)]" />
         <div className="pointer-events-none absolute inset-x-0 top-0 h-2 stripe-band" />
 
-        <div className="relative mx-auto max-w-4xl px-6 py-16 text-center sm:py-24">
-          <p className="font-mono text-[11px] uppercase tracking-[0.4em] text-fuchsia-300">
-            {d.eyebrow}
-          </p>
-          <h1 className="mt-4 font-display text-5xl uppercase leading-[0.95] tracking-[0.02em] sm:text-7xl">
-            {d.groomName}
-            <span className="mx-3 text-fuchsia-400">&amp;</span>
-            {d.brideName}
-          </h1>
-          <p className="mt-4 font-display text-lg uppercase tracking-[0.25em] text-white/70 sm:text-xl">
-            {d.tagline}
-          </p>
-
-          <div className="mx-auto mt-10 max-w-md">
-            <Countdown weddingAt={WEDDING_AT} />
+        <div className="relative mx-auto grid max-w-6xl items-center gap-8 px-6 py-12 sm:py-16 lg:grid-cols-[minmax(0,420px)_1fr] lg:gap-12">
+          {/* Illustration — framed like a punk-zine / tattoo-flash print. */}
+          <div className="mx-auto w-full max-w-sm lg:max-w-none">
+            <div className="rotate-[-1.2deg] rounded-3xl border border-rose-300/40 bg-white p-2.5 shadow-[0_0_60px_-12px_rgba(244,63,94,0.55)] transition-transform hover:rotate-0 sm:p-3">
+              <Image
+                src="/banners/wedding.png"
+                alt="Kid Ghost and Marlinda — a punk skeleton bride and groom, TIL DEATH DO US ROCK"
+                width={1122}
+                height={1402}
+                priority
+                sizes="(min-width: 1024px) 420px, 90vw"
+                className="h-auto w-full rounded-2xl"
+              />
+            </div>
           </div>
 
-          {(d.rsvpUrl || d.registryUrl) && (
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-              {d.rsvpUrl && (
-                <Link
-                  href={d.rsvpUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="rounded-md bg-gradient-to-br from-fuchsia-500 to-pink-500 px-6 py-3 font-display text-sm uppercase tracking-[0.2em] text-black transition hover:scale-[1.03]"
-                >
-                  RSVP
-                </Link>
-              )}
-              {d.registryUrl && (
-                <Link
-                  href={d.registryUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="rounded-md border border-fuchsia-400/50 px-6 py-3 font-display text-sm uppercase tracking-[0.2em] text-fuchsia-100 transition hover:bg-fuchsia-500/10"
-                >
-                  Registry
-                </Link>
-              )}
+          {/* Text block */}
+          <div className="text-center lg:text-left">
+            <p className="font-mono text-[11px] uppercase tracking-[0.4em] text-rose-300">
+              {d.eyebrow}
+            </p>
+            <h1 className="mt-4 font-display text-5xl uppercase leading-[0.95] tracking-[0.02em] sm:text-6xl xl:text-7xl">
+              {d.groomName}
+              <span className="mx-3 text-rose-400">&amp;</span>
+              {d.brideName}
+            </h1>
+            <p className="mt-4 font-display text-lg uppercase tracking-[0.25em] text-white/70 sm:text-xl">
+              {d.tagline}
+            </p>
+
+            <div className="mx-auto mt-8 max-w-md lg:mx-0">
+              <Countdown weddingAt={WEDDING_AT} />
             </div>
-          )}
+
+            {(d.rsvpUrl || d.registryUrl) && (
+              <div className="mt-8 flex flex-wrap items-center justify-center gap-3 lg:justify-start">
+                {d.rsvpUrl && (
+                  <Link
+                    href={d.rsvpUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-md bg-gradient-to-br from-rose-500 to-pink-500 px-6 py-3 font-display text-sm uppercase tracking-[0.2em] text-black transition hover:scale-[1.03]"
+                  >
+                    RSVP
+                  </Link>
+                )}
+                {d.registryUrl && (
+                  <Link
+                    href={d.registryUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-md border border-rose-400/50 px-6 py-3 font-display text-sm uppercase tracking-[0.2em] text-rose-100 transition hover:bg-rose-500/10"
+                  >
+                    Registry
+                  </Link>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </section>
 
