@@ -1,0 +1,83 @@
+/* Dog parade — little dogs trot along the bottom of the /wedding page
+ * and pop speech bubbles cheering the couple on. Scoped animations here;
+ * the SVGs + state live in DogParade.tsx.
+ *
+ * Layering (each element owns exactly one transform so they don't fight):
+ *   .runner  → translateX across the screen (position)
+ *   .facer   → scaleX(-1) for dogs facing left (static)
+ *   .bobber  → translateY trot bob
+ *   leg <g>  → rotate swing (the running gait)
+ */
+
+/* ── Run across the screen ──────────────────────────────────────────── */
+.runRight {
+  animation-name: runRight;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+.runLeft {
+  animation-name: runLeft;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+@keyframes runRight {
+  from { transform: translateX(-140px); }
+  to   { transform: translateX(calc(100vw + 140px)); }
+}
+@keyframes runLeft {
+  from { transform: translateX(calc(100vw + 140px)); }
+  to   { transform: translateX(-140px); }
+}
+
+/* ── Trot bob ───────────────────────────────────────────────────────── */
+.bobber {
+  animation-name: bob;
+  animation-duration: 0.34s;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+@keyframes bob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-3px); }
+}
+
+/* ── Leg swing (the running gait) ───────────────────────────────────── */
+.legFront,
+.legBack {
+  transform-box: fill-box;
+  transform-origin: top center;
+  animation-duration: 0.30s;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+.legFront { animation-name: swingA; }
+.legBack  { animation-name: swingB; }
+@keyframes swingA {
+  0%, 100% { transform: rotate(16deg); }
+  50%      { transform: rotate(-16deg); }
+}
+@keyframes swingB {
+  0%, 100% { transform: rotate(-16deg); }
+  50%      { transform: rotate(16deg); }
+}
+
+/* ── Speech bubble pop ──────────────────────────────────────────────── */
+.bubble {
+  animation: bubblePop 260ms cubic-bezier(0.22, 1.4, 0.36, 1);
+}
+@keyframes bubblePop {
+  0%   { opacity: 0; transform: translateX(-50%) translateY(6px) scale(0.7); }
+  100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+
+/* ── Respect reduced-motion: dogs stand still, no running/bobbing ───── */
+@media (prefers-reduced-motion: reduce) {
+  .runRight,
+  .runLeft,
+  .bobber,
+  .legFront,
+  .legBack,
+  .bubble {
+    animation: none !important;
+  }
+}

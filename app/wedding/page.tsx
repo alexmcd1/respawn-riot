@@ -3,6 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import Countdown from "./_components/Countdown";
 import PlanningChecklist from "./_components/PlanningChecklist";
+import DogParade from "./_components/DogParade";
 import {
   OUR_STORY,
   PLAYLIST,
@@ -43,6 +44,10 @@ export default function WeddingPage() {
 
   return (
     <main className="bg-black text-white">
+      {/* Little dogs trot along the bottom of the screen cheering the
+          couple on — Boston terriers + a dachshund. Fixed overlay,
+          pointer-events-none, so it never blocks the page. */}
+      <DogParade />
       {/* ─── Hero — features the Kid Ghost & Marlinda wedding illustration.
           The art is a tall B&W portrait (1122×1402), not a wide banner, so
           it gets a framed "zine print" treatment beside the text rather
