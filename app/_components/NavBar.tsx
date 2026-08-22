@@ -26,6 +26,7 @@ const links: NavLink[] = [
   { href: '/creativity',    label: 'Create',   text: 'text-fuchsia-300',   glow: 'hover:border-fuchsia-400 hover:text-fuchsia-300 shadow-fuchsia-500/40', num: '08' },
   { href: '/books',         label: 'Books',    text: 'text-amber-300',     glow: 'hover:border-amber-400 hover:text-amber-300 shadow-amber-500/40',    num: '09' },
   { href: '/nerd',          label: 'Nerd',     text: 'text-fuchsia-300',   glow: 'hover:border-fuchsia-400 hover:text-fuchsia-300 shadow-fuchsia-500/40', num: '10' },
+  { href: '/wedding',       label: 'Wedding',  text: 'text-rose-300',      glow: 'hover:border-rose-400 hover:text-rose-300 shadow-rose-500/40',       num: '11' },
   // Buddies/chat used to live in nav slot 09 — now lives as an account
   // setting (/account). The /buddies route still exists so the floating
   // widget's "open full view" link continues to work.
